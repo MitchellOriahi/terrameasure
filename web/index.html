@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TerraMeasure — Software Land Surveying</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    /* ── RESET ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #09090b;
+      --surface: #18181b;
+      --surface2: #27272a;
+      --surface3: #3f3f46;
+      --border: rgba(63,63,70,.7);
+      --text: #fafafa;
+      --text2: rgba(250,250,250,.6);
+      --text3: rgba(250,250,250,.3);
+      --accent: #2563eb;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      --font-mono: "SF Mono", "Menlo", "Monaco", monospace;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-pill: 999px;
+      --blur: blur(20px) saturate(180%);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    a { text-decoration: none; color: inherit; }
+
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 clamp(20px, 4vw, 48px);
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-family: var(--font-ui);
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+    .nav-logo .sym { color: var(--accent); margin: 0 1px; }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-links a {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text2);
+      padding: 6px 16px;
+      border-radius: var(--radius-pill);
+      transition: color 0.2s, background 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-links .cta {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      padding: 8px 22px;
+    }
+    .nav-links .cta:hover { background: #0a70dd; }
+
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      text-align: center;
+      padding: 120px 24px 130px;
+    }
+
+    /* Radial blue glow — Apple silicon style */
+    .hero::before {
+      content: "";
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 900px;
+      height: 600px;
+      background: radial-gradient(ellipse at center, rgba(37,99,235,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Subtle grid overlay */
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 820px;
+      margin: 0 auto;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(37,99,235,0.1);
+      border: 1px solid rgba(37,99,235,0.25);
+      border-radius: var(--radius-pill);
+      padding: 6px 18px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--accent);
+      margin-bottom: 32px;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.6rem, 5.5vw, 4rem);
+      font-weight: 700;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      margin-bottom: 24px;
+    }
+
+    .hero .subtitle {
+      font-size: clamp(1rem, 1.6vw, 1.15rem);
+      color: var(--text2);
+      line-height: 1.7;
+      max-width: 640px;
+      margin: 0 auto 44px;
+      font-weight: 400;
+    }
+
+    .hero-ctas {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 1.05rem;
+      font-weight: 600;
+      padding: 14px 32px;
+      border-radius: var(--radius-pill);
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn-primary:hover { background: #0a70dd; transform: scale(1.02); }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      color: var(--accent);
+      font-size: 1.05rem;
+      font-weight: 600;
+      padding: 14px 32px;
+      border-radius: var(--radius-pill);
+      border: 1.5px solid rgba(37,99,235,0.5);
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .btn-secondary:hover {
+      background: rgba(37,99,235,0.08);
+      border-color: var(--accent);
+    }
+
+
+    /* ── SECTION UTILITY ── */
+    .section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 100px 24px;
+    }
+
+    .section-label {
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: clamp(2rem, 3.5vw, 2.8rem);
+      font-weight: 700;
+      letter-spacing: -0.8px;
+      margin-bottom: 16px;
+    }
+
+    .section-sub {
+      text-align: center;
+      font-size: 1.05rem;
+      color: var(--text2);
+      max-width: 600px;
+      margin: 0 auto 60px;
+    }
+
+
+    /* ── PRODUCT CARDS ── */
+    .products {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .product-card {
+      background: rgba(28,28,30,0.8);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 36px 36px;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.25s, box-shadow 0.25s;
+    }
+    .product-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+
+    .product-icon { font-size: 2.5rem; margin-bottom: 20px; }
+
+    .product-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .product-header h3 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 12px;
+      border-radius: var(--radius-pill);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-free {
+      background: rgba(34,197,94,0.15);
+      border: 1px solid rgba(34,197,94,0.35);
+      color: var(--green);
+    }
+    .badge-premium {
+      background: rgba(255,159,10,0.15);
+      border: 1px solid rgba(255,159,10,0.35);
+      color: var(--yellow);
+    }
+
+    .product-desc {
+      font-size: 0.95rem;
+      color: var(--text2);
+      line-height: 1.7;
+      margin-bottom: 24px;
+    }
+
+    .feature-checks {
+      list-style: none;
+      margin-bottom: 32px;
+      flex: 1;
+    }
+    .feature-checks li {
+      font-size: 0.9rem;
+      color: var(--text2);
+      padding: 7px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .feature-checks li::before {
+      content: "✓";
+      font-weight: 700;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+    .card-free .feature-checks li::before { color: var(--green); }
+    .card-premium .feature-checks li::before { color: var(--yellow); }
+
+    .card-cta {
+      display: block;
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 14px 28px;
+      border-radius: var(--radius-pill);
+      transition: background 0.2s, transform 0.15s;
+    }
+    .card-cta-solid {
+      background: var(--accent);
+      color: #fff;
+    }
+    .card-cta-solid:hover { background: #0a70dd; transform: scale(1.02); }
+    .card-cta-outline {
+      background: transparent;
+      color: var(--accent);
+      border: 1.5px solid rgba(37,99,235,0.5);
+    }
+    .card-cta-outline:hover {
+      background: rgba(37,99,235,0.08);
+      border-color: var(--accent);
+    }
+
+
+    /* ── HOW IT WORKS ── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+    }
+
+    .step { text-align: center; }
+
+    .step-num {
+      width: 52px;
+      height: 52px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      font-size: 1.2rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+    }
+
+    .step h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .step p {
+      font-size: 0.95rem;
+      color: var(--text2);
+      line-height: 1.65;
+      max-width: 300px;
+      margin: 0 auto;
+    }
+
+
+    /* ── METRICS STRIP ── */
+    .metrics {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .metrics-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 60px 24px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      text-align: center;
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .metric-label {
+      font-size: 0.88rem;
+      color: var(--text2);
+      font-weight: 500;
+    }
+
+
+    /* ── COMPARISON TABLE ── */
+    .table-wrap {
+      background: rgba(28,28,30,0.8);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+
+    .compare-table th {
+      padding: 16px 24px;
+      text-align: left;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .compare-table td {
+      padding: 14px 24px;
+      border-bottom: 1px solid rgba(63,63,70,0.3);
+      color: var(--text2);
+    }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table tr:nth-child(even) td { background: rgba(44,44,46,0.3); }
+
+    .compare-table .check { color: var(--green); font-weight: 600; }
+    .compare-table .cross { color: var(--text3); }
+
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 24px;
+    }
+
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+
+    .footer-left {
+      font-size: 0.82rem;
+      color: var(--text3);
+      line-height: 1.7;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+    .footer-links a {
+      font-size: 0.85rem;
+      color: var(--text2);
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--text); }
+
+    .footer-disclaimer {
+      max-width: 1100px;
+      margin: 20px auto 0;
+      padding-top: 20px;
+      border-top: 1px solid rgba(63,63,70,0.3);
+      font-size: 0.78rem;
+      color: var(--text3);
+      line-height: 1.7;
+    }
+
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .products { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: 1fr; gap: 48px; }
+      .metrics-inner { grid-template-columns: repeat(2, 1fr); }
+      .compare-table th,
+      .compare-table td { padding: 12px 16px; font-size: 0.84rem; }
+      .hero { padding: 80px 20px 100px; }
+      .product-card { padding: 32px 24px 28px; }
+      .footer-inner { flex-direction: column; }
+      .nav-links a:not(.cta) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <a href="/web/index.html" class="nav-logo">Terra<span class="sym">&#9672;</span>Measure</a>
+  <div class="nav-links">
+    <a href="/web/terrascan.html">TerraScan</a>
+    <a href="/web/terraphoto.html">TerraPhoto</a>
+    <a href="/web/terrascan.html" class="cta">Launch App</a>
+  </div>
+</nav>
+
+
+<!-- ── HERO ── -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">Free Preliminary Land Survey</div>
+    <h1>Survey any land<br>in minutes.</h1>
+    <p class="subtitle">
+      Get elevation data, slope analysis, cut/fill volumes, and a site report
+      &mdash; no equipment, no waiting, no fees. TerraMeasure does in minutes
+      what takes surveyors days.
+    </p>
+    <div class="hero-ctas">
+      <a href="/web/terrascan.html" class="btn-primary">Launch TerraScan &rarr;</a>
+      <a href="#how-it-works" class="btn-secondary">See how it works</a>
+    </div>
+  </div>
+</section>
+
+
+<!-- ── PRODUCTS ── -->
+<section class="section">
+  <div class="section-label">Products</div>
+  <h2 class="section-title">Two ways to survey.</h2>
+  <p class="section-sub">
+    Choose map-click simplicity or photo-based precision. Both use the same
+    measurement engine, same results.
+  </p>
+
+  <div class="products">
+
+    <!-- TerraScan -->
+    <div class="product-card card-free">
+      <div class="product-icon">&#x1F6F0;&#xFE0F;</div>
+      <div class="product-header">
+        <h3>TerraScan</h3>
+        <span class="badge badge-free">Free</span>
+      </div>
+      <p class="product-desc">
+        Click any point on the map or draw a polygon. Get DEM elevation data,
+        slope analysis, cut/fill volumes, contour maps, and a 3D terrain view
+        &mdash; all from USGS and open elevation data.
+      </p>
+      <ul class="feature-checks">
+        <li>Instant results</li>
+        <li>Slope &amp; contour maps</li>
+        <li>3D terrain</li>
+        <li>Site suitability score</li>
+        <li>CSV/GeoJSON export</li>
+      </ul>
+      <a href="/web/terrascan.html" class="card-cta card-cta-solid">Open TerraScan</a>
+    </div>
+
+    <!-- TerraPhoto -->
+    <div class="product-card card-premium">
+      <div class="product-icon">&#x1F4F7;</div>
+      <div class="product-header">
+        <h3>TerraPhoto</h3>
+        <span class="badge badge-premium">Premium</span>
+      </div>
+      <p class="product-desc">
+        Upload photos taken with a smartphone. GPS metadata is extracted
+        automatically to locate the site. Get the same full analysis as
+        TerraScan &mdash; no map interaction needed.
+      </p>
+      <ul class="feature-checks">
+        <li>GPS auto-detection</li>
+        <li>Same full analysis</li>
+        <li>Works for remote sites</li>
+        <li>No map knowledge needed</li>
+      </ul>
+      <a href="/web/terraphoto.html" class="card-cta card-cta-outline">Open TerraPhoto</a>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ── HOW IT WORKS ── -->
+<section class="section" id="how-it-works">
+  <div class="section-label">How it works</div>
+  <h2 class="section-title">Three steps. No equipment.</h2>
+  <p class="section-sub">
+    From picking a location to a downloadable report in under a minute.
+  </p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>Pick a location</h3>
+      <p>Click any point on a world map, or draw a polygon around your site.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>Fetch terrain data</h3>
+      <p>We pull real USGS LiDAR and elevation data for your exact location.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>Get your report</h3>
+      <p>Instant slope analysis, cut/fill volumes, a site score, and downloadable maps.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ── METRICS ── -->
+<section class="metrics">
+  <div class="metrics-inner">
+    <div>
+      <div class="metric-value">&lt; 30 sec</div>
+      <div class="metric-label">Average survey time</div>
+    </div>
+    <div>
+      <div class="metric-value">1m&ndash;30m</div>
+      <div class="metric-label">Resolution options</div>
+    </div>
+    <div>
+      <div class="metric-value">&plusmn;5m</div>
+      <div class="metric-label">Vertical accuracy</div>
+    </div>
+    <div>
+      <div class="metric-value">100%</div>
+      <div class="metric-label">Free for basic surveys</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ── COMPARISON TABLE ── -->
+<section class="section">
+  <div class="section-label">Compare</div>
+  <h2 class="section-title">Feature comparison.</h2>
+  <p class="section-sub">
+    Both tiers use the same measurement engine. Pick the one that fits your workflow.
+  </p>
+
+  <div class="table-wrap">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>TerraScan (Free)</th>
+          <th>TerraPhoto (Premium)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Map-click surveying</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+        <tr><td>Polygon surveying</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+        <tr><td>USGS LiDAR data</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+        <tr><td>Satellite imagery overlay</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+        <tr><td>Photo-based survey</td><td class="cross">&#10007;</td><td class="check">&#10003;</td></tr>
+        <tr><td>3D terrain view</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+        <tr><td>CSV/GeoJSON export</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+        <tr><td>Named survey saves</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+        <tr><td>Site suitability report</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+
+<!-- ── FOOTER ── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-left">
+      &copy; 2025 TerraMeasure &middot; Preliminary surveys only &middot; Not a licensed survey
+    </div>
+    <div class="footer-links">
+      <a href="/web/terrascan.html">TerraScan</a>
+      <a href="/web/terraphoto.html">TerraPhoto</a>
+      <a href="/web/index.html">Home</a>
+    </div>
+  </div>
+  <div class="footer-disclaimer">
+    All TerraMeasure outputs are preliminary and uncertified. A licensed Professional
+    Land Surveyor (PLS) must prepare and seal any legally binding survey.
+  </div>
+</footer>
+
+</body>
+</html>

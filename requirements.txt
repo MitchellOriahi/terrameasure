@@ -1,0 +1,17 @@
+# Core dependencies for TerraMeasure
+# Install with:  pip install -r requirements.txt
+
+numpy        # fast math on the DEM grid
+shapely      # geometry: areas, distances, perimeters
+requests     # fetching public elevation data over the web
+rasterio     # reading GeoTIFF elevation files from USGS 3DEP
+matplotlib   # drawing contour maps and slope visualizations
+
+# --- Web server (Phase 1 Step 4) ---
+fastapi      # the web server / API layer
+uvicorn      # runs the FastAPI server
+python-multipart  # needed by FastAPI to handle form uploads
+aiofiles          # needed by FastAPI to serve static HTML/JS/CSS files
+
+# --- Phase 2 (leave commented until needed) ---
+# geopandas  # geometry + geographic coordinates together

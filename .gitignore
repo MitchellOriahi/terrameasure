@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environment
+venv/
+env/
+.venv/
+ENV/
+
+# Environment / secrets
+.env
+.env.*
+*.key
+secrets.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code local config (personal memory, not project code)
+.claude/
+
+# Test output images generated at root level
+/contour_map.png
+/slope_map.png
+/worldmonitor_ref.png
+
+# Server log files
+server_out.txt
+server_err.txt
+
+# Personal documents
+*.docx
+
+# Byte-compiled / cached data files
+*.db
+*.sqlite3
