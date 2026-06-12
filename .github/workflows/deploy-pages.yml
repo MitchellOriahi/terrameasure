@@ -1,0 +1,48 @@
+# This file tells GitHub to automatically publish the web/ folder to
+# GitHub Pages every time you push to the master branch.
+# No manual steps needed after the first-time setup below.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [master]   # runs automatically on every push to master
+  workflow_dispatch:     # also lets you trigger it manually from the GitHub UI
+
+# Give the workflow permission to write to the Pages environment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only allow one deployment at a time
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # Step 1: Check out your repo
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Step 2: Tell GitHub Pages to use the web/ subfolder
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      # Step 3: Package up the web/ folder for Pages
+      - name: Upload web/ as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web   # only the web/ folder is published — not the Python code
+
+      # Step 4: Deploy it
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

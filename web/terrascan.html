@@ -687,7 +687,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);overflow:hidden;}
   <div class="topbar">
 
     <!-- Logo -->
-    <a href="/web/index.html" class="logo">Terra<span class="sym">◈</span>Measure<span class="sub">TerraScan v0.3</span></a>
+    <a href="index.html" class="logo">Terra<span class="sym">◈</span>Measure<span class="sub">TerraScan v0.3</span></a>
     <div class="t-sep"></div>
 
     <!-- Draw tool ribbon (like MS Paint / Word toolbar) -->
@@ -762,8 +762,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);overflow:hidden;}
     <div class="t-sep"></div>
     <span id="coord-top">Hover map</span>
     <div class="t-sep"></div>
-    <a href="/web/terraphoto.html" class="t-link">TerraPhoto</a>
-    <a href="/web/index.html" class="t-link" style="margin-left:3px;">Home</a>
+    <a href="terraphoto.html" class="t-link">TerraPhoto</a>
+    <a href="index.html" class="t-link" style="margin-left:3px;">Home</a>
 
   </div><!-- /topbar -->
 
@@ -974,7 +974,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);overflow:hidden;}
      ================================================================ -->
 <script>
 // Auto-detect API base: same origin as the page (FastAPI serves both)
-const API = window.location.origin;
+// ── BACKEND URL ──────────────────────────────────────────────────────────────
+// Replace this with your Railway deployment URL after you deploy the backend.
+// Example: "https://terrameasure-production.up.railway.app"
+// Leave it as window.location.origin only when running locally (python -m uvicorn api.server:app).
+const API = "REPLACE_WITH_RAILWAY_URL";
 const OVERPASS = "https://overpass-api.de/api/interpreter";
 
 /* ── UTILITIES ── */

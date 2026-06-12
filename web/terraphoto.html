@@ -363,7 +363,7 @@ html, body {
 
 <!-- TOP BAR -->
 <div class="topbar">
-  <a href="/web/index.html">← Home</a>
+  <a href="index.html">← Home</a>
   <span class="sep">|</span>
   <span class="title">📸 TerraPhoto</span>
   <span class="badge">Premium</span>
@@ -481,7 +481,10 @@ html, body {
 
 <!-- ========================= SCRIPTS ========================= -->
 <script>
-const API = window.location.origin;
+// ── BACKEND URL ──────────────────────────────────────────────────────────────
+// Replace this with your Railway deployment URL after you deploy the backend.
+// Example: "https://terrameasure-production.up.railway.app"
+const API = "REPLACE_WITH_RAILWAY_URL";
 let uploadedFiles = [];         // File objects from the input
 let extractedLocation = null;   // {lat, lon, width_m, height_m, gps_points, note}
 let surveyData = null;          // full API response
