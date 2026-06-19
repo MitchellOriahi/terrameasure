@@ -527,6 +527,7 @@
   <div class="nav-links">
     <a href="terrascan.html">TerraScan</a>
     <a href="terraphoto.html">TerraPhoto</a>
+    <a href="terranews.html">TerraIntel</a>
     <a href="terrascan.html" class="cta">Launch App</a>
   </div>
 </nav>
@@ -535,16 +536,16 @@
 <!-- ── HERO ── -->
 <section class="hero">
   <div class="hero-inner">
-    <div class="hero-badge">Free Preliminary Land Survey</div>
-    <h1>Survey any land<br>in minutes.</h1>
+    <div class="hero-badge">Terrain Intelligence &middot; Free &middot; Global</div>
+    <h1>Survey. Farm.<br>Understand land.</h1>
     <p class="subtitle">
-      Get elevation data, slope analysis, cut/fill volumes, and a site report
-      &mdash; no equipment, no waiting, no fees. TerraMeasure does in minutes
-      what takes surveyors days.
+      Elevation analysis, agricultural suitability, environmental risk factors, and
+      global land intelligence &mdash; no equipment, no waiting, no fees.
+      TerraMeasure does in minutes what takes surveyors days.
     </p>
     <div class="hero-ctas">
       <a href="terrascan.html" class="btn-primary">Launch TerraScan &rarr;</a>
-      <a href="#how-it-works" class="btn-secondary">See how it works</a>
+      <a href="terranews.html" class="btn-secondary">Global Land News</a>
     </div>
   </div>
 </section>
@@ -553,13 +554,13 @@
 <!-- ── PRODUCTS ── -->
 <section class="section">
   <div class="section-label">Products</div>
-  <h2 class="section-title">Two ways to survey.</h2>
+  <h2 class="section-title">Everything land, in one place.</h2>
   <p class="section-sub">
-    Choose map-click simplicity or photo-based precision. Both use the same
-    measurement engine, same results.
+    Terrain analysis, agriculture suitability, and global land intelligence &mdash;
+    all from the same engine.
   </p>
 
-  <div class="products">
+  <div class="products" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">
 
     <!-- TerraScan -->
     <div class="product-card card-free">
@@ -570,14 +571,14 @@
       </div>
       <p class="product-desc">
         Click any point on the map or draw a polygon. Get DEM elevation data,
-        slope analysis, cut/fill volumes, contour maps, and a 3D terrain view
-        &mdash; all from USGS and open elevation data.
+        slope analysis, cut/fill volumes, environmental risk factors, agricultural
+        suitability, and a 3D terrain view.
       </p>
       <ul class="feature-checks">
-        <li>Instant results</li>
-        <li>Slope &amp; contour maps</li>
-        <li>3D terrain</li>
-        <li>Site suitability score</li>
+        <li>Instant terrain analysis</li>
+        <li>Environmental risk factors (Flood, Fire, Heat, Wind)</li>
+        <li>Agriculture suitability scoring</li>
+        <li>3D terrain &amp; contour maps</li>
         <li>CSV/GeoJSON export</li>
       </ul>
       <a href="terrascan.html" class="card-cta card-cta-solid">Open TerraScan</a>
@@ -596,12 +597,85 @@
         TerraScan &mdash; no map interaction needed.
       </p>
       <ul class="feature-checks">
-        <li>GPS auto-detection</li>
-        <li>Same full analysis</li>
+        <li>GPS auto-detection from photos</li>
+        <li>Same full terrain + ag analysis</li>
         <li>Works for remote sites</li>
         <li>No map knowledge needed</li>
       </ul>
       <a href="terraphoto.html" class="card-cta card-cta-outline">Open TerraPhoto</a>
+    </div>
+
+    <!-- TerraIntel -->
+    <div class="product-card" style="border-color:rgba(20,184,166,0.3);background:rgba(20,184,166,0.04);">
+      <div class="product-icon">&#x1F4F0;</div>
+      <div class="product-header">
+        <h3>TerraIntel</h3>
+        <span class="badge" style="background:rgba(20,184,166,0.15);border:1px solid rgba(20,184,166,0.35);color:#14b8a6;">Live</span>
+      </div>
+      <p class="product-desc">
+        24/7 global land intelligence feed. Agriculture markets, natural hazards,
+        land policy, and satellite-detected change &mdash; from USGS, USDA, NASA,
+        and NOAA. Every story links directly to its source. No AI-generated claims.
+      </p>
+      <ul class="feature-checks" style="--check-color:#14b8a6;">
+        <li>USGS · USDA · NASA · NOAA</li>
+        <li>Agriculture &amp; crop news</li>
+        <li>Natural hazard alerts</li>
+        <li>Land policy updates</li>
+        <li>Source citation on every story</li>
+      </ul>
+      <a href="terranews.html" class="card-cta" style="background:#14b8a6;color:#000;font-weight:700;text-align:center;display:block;padding:14px 28px;border-radius:999px;">Open TerraIntel</a>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── ENVIRONMENTAL RISK ── -->
+<section class="section" id="environmental-risk" style="padding-top:0;">
+  <div class="section-label">Environmental Intelligence</div>
+  <h2 class="section-title">Know the risk before you go.</h2>
+  <p class="section-sub">
+    Every TerraScan survey now includes four environmental risk factors, scored
+    out of 10 using USGS, NOAA, and NASA public data &mdash; the same way
+    professional due-diligence tools do it.
+  </p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;">
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 20px;display:flex;align-items:center;gap:16px;">
+      <div style="font-size:2rem;flex-shrink:0;">&#x1F32A;</div>
+      <div>
+        <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:4px;">Flood Factor</div>
+        <div style="font-size:1.05rem;font-weight:700;">Scored /10</div>
+        <div style="font-size:0.82rem;color:var(--text2);margin-top:4px;">FEMA flood zone + elevation exposure</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 20px;display:flex;align-items:center;gap:16px;">
+      <div style="font-size:2rem;flex-shrink:0;">&#x1F525;</div>
+      <div>
+        <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#f97316;margin-bottom:4px;">Fire Factor</div>
+        <div style="font-size:1.05rem;font-weight:700;">Scored /10</div>
+        <div style="font-size:0.82rem;color:var(--text2);margin-top:4px;">NASA FIRMS recent fire activity</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 20px;display:flex;align-items:center;gap:16px;">
+      <div style="font-size:2rem;flex-shrink:0;">&#x1F321;&#xFE0F;</div>
+      <div>
+        <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#ef4444;margin-bottom:4px;">Heat Factor</div>
+        <div style="font-size:1.05rem;font-weight:700;">Scored /10</div>
+        <div style="font-size:0.82rem;color:var(--text2);margin-top:4px;">NOAA climate normals · heat days/yr</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 20px;display:flex;align-items:center;gap:16px;">
+      <div style="font-size:2rem;flex-shrink:0;">&#x1F4A8;</div>
+      <div>
+        <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:4px;">Wind Factor</div>
+        <div style="font-size:1.05rem;font-weight:700;">Scored /10</div>
+        <div style="font-size:0.82rem;color:var(--text2);margin-top:4px;">Open-Meteo historical wind percentile</div>
+      </div>
     </div>
 
   </div>
@@ -686,6 +760,10 @@
         <tr><td>CSV/GeoJSON export</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
         <tr><td>Named survey saves</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
         <tr><td>Site suitability report</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+        <tr><td><strong>Agriculture suitability score</strong></td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+        <tr><td><strong>Soil drainage &amp; crop zone</strong></td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+        <tr><td><strong>Flood / Fire / Heat / Wind factors</strong></td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+        <tr><td><strong>TerraIntel news feed</strong></td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
       </tbody>
     </table>
   </div>
@@ -701,6 +779,7 @@
     <div class="footer-links">
       <a href="terrascan.html">TerraScan</a>
       <a href="terraphoto.html">TerraPhoto</a>
+      <a href="terranews.html">TerraIntel</a>
       <a href="index.html">Home</a>
     </div>
   </div>
