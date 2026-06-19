@@ -482,9 +482,12 @@ html, body {
 <!-- ========================= SCRIPTS ========================= -->
 <script>
 // ── BACKEND URL ──────────────────────────────────────────────────────────────
-// Replace this with your Railway deployment URL after you deploy the backend.
-// Example: "https://terrameasure-production.up.railway.app"
-const API = "REPLACE_WITH_RAILWAY_URL";
+// Auto-detects local vs deployed:
+// - localhost → FastAPI server on port 8000 (same origin as HTML)
+// - anything else → Railway deployment URL (update after deploying backend)
+const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? window.location.origin
+  : "REPLACE_WITH_RAILWAY_URL";
 let uploadedFiles = [];         // File objects from the input
 let extractedLocation = null;   // {lat, lon, width_m, height_m, gps_points, note}
 let surveyData = null;          // full API response

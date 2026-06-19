@@ -833,6 +833,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);overflow:hidden;}
           <span class="ol-name">Flood Zones</span>
         </div>
 
+        <div class="ol-cat">Climate (Annual Average)</div>
+        <div class="ol-item" id="li-climate-temp" onclick="toggleClimate('temp',this)">
+          <input type="checkbox" id="chk-climate-temp" class="ol-chk"/>
+          <span class="ol-dot" style="background:linear-gradient(90deg,#3b82f6,#22c55e,#ef4444);border-radius:50%;"></span>
+          <span class="ol-name">Avg Temperature</span>
+        </div>
+        <div class="ol-item" id="li-climate-precip" onclick="toggleClimate('precip',this)">
+          <input type="checkbox" id="chk-climate-precip" class="ol-chk"/>
+          <span class="ol-dot" style="background:linear-gradient(90deg,#f5e642,#3b82f6);border-radius:50%;"></span>
+          <span class="ol-name">Avg Precipitation</span>
+        </div>
+
         <div class="ol-cat">Map Features</div>
         <div class="ol-item" id="li-buildings" onclick="toggleOSM('buildings',this)">
           <input type="checkbox" id="chk-buildings" class="ol-chk"/>
@@ -887,6 +899,20 @@ html,body{height:100%;background:var(--bg);color:var(--text);overflow:hidden;}
 
       </div><!-- /op-list -->
     </div><!-- /overlays-panel -->
+
+    <!-- Climate legend — shown when a climate overlay is active -->
+    <div id="climate-legend" style="display:none;position:absolute;bottom:90px;left:12px;z-index:800;
+         background:rgba(9,9,11,0.92);border:1px solid rgba(63,63,70,.8);border-radius:10px;
+         padding:10px 14px;min-width:180px;backdrop-filter:blur(12px);">
+      <div id="climate-legend-title" style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:rgba(250,250,250,.5);margin-bottom:8px;"></div>
+      <div id="climate-legend-bar" style="height:10px;border-radius:5px;margin-bottom:6px;"></div>
+      <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:rgba(250,250,250,.4);">
+        <span id="climate-legend-min"></span>
+        <span id="climate-legend-mid"></span>
+        <span id="climate-legend-max"></span>
+      </div>
+      <div style="font-size:0.62rem;color:rgba(250,250,250,.25);margin-top:6px;">Source: Open-Meteo · 5-yr avg</div>
+    </div>
 
   </div><!-- /map-area -->
 
@@ -980,10 +1006,15 @@ html,body{height:100%;background:var(--bg);color:var(--text);overflow:hidden;}
 <script>
 // Auto-detect API base: same origin as the page (FastAPI serves both)
 // ── BACKEND URL ──────────────────────────────────────────────────────────────
-// Replace this with your Railway deployment URL after you deploy the backend.
-// Example: "https://terrameasure-production.up.railway.app"
-// Leave it as window.location.origin only when running locally (python -m uvicorn api.server:app).
-const API = "REPLACE_WITH_RAILWAY_URL";
+// When running locally (python -m uvicorn api.server:app --port 8000), the
+// FastAPI server serves BOTH the HTML files and the API from the same port.
+// So we can just use window.location.origin (e.g. http://localhost:8000).
+//
+// When deployed to GitHub Pages, the HTML is on githubio but the API is on
+// Railway — so we use the Railway URL instead.
+const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? window.location.origin           // local: FastAPI serves everything
+  : "REPLACE_WITH_RAILWAY_URL";      // deployed: set this to your Railway URL
 const OVERPASS = "https://overpass-api.de/api/interpreter";
 
 /* ── UTILITIES ── */
@@ -1066,6 +1097,9 @@ const faultWMS = L.tileLayer.wms(
 map.on("mousemove",e=>{
   document.getElementById("coord-top").textContent=e.latlng.lat.toFixed(5)+"° "+e.latlng.lng.toFixed(5)+"°";
 });
+
+// Refresh climate overlay when the user pans or zooms to a new area
+map.on("moveend", onMapMoveEndForClimate);
 
 /* ── LIVE CLOCK ── */
 function updateClock(){
@@ -1865,6 +1899,264 @@ function switchRTab(id,btn){
 new ResizeObserver(()=>{if(profileChart) profileChart.resize();}).observe(document.getElementById('strip-left'));
 function switchATab(id,btn){switchRTab(id,btn);}
 function switchVTab(){}
+
+/* ================================================================
+   CLIMATE OVERLAY
+   ================================================================
+
+   What this does:
+   - When the user enables "Avg Temperature" or "Avg Precipitation"
+     in the overlays panel, we cover the visible map with a grid of
+     colored rectangles. Each rectangle's color shows the climate value
+     for that location (annual average over the past 5 years).
+
+   Where the data comes from:
+   - Open-Meteo archive API (https://open-meteo.com) — completely free,
+     no API key required, supports CORS so the browser can call it directly.
+   - We fetch 5 years of monthly averages, then average them to get a
+     single "annual average" number per grid cell.
+
+   How the grid works:
+   - We look at the current Leaflet map bounds (what's visible on screen).
+   - We divide that into a GRID_W × GRID_H grid.
+   - For each cell we send one request to Open-Meteo.
+   - Cells are rendered as semi-transparent colored L.rectangle objects.
+   - A legend appears bottom-left showing the color scale.
+
+   Color scales:
+   - Temperature: purple (cold) → blue → cyan → green → yellow → red (hot)
+   - Precipitation: yellow (dry) → green → blue (wet)
+   ================================================================ */
+
+const CLIMATE_GRID_W = 5;   // number of columns in the climate grid
+const CLIMATE_GRID_H = 4;   // number of rows
+
+let climateLayers = [];      // current climate rectangle layers on the map
+let activeClimateMode = null; // 'temp' | 'precip' | null
+
+async function toggleClimate(mode, item) {
+  const chk = item.querySelector('.ol-chk');
+
+  // If this overlay is already on, turn it off
+  if (activeClimateMode === mode) {
+    clearClimateOverlay();
+    item.classList.remove('active');
+    chk.checked = false;
+    return;
+  }
+
+  // Turn off any existing climate overlay first
+  clearClimateOverlay();
+  document.querySelectorAll('#li-climate-temp,#li-climate-precip').forEach(el => {
+    el.classList.remove('active');
+    el.querySelector('.ol-chk').checked = false;
+  });
+
+  // Mark this item as active
+  item.classList.add('active');
+  chk.checked = true;
+  activeClimateMode = mode;
+
+  // Show a loading toast
+  toast('Fetching climate data…', 'info');
+
+  // Get the current map viewport bounds
+  const bounds = map.getBounds();
+  const latMin = bounds.getSouth();
+  const latMax = bounds.getNorth();
+  const lonMin = bounds.getWest();
+  const lonMax = bounds.getEast();
+
+  // Build a grid of (lat, lon) center points
+  const latStep = (latMax - latMin) / CLIMATE_GRID_H;
+  const lonStep = (lonMax - lonMin) / CLIMATE_GRID_W;
+
+  const cells = [];
+  for (let row = 0; row < CLIMATE_GRID_H; row++) {
+    for (let col = 0; col < CLIMATE_GRID_W; col++) {
+      const cLat = latMin + (row + 0.5) * latStep;
+      const cLon = lonMin + (col + 0.5) * lonStep;
+      cells.push({
+        lat: cLat, lon: cLon,
+        // The rectangle bounds for this cell
+        south: latMin + row       * latStep,
+        north: latMin + (row + 1) * latStep,
+        west:  lonMin + col       * lonStep,
+        east:  lonMin + (col + 1) * lonStep,
+      });
+    }
+  }
+
+  // Fetch climate data for all cells in parallel
+  // Open-Meteo archive API: returns monthly averages for the date range we give it.
+  // We ask for Jan 2019 – Dec 2023 (5 years) and compute the overall annual mean.
+  const START = '2019-01-01';
+  const END   = '2023-12-31';
+
+  const meteoVar = mode === 'temp' ? 'temperature_2m_mean' : 'precipitation_sum';
+
+  const fetches = cells.map(cell =>
+    fetch(
+      `https://archive-api.open-meteo.com/v1/archive` +
+      `?latitude=${cell.lat.toFixed(4)}&longitude=${cell.lon.toFixed(4)}` +
+      `&start_date=${START}&end_date=${END}` +
+      `&monthly=${meteoVar}&timezone=UTC`,
+      { signal: AbortSignal.timeout(12000) }
+    )
+    .then(r => r.json())
+    .then(j => {
+      const vals = (j.monthly?.[meteoVar] || []).filter(v => v !== null);
+      if (vals.length === 0) return { ...cell, value: null };
+
+      let value;
+      if (mode === 'temp') {
+        // Annual average temperature = mean of monthly means
+        value = vals.reduce((a, b) => a + b, 0) / vals.length;
+      } else {
+        // Annual precipitation = sum of monthly totals ÷ number of years
+        const totalMm = vals.reduce((a, b) => a + b, 0);
+        value = totalMm / 5;  // 5-year average annual total
+      }
+      return { ...cell, value };
+    })
+    .catch(() => ({ ...cell, value: null }))
+  );
+
+  const results = await Promise.all(fetches);
+
+  // Find value range across all cells (for color scaling)
+  const validVals = results.map(r => r.value).filter(v => v !== null);
+  if (validVals.length === 0) {
+    toast('Climate data unavailable for this area.', 'warning');
+    clearClimateOverlay();
+    return;
+  }
+  const minVal = Math.min(...validVals);
+  const maxVal = Math.max(...validVals);
+
+  // Render one colored rectangle per cell
+  results.forEach(cell => {
+    if (cell.value === null) return;
+
+    const t = (cell.value - minVal) / (maxVal - minVal || 1); // 0..1
+    const color = mode === 'temp' ? tempColor(t) : precipColor(t);
+
+    const rect = L.rectangle(
+      [[cell.south, cell.west], [cell.north, cell.east]],
+      {
+        color:       'transparent',
+        fillColor:   color,
+        fillOpacity: 0.45,
+        weight:      0,
+      }
+    );
+
+    // Popup shows the actual value when you click a cell
+    const label = mode === 'temp'
+      ? `Avg temp: <strong>${cell.value.toFixed(1)} °C</strong>`
+      : `Avg precip: <strong>${Math.round(cell.value)} mm/yr</strong>`;
+    rect.bindPopup(`<div style="font-size:13px;font-family:monospace;color:#111">${label}<br><span style="color:#666;font-size:11px">Open-Meteo · 5-yr avg · ${cell.lat.toFixed(2)}°, ${cell.lon.toFixed(2)}°</span></div>`);
+
+    rect.addTo(map);
+    climateLayers.push(rect);
+  });
+
+  // Show the legend
+  showClimateLegend(mode, minVal, maxVal);
+  toast(`Climate overlay loaded (${results.length} cells)`, 'success');
+}
+
+// Remove all climate rectangles and hide the legend
+function clearClimateOverlay() {
+  climateLayers.forEach(l => map.removeLayer(l));
+  climateLayers = [];
+  activeClimateMode = null;
+  document.getElementById('climate-legend').style.display = 'none';
+}
+
+// Show the color scale legend bottom-left
+function showClimateLegend(mode, minVal, maxVal) {
+  const legend = document.getElementById('climate-legend');
+  const title  = document.getElementById('climate-legend-title');
+  const bar    = document.getElementById('climate-legend-bar');
+  const lMin   = document.getElementById('climate-legend-min');
+  const lMid   = document.getElementById('climate-legend-mid');
+  const lMax   = document.getElementById('climate-legend-max');
+
+  if (mode === 'temp') {
+    title.textContent = 'Avg Temperature (°C)';
+    bar.style.background = 'linear-gradient(90deg, #6b21a8, #3b82f6, #06b6d4, #22c55e, #eab308, #f97316, #ef4444)';
+    lMin.textContent = minVal.toFixed(1) + ' °C';
+    lMid.textContent = ((minVal + maxVal) / 2).toFixed(1) + ' °C';
+    lMax.textContent = maxVal.toFixed(1) + ' °C';
+  } else {
+    title.textContent = 'Avg Precipitation (mm/yr)';
+    bar.style.background = 'linear-gradient(90deg, #f5e642, #84cc16, #22c55e, #06b6d4, #3b82f6)';
+    lMin.textContent = Math.round(minVal) + ' mm';
+    lMid.textContent = Math.round((minVal + maxVal) / 2) + ' mm';
+    lMax.textContent = Math.round(maxVal) + ' mm';
+  }
+
+  legend.style.display = 'block';
+}
+
+// Temperature color scale: cold = purple/blue, hot = red
+// t is 0 (coldest in view) → 1 (hottest in view)
+function tempColor(t) {
+  // 7-stop gradient: purple → blue → cyan → green → yellow → orange → red
+  const stops = [
+    [107,  33, 168],  // purple
+    [ 59, 130, 246],  // blue
+    [  6, 182, 212],  // cyan
+    [ 34, 197,  94],  // green
+    [234, 179,   8],  // yellow
+    [249, 115,  22],  // orange
+    [239,  68,  68],  // red
+  ];
+  return interpolateColorStops(stops, t);
+}
+
+// Precipitation color scale: dry = yellow, wet = blue
+function precipColor(t) {
+  const stops = [
+    [245, 230,  66],  // yellow (dry)
+    [132, 204,  22],  // lime
+    [ 34, 197,  94],  // green
+    [  6, 182, 212],  // cyan
+    [ 59, 130, 246],  // blue (wet)
+  ];
+  return interpolateColorStops(stops, t);
+}
+
+// Interpolate through an array of [r,g,b] color stops at position t (0..1)
+function interpolateColorStops(stops, t) {
+  const n = stops.length - 1;
+  const i = Math.min(Math.floor(t * n), n - 1);
+  const f = t * n - i;
+  const [r1,g1,b1] = stops[i];
+  const [r2,g2,b2] = stops[i + 1];
+  const r = Math.round(r1 + (r2-r1)*f);
+  const g = Math.round(g1 + (g2-g1)*f);
+  const b = Math.round(b1 + (b2-b1)*f);
+  return `rgb(${r},${g},${b})`;
+}
+
+// If the user pans/zooms the map while climate is active, refresh the overlay
+// (debounced so we don't fire on every pixel of a pan)
+let _climateRefreshTimer = null;
+function onMapMoveEndForClimate() {
+  if (!activeClimateMode) return;
+  clearTimeout(_climateRefreshTimer);
+  _climateRefreshTimer = setTimeout(() => {
+    // Capture the current mode before clearing it
+    const mode = activeClimateMode;
+    const item = document.getElementById(`li-climate-${mode}`);
+    // Clear the old overlay (sets activeClimateMode = null)
+    clearClimateOverlay();
+    // Re-draw for the new viewport
+    if (item) toggleClimate(mode, item);
+  }, 800);
+}
 
 /* ================================================================
    ENVIRONMENT TAB
