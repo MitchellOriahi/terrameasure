@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TerraMeasure — Software Land Surveying</title>
+  <title>TerraMeasure — Terrain Intelligence, Free</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
@@ -11,25 +11,22 @@
     /* ── RESET ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* ── DESIGN TOKENS ── matching terrascan.html exactly */
     :root {
-      --bg: #09090b;
-      --surface: #18181b;
-      --surface2: #27272a;
-      --surface3: #3f3f46;
-      --border: rgba(63,63,70,.7);
-      --text: #fafafa;
-      --text2: rgba(250,250,250,.6);
-      --text3: rgba(250,250,250,.3);
-      --accent: #2563eb;
-      --green: #22c55e;
-      --red: #ef4444;
-      --yellow: #f59e0b;
-      --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-      --font-mono: "SF Mono", "Menlo", "Monaco", monospace;
-      --radius: 16px;
-      --radius-sm: 10px;
-      --radius-pill: 999px;
-      --blur: blur(20px) saturate(180%);
+      --bg:       #060c17;   /* very dark navy */
+      --surface:  #0d1826;   /* card backgrounds */
+      --surface2: #111f30;   /* hover surfaces */
+      --border:   rgba(0,212,255,0.12);
+      --accent:   #2563eb;   /* primary blue */
+      --accent2:  #00d4ff;   /* cyan highlight */
+      --green:    #22c55e;
+      --text:     #f1f5f9;
+      --text2:    rgba(241,245,249,.6);
+      --text3:    rgba(241,245,249,.32);
+      --font-ui:  "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono:"SF Mono", "Menlo", "Monaco", monospace;
+      --radius:   16px;
+      --pill:     999px;
     }
 
     html { scroll-behavior: smooth; }
@@ -40,137 +37,259 @@
       color: var(--text);
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
     }
 
     a { text-decoration: none; color: inherit; }
 
 
-    /* ── NAV ── */
+    /* ════════════════════════════════════════════════════════
+       NAV — sticky, glassmorphism
+    ════════════════════════════════════════════════════════ */
     nav {
       position: sticky;
       top: 0;
-      z-index: 100;
-      height: 60px;
+      z-index: 200;
+      height: 64px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 clamp(20px, 4vw, 48px);
-      background: rgba(0,0,0,0.75);
-      backdrop-filter: var(--blur);
-      -webkit-backdrop-filter: var(--blur);
+      padding: 0 clamp(20px, 4vw, 56px);
+      /* starts slightly transparent, JS adds .scrolled for more opacity */
+      background: rgba(6,12,23,0.7);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
       border-bottom: 1px solid var(--border);
+      transition: background 0.3s;
+    }
+    nav.scrolled {
+      background: rgba(6,12,23,0.92);
     }
 
     .nav-logo {
-      font-family: var(--font-ui);
-      font-size: 1.2rem;
-      font-weight: 700;
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.4px;
       color: var(--text);
-      letter-spacing: -0.3px;
+      white-space: nowrap;
     }
-    .nav-logo .sym { color: var(--accent); margin: 0 1px; }
+    /* The ◈ symbol gets the cyan accent color */
+    .nav-logo .sym { color: var(--accent2); }
 
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 4px;
     }
     .nav-links a {
       font-size: 0.9rem;
       font-weight: 500;
       color: var(--text2);
-      padding: 6px 16px;
-      border-radius: var(--radius-pill);
+      padding: 7px 16px;
+      border-radius: var(--pill);
       transition: color 0.2s, background 0.2s;
     }
-    .nav-links a:hover { color: var(--text); }
-    .nav-links .cta {
+    .nav-links a:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+
+    /* "Open App →" CTA button in nav */
+    .nav-cta {
       background: var(--accent);
-      color: #fff;
-      font-weight: 600;
-      padding: 8px 22px;
+      color: #fff !important;
+      font-weight: 600 !important;
+      padding: 9px 22px !important;
+      border-radius: var(--pill) !important;
+      transition: background 0.2s, transform 0.15s !important;
     }
-    .nav-links .cta:hover { background: #0a70dd; }
+    .nav-cta:hover { background: #1d4ed8 !important; transform: scale(1.03); }
+
+    /* Hamburger — only shown on mobile */
+    .nav-hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: 6px;
+      background: none;
+      border: none;
+    }
+    .nav-hamburger span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--text2);
+      border-radius: 2px;
+      transition: background 0.2s;
+    }
+    .nav-hamburger:hover span { background: var(--text); }
+
+    /* Mobile nav drawer */
+    .nav-drawer {
+      display: none;
+      position: fixed;
+      top: 64px;
+      left: 0;
+      right: 0;
+      background: rgba(6,12,23,0.97);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px 24px;
+      z-index: 199;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-drawer.open { display: flex; }
+    .nav-drawer a {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text2);
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      transition: color 0.2s, background 0.2s;
+    }
+    .nav-drawer a:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .nav-drawer .nav-cta {
+      background: var(--accent) !important;
+      color: #fff !important;
+      text-align: center;
+      margin-top: 8px;
+    }
 
 
-    /* ── HERO ── */
+    /* ════════════════════════════════════════════════════════
+       HERO — full viewport
+    ════════════════════════════════════════════════════════ */
     .hero {
       position: relative;
-      overflow: hidden;
+      min-height: 100svh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       text-align: center;
-      padding: 120px 24px 130px;
+      overflow: hidden;
+      padding: 80px 24px 60px;
     }
 
-    /* Radial blue glow — Apple silicon style */
-    .hero::before {
-      content: "";
+    /* Glowing orb — top left, blue */
+    .hero-orb-1 {
       position: absolute;
-      top: 30%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 900px;
-      height: 600px;
-      background: radial-gradient(ellipse at center, rgba(37,99,235,0.12) 0%, transparent 70%);
+      top: -10%;
+      left: -15%;
+      width: 70vw;
+      height: 70vw;
+      max-width: 800px;
+      max-height: 800px;
+      background: radial-gradient(ellipse at center, rgba(37,99,235,.12) 0%, transparent 65%);
       pointer-events: none;
     }
 
-    /* Subtle grid overlay */
-    .hero::after {
-      content: "";
+    /* Glowing orb — bottom right, cyan */
+    .hero-orb-2 {
       position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-      background-size: 60px 60px;
+      bottom: -15%;
+      right: -10%;
+      width: 60vw;
+      height: 60vw;
+      max-width: 700px;
+      max-height: 700px;
+      background: radial-gradient(ellipse at center, rgba(0,212,255,.07) 0%, transparent 65%);
       pointer-events: none;
     }
 
+    /* Animated topographic contour rings */
+    /* Each ring is a circle border that rotates slowly */
+    .contour-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(0,212,255,0.04);
+      pointer-events: none;
+      /* They shrink/grow using scale via JS on scroll, but mainly just rotate */
+    }
+    .contour-ring:nth-child(1)  { width: 200px;  height: 200px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 60s linear infinite; }
+    .contour-ring:nth-child(2)  { width: 380px;  height: 320px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 80s linear infinite reverse; }
+    .contour-ring:nth-child(3)  { width: 560px;  height: 440px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 100s linear infinite; }
+    .contour-ring:nth-child(4)  { width: 740px;  height: 560px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 120s linear infinite reverse; }
+    .contour-ring:nth-child(5)  { width: 920px;  height: 680px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 140s linear infinite; }
+    .contour-ring:nth-child(6)  { width: 1100px; height: 800px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 160s linear infinite reverse; }
+    .contour-ring:nth-child(7)  { width: 1280px; height: 920px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 180s linear infinite; }
+    .contour-ring:nth-child(8)  { width: 1460px; height: 1040px; top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 200s linear infinite reverse; }
+    .contour-ring:nth-child(9)  { width: 1640px; height: 1160px; top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 220s linear infinite; }
+    .contour-ring:nth-child(10) { width: 1820px; height: 1280px; top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 240s linear infinite reverse; }
+
+    @keyframes spin1 {
+      from { transform: translate(-50%,-50%) rotate(0deg); }
+      to   { transform: translate(-50%,-50%) rotate(360deg); }
+    }
+    @keyframes spin2 {
+      from { transform: translate(-50%,-50%) rotate(0deg); }
+      to   { transform: translate(-50%,-50%) rotate(-360deg); }
+    }
+
+    /* The actual hero content sits above all decoration */
     .hero-inner {
       position: relative;
-      z-index: 1;
-      max-width: 820px;
+      z-index: 2;
+      max-width: 860px;
       margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
+    /* Eyebrow pill badge */
     .hero-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      background: rgba(37,99,235,0.1);
-      border: 1px solid rgba(37,99,235,0.25);
-      border-radius: var(--radius-pill);
-      padding: 6px 18px;
+      gap: 8px;
+      background: rgba(0,212,255,0.06);
+      border: 1px solid rgba(0,212,255,0.25);
+      border-radius: var(--pill);
+      padding: 6px 20px;
       font-size: 0.82rem;
-      font-weight: 500;
-      color: var(--accent);
-      margin-bottom: 32px;
+      font-weight: 600;
+      color: var(--accent2);
+      letter-spacing: 0.4px;
+      margin-bottom: 36px;
     }
 
+    /* H1 — very large, two lines */
     .hero h1 {
-      font-size: clamp(2.6rem, 5.5vw, 4rem);
-      font-weight: 700;
-      letter-spacing: -1.5px;
-      line-height: 1.1;
-      margin-bottom: 24px;
+      font-size: clamp(3rem, 7vw, 5.5rem);
+      font-weight: 800;
+      letter-spacing: -2px;
+      line-height: 1.05;
+      margin-bottom: 28px;
     }
 
-    .hero .subtitle {
-      font-size: clamp(1rem, 1.6vw, 1.15rem);
+    /* First line of H1 — plain white */
+    .hero-h1-line1 { display: block; color: var(--text); }
+
+    /* Second line of H1 — cyan gradient text */
+    .hero-h1-line2 {
+      display: block;
+      background: linear-gradient(135deg, #fff 30%, #00d4ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Subtitle paragraph */
+    .hero-sub {
+      font-size: 1.1rem;
       color: var(--text2);
-      line-height: 1.7;
-      max-width: 640px;
-      margin: 0 auto 44px;
-      font-weight: 400;
+      line-height: 1.75;
+      max-width: 580px;
+      margin: 0 auto 40px;
     }
 
+    /* Two CTA buttons side by side */
     .hero-ctas {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 16px;
+      gap: 14px;
       flex-wrap: wrap;
+      margin-bottom: 20px;
     }
 
     .btn-primary {
@@ -179,186 +298,389 @@
       gap: 6px;
       background: var(--accent);
       color: #fff;
-      font-size: 1.05rem;
+      font-size: 1rem;
       font-weight: 600;
       padding: 14px 32px;
-      border-radius: var(--radius-pill);
-      transition: background 0.2s, transform 0.15s;
+      border-radius: var(--pill);
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
     }
-    .btn-primary:hover { background: #0a70dd; transform: scale(1.02); }
+    .btn-primary:hover {
+      background: #1d4ed8;
+      transform: scale(1.03);
+      box-shadow: 0 0 30px rgba(37,99,235,.35);
+    }
 
     .btn-secondary {
       display: inline-flex;
       align-items: center;
       gap: 6px;
       background: transparent;
-      color: var(--accent);
-      font-size: 1.05rem;
+      color: var(--accent2);
+      font-size: 1rem;
       font-weight: 600;
       padding: 14px 32px;
-      border-radius: var(--radius-pill);
-      border: 1.5px solid rgba(37,99,235,0.5);
+      border-radius: var(--pill);
+      border: 1.5px solid rgba(0,212,255,0.35);
       transition: background 0.2s, border-color 0.2s;
     }
     .btn-secondary:hover {
-      background: rgba(37,99,235,0.08);
-      border-color: var(--accent);
+      background: rgba(0,212,255,0.07);
+      border-color: var(--accent2);
+    }
+
+    /* Trust row — small text below CTAs */
+    .hero-trust {
+      font-size: 0.8rem;
+      color: var(--text3);
+      letter-spacing: 0.3px;
+      margin-bottom: 64px;
+    }
+    .hero-trust span { margin: 0 6px; }
+
+    /* ── App mockup "browser frame" ── */
+    /* A pure-CSS fake browser window, tilted slightly for depth */
+    .mockup-wrap {
+      width: 100%;
+      max-width: 820px;
+      perspective: 1000px;
+    }
+
+    .mockup-frame {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      overflow: hidden;
+      box-shadow:
+        0 60px 120px rgba(0,0,0,.55),
+        0 0 0 1px rgba(255,255,255,.06);
+      transform: rotateX(4deg);
+      transform-origin: top center;
+    }
+
+    /* Fake browser title bar */
+    .mockup-bar {
+      background: #0a1628;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .mockup-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .mockup-dot:nth-child(1) { background: #ff5f57; }
+    .mockup-dot:nth-child(2) { background: #febc2e; }
+    .mockup-dot:nth-child(3) { background: #28c840; }
+    .mockup-title {
+      flex: 1;
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text3);
+      font-weight: 500;
+      letter-spacing: 0.3px;
+      margin-left: -60px; /* optical centering past the dots */
+    }
+
+    /* Fake app body inside the browser frame — now just a height container;
+       the demo-canvas fills 100% of it */
+    .mockup-body {
+      height: 340px;
+      position: relative;
+    }
+
+    /* Left sidebar stub */
+    .mock-sidebar {
+      background: #0d1826;
+      border-right: 1px solid rgba(0,212,255,0.1);
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      grid-row: 1 / 3;
+    }
+    .mock-sidebar-item {
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.04);
+    }
+    .mock-sidebar-item:first-child { background: rgba(37,99,235,0.18); width: 70%; }
+    .mock-sidebar-item:nth-child(2) { width: 85%; }
+    .mock-sidebar-item:nth-child(3) { width: 60%; }
+    .mock-sidebar-item:nth-child(4) { width: 75%; }
+    .mock-sidebar-item:nth-child(5) { width: 50%; margin-top: auto; }
+
+    /* Map area — middle */
+    .mock-map {
+      background:
+        /* subtle grid lines like a map */
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px),
+        /* base color */
+        #071220;
+      background-size: 32px 32px, 32px 32px, 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Terrain color blobs inside the map */
+    .mock-map::before {
+      content: "";
+      position: absolute;
+      top: 30%;
+      left: 35%;
+      width: 200px;
+      height: 140px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(34,197,94,0.18) 0%, transparent 70%);
+    }
+    .mock-map::after {
+      content: "";
+      position: absolute;
+      top: 20%;
+      left: 50%;
+      width: 140px;
+      height: 100px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(37,99,235,0.2) 0%, transparent 70%);
+    }
+
+    /* Glowing dot on map — selected location */
+    .mock-pin {
+      position: absolute;
+      top: 45%;
+      left: 48%;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent2);
+      box-shadow: 0 0 0 4px rgba(0,212,255,0.2), 0 0 20px rgba(0,212,255,0.5);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .mock-pin::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%,-50%);
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,212,255,0.3);
+      animation: ring-pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(0,212,255,0.2), 0 0 20px rgba(0,212,255,0.5); }
+      50%       { box-shadow: 0 0 0 8px rgba(0,212,255,0.1), 0 0 30px rgba(0,212,255,0.7); }
+    }
+    @keyframes ring-pulse {
+      0%    { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+      100%  { opacity: 0; transform: translate(-50%,-50%) scale(2.5); }
+    }
+
+    /* Right panel stub */
+    .mock-panel {
+      background: #0d1826;
+      border-left: 1px solid rgba(0,212,255,0.1);
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      grid-row: 1 / 2;
+    }
+    .mock-panel-label {
+      height: 14px;
+      border-radius: 4px;
+      background: rgba(0,212,255,0.1);
+      width: 60%;
+    }
+    .mock-panel-val {
+      height: 22px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.06);
+    }
+    .mock-panel-val:nth-child(2) { background: rgba(34,197,94,0.15); }
+    .mock-panel-val:nth-child(4) { width: 80%; }
+    .mock-panel-val:nth-child(6) { width: 65%; }
+
+    /* Bottom bar stub spanning map + panel */
+    .mock-bottom {
+      grid-column: 2 / 4;
+      background: #0a1628;
+      border-top: 1px solid rgba(0,212,255,0.08);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+    }
+    .mock-bottom-chip {
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.04);
+      padding: 0 12px;
+      font-size: 0.72rem;
+      color: var(--text3);
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+    }
+    .mock-bottom-chip.active {
+      background: rgba(37,99,235,0.2);
+      color: var(--accent2);
+      border: 1px solid rgba(0,212,255,0.2);
     }
 
 
-    /* ── SECTION UTILITY ── */
+    /* ════════════════════════════════════════════════════════
+       STATS BAR
+    ════════════════════════════════════════════════════════ */
+    .stats-bar {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stats-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 56px 24px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      text-align: center;
+    }
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: clamp(1.7rem, 3vw, 2.2rem);
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+      line-height: 1.1;
+    }
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--text3);
+      font-weight: 500;
+    }
+
+
+    /* ════════════════════════════════════════════════════════
+       SHARED SECTION UTILITIES
+    ════════════════════════════════════════════════════════ */
     .section {
       max-width: 1100px;
       margin: 0 auto;
       padding: 100px 24px;
     }
 
-    .section-label {
+    .section-eyebrow {
       text-align: center;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--accent2);
       text-transform: uppercase;
-      letter-spacing: 1.5px;
+      letter-spacing: 2px;
       margin-bottom: 12px;
     }
 
     .section-title {
       text-align: center;
       font-size: clamp(2rem, 3.5vw, 2.8rem);
-      font-weight: 700;
-      letter-spacing: -0.8px;
-      margin-bottom: 16px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 14px;
+      line-height: 1.15;
     }
 
     .section-sub {
       text-align: center;
-      font-size: 1.05rem;
-      color: var(--text2);
-      max-width: 600px;
-      margin: 0 auto 60px;
-    }
-
-
-    /* ── PRODUCT CARDS ── */
-    .products {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-    }
-
-    .product-card {
-      background: rgba(28,28,30,0.8);
-      backdrop-filter: var(--blur);
-      -webkit-backdrop-filter: var(--blur);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 40px 36px 36px;
-      display: flex;
-      flex-direction: column;
-      transition: transform 0.25s, box-shadow 0.25s;
-    }
-    .product-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-    }
-
-    .product-icon { font-size: 2.5rem; margin-bottom: 20px; }
-
-    .product-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .product-header h3 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      letter-spacing: -0.3px;
-    }
-
-    .badge {
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 3px 12px;
-      border-radius: var(--radius-pill);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .badge-free {
-      background: rgba(34,197,94,0.15);
-      border: 1px solid rgba(34,197,94,0.35);
-      color: var(--green);
-    }
-    .badge-premium {
-      background: rgba(255,159,10,0.15);
-      border: 1px solid rgba(255,159,10,0.35);
-      color: var(--yellow);
-    }
-
-    .product-desc {
-      font-size: 0.95rem;
-      color: var(--text2);
-      line-height: 1.7;
-      margin-bottom: 24px;
-    }
-
-    .feature-checks {
-      list-style: none;
-      margin-bottom: 32px;
-      flex: 1;
-    }
-    .feature-checks li {
-      font-size: 0.9rem;
-      color: var(--text2);
-      padding: 7px 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .feature-checks li::before {
-      content: "✓";
-      font-weight: 700;
-      font-size: 0.85rem;
-      flex-shrink: 0;
-    }
-    .card-free .feature-checks li::before { color: var(--green); }
-    .card-premium .feature-checks li::before { color: var(--yellow); }
-
-    .card-cta {
-      display: block;
-      text-align: center;
       font-size: 1rem;
-      font-weight: 600;
-      padding: 14px 28px;
-      border-radius: var(--radius-pill);
-      transition: background 0.2s, transform 0.15s;
-    }
-    .card-cta-solid {
-      background: var(--accent);
-      color: #fff;
-    }
-    .card-cta-solid:hover { background: #0a70dd; transform: scale(1.02); }
-    .card-cta-outline {
-      background: transparent;
-      color: var(--accent);
-      border: 1.5px solid rgba(37,99,235,0.5);
-    }
-    .card-cta-outline:hover {
-      background: rgba(37,99,235,0.08);
-      border-color: var(--accent);
+      color: var(--text2);
+      max-width: 560px;
+      margin: 0 auto 64px;
+      line-height: 1.75;
     }
 
 
-    /* ── HOW IT WORKS ── */
-    .steps {
+    /* ════════════════════════════════════════════════════════
+       FEATURES — 3-column card grid
+    ════════════════════════════════════════════════════════ */
+    .features-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 32px;
+      gap: 20px;
     }
 
-    .step { text-align: center; }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+    }
+    .feature-card:hover {
+      border-color: rgba(37,99,235,.4);
+      transform: translateY(-3px);
+      box-shadow: 0 20px 50px rgba(0,0,0,.3);
+    }
+
+    .feature-icon {
+      font-size: 2rem;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .feature-card h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      margin-bottom: 10px;
+    }
+
+    .feature-card p {
+      font-size: 0.9rem;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+
+
+    /* ════════════════════════════════════════════════════════
+       HOW IT WORKS — 3-step horizontal timeline
+    ════════════════════════════════════════════════════════ */
+    /* The steps section uses a full-width band for the colored background */
+    .how-band {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .steps-row {
+      display: grid;
+      grid-template-columns: 1fr 40px 1fr 40px 1fr;
+      align-items: start;
+      gap: 0 8px;
+    }
+
+    /* The dashed connector line between steps */
+    .step-connector {
+      display: flex;
+      align-items: flex-start;
+      padding-top: 26px; /* aligns with middle of the step circle */
+      justify-content: center;
+    }
+    .step-connector::after {
+      content: "";
+      display: block;
+      width: 100%;
+      border-top: 2px dashed rgba(37,99,235,0.3);
+    }
+
+    .step {
+      text-align: center;
+      padding: 8px 12px;
+    }
 
     .step-num {
       width: 52px;
@@ -372,120 +694,171 @@
       align-items: center;
       justify-content: center;
       margin: 0 auto 20px;
+      box-shadow: 0 0 24px rgba(37,99,235,.35);
     }
 
     .step h3 {
-      font-size: 1.15rem;
+      font-size: 1.1rem;
       font-weight: 700;
       margin-bottom: 10px;
     }
 
     .step p {
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       color: var(--text2);
-      line-height: 1.65;
-      max-width: 300px;
-      margin: 0 auto;
+      line-height: 1.7;
     }
 
 
-    /* ── METRICS STRIP ── */
-    .metrics {
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .metrics-inner {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 60px 24px;
+    /* ════════════════════════════════════════════════════════
+       DATA SOURCES
+    ════════════════════════════════════════════════════════ */
+    .sources-row {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 24px;
-      text-align: center;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
     }
 
-    .metric-value {
-      font-family: var(--font-mono);
-      font-size: clamp(1.8rem, 3vw, 2.4rem);
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 6px;
-    }
-
-    .metric-label {
-      font-size: 0.88rem;
-      color: var(--text2);
-      font-weight: 500;
-    }
-
-
-    /* ── COMPARISON TABLE ── */
-    .table-wrap {
-      background: rgba(28,28,30,0.8);
-      backdrop-filter: var(--blur);
-      -webkit-backdrop-filter: var(--blur);
-      border: 1px solid var(--border);
+    .source-badge {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.1);
       border-radius: var(--radius);
-      overflow: hidden;
+      padding: 20px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .source-badge:hover {
+      background: rgba(255,255,255,0.05);
+      border-color: var(--border);
     }
 
-    .compare-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.92rem;
+    .source-acronym {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--accent2);
+      flex-shrink: 0;
+      min-width: 60px;
     }
 
-    .compare-table th {
-      padding: 16px 24px;
-      text-align: left;
-      font-size: 0.82rem;
+    .source-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .source-name {
+      font-size: 0.88rem;
       font-weight: 600;
-      color: var(--text2);
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      background: var(--surface2);
-      border-bottom: 1px solid var(--border);
+      color: var(--text);
     }
 
-    .compare-table td {
-      padding: 14px 24px;
-      border-bottom: 1px solid rgba(63,63,70,0.3);
-      color: var(--text2);
+    .source-use {
+      font-size: 0.78rem;
+      color: var(--text3);
     }
-    .compare-table tr:last-child td { border-bottom: none; }
-    .compare-table tr:nth-child(even) td { background: rgba(44,44,46,0.3); }
-
-    .compare-table .check { color: var(--green); font-weight: 600; }
-    .compare-table .cross { color: var(--text3); }
 
 
-    /* ── FOOTER ── */
+    /* ════════════════════════════════════════════════════════
+       CTA SECTION
+    ════════════════════════════════════════════════════════ */
+    .cta-section {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, #0f172a, #0d1826);
+      text-align: center;
+      padding: 120px 24px;
+    }
+
+    /* Big radial glow behind the CTA content */
+    .cta-section::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%,-50%);
+      width: 600px;
+      height: 400px;
+      background: radial-gradient(ellipse at 50% 50%, rgba(37,99,235,.2) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .cta-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    .cta-title {
+      font-size: clamp(2.2rem, 4vw, 3.2rem);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      color: #fff;
+      margin-bottom: 16px;
+      line-height: 1.1;
+    }
+
+    .cta-sub {
+      font-size: 1rem;
+      color: var(--text2);
+      margin-bottom: 40px;
+      line-height: 1.75;
+    }
+
+    .btn-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 16px 40px;
+      border-radius: var(--pill);
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+      margin-bottom: 20px;
+    }
+    .btn-cta:hover {
+      background: #1d4ed8;
+      transform: scale(1.04);
+      box-shadow: 0 0 40px rgba(37,99,235,.4);
+    }
+
+    .cta-note {
+      font-size: 0.82rem;
+      color: var(--text3);
+    }
+
+
+    /* ════════════════════════════════════════════════════════
+       FOOTER
+    ════════════════════════════════════════════════════════ */
     footer {
       border-top: 1px solid var(--border);
-      padding: 40px 24px;
+      padding: 40px 24px 32px;
     }
 
     .footer-inner {
       max-width: 1100px;
       margin: 0 auto;
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 24px;
+      gap: 20px;
     }
 
     .footer-left {
       font-size: 0.82rem;
       color: var(--text3);
-      line-height: 1.7;
     }
 
     .footer-links {
       display: flex;
-      gap: 24px;
+      gap: 20px;
     }
     .footer-links a {
       font-size: 0.85rem;
@@ -498,296 +871,793 @@
       max-width: 1100px;
       margin: 20px auto 0;
       padding-top: 20px;
-      border-top: 1px solid rgba(63,63,70,0.3);
-      font-size: 0.78rem;
+      border-top: 1px solid rgba(0,212,255,0.07);
+      font-size: 0.76rem;
       color: var(--text3);
       line-height: 1.7;
     }
 
 
-    /* ── RESPONSIVE ── */
+    /* ════════════════════════════════════════════════════════
+       SCROLL-REVEAL ANIMATION
+       .reveal starts hidden; .revealed fades + slides in.
+    ════════════════════════════════════════════════════════ */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity .6s ease, transform .6s ease;
+    }
+    .reveal.revealed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    /* Stagger children of a parent with .reveal-stagger */
+    .reveal-stagger .reveal:nth-child(1) { transition-delay: 0s;   }
+    .reveal-stagger .reveal:nth-child(2) { transition-delay: .08s; }
+    .reveal-stagger .reveal:nth-child(3) { transition-delay: .16s; }
+    .reveal-stagger .reveal:nth-child(4) { transition-delay: .24s; }
+    .reveal-stagger .reveal:nth-child(5) { transition-delay: .32s; }
+    .reveal-stagger .reveal:nth-child(6) { transition-delay: .40s; }
+
+
+    /* ── DEMO CANVAS ── */
+    .demo-canvas{
+      position:relative;width:100%;height:100%;
+      background:#060c17;overflow:hidden;
+      border-radius:0 0 10px 10px;
+    }
+    .demo-map-grid{
+      position:absolute;inset:0;
+      background-image:
+        linear-gradient(rgba(37,99,235,.06) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(37,99,235,.06) 1px,transparent 1px);
+      background-size:40px 40px;
+    }
+
+    /* Cursor */
+    .demo-cursor{
+      position:absolute;width:20px;height:20px;
+      transform:translate(-50%,-50%);
+      transition:left .8s cubic-bezier(.4,0,.2,1), top .8s cubic-bezier(.4,0,.2,1);
+      z-index:10;pointer-events:none;opacity:0;
+    }
+
+    /* Pin */
+    .demo-pin{position:absolute;transform:translate(-50%,-100%);z-index:8;opacity:0;pointer-events:none;}
+    .demo-pin-dot{width:10px;height:10px;background:#2563eb;border-radius:50%;margin:0 auto;
+      box-shadow:0 0 0 3px rgba(37,99,235,.3);}
+    .demo-pin-ring{
+      position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+      width:10px;height:10px;border:2px solid #2563eb;border-radius:50%;
+      animation:pingRing 1.5s ease-out infinite;
+    }
+    @keyframes pingRing{0%{width:10px;height:10px;opacity:1}100%{width:40px;height:40px;opacity:0;margin:-15px}}
+    .demo-pin-label{
+      position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
+      background:rgba(9,9,20,.9);border:1px solid rgba(37,99,235,.4);border-radius:6px;
+      padding:3px 8px;font-size:10px;font-weight:600;color:#fff;white-space:nowrap;font-family:monospace;
+    }
+
+    /* Survey rectangle */
+    .demo-rect{
+      position:absolute;border:2px dashed #2563eb;border-radius:4px;
+      background:rgba(37,99,235,.06);
+      transform:translate(-50%,-50%);z-index:6;
+      width:0;height:0;opacity:0;
+      transition:width .5s ease,height .5s ease,opacity .3s ease;
+    }
+
+    /* Scan overlay */
+    .demo-scan{
+      position:absolute;inset:0;background:rgba(6,12,23,.88);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:10px;opacity:0;pointer-events:none;z-index:12;
+      transition:opacity .3s ease;
+    }
+    .demo-diamond-svg{width:48px;height:48px;filter:drop-shadow(0 0 8px rgba(37,99,235,.5));}
+    .demo-scan-progress{width:140px;height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden;}
+    .demo-scan-fill{height:100%;width:0%;background:#2563eb;transition:width .1s linear;}
+    .demo-scan-status{font-size:10px;color:rgba(255,255,255,.4);font-family:monospace;letter-spacing:.3px;}
+
+    /* Toast chip */
+    .demo-toast{
+      position:absolute;top:10px;left:50%;transform:translateX(-50%) translateY(-40px);
+      background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);
+      color:#22c55e;font-size:10px;font-weight:600;padding:4px 12px;
+      border-radius:99px;font-family:monospace;white-space:nowrap;
+      transition:transform .4s cubic-bezier(.34,1.56,.64,1), opacity .3s ease;
+      opacity:0;z-index:15;
+    }
+
+    /* Results panel */
+    .demo-results{
+      position:absolute;bottom:0;left:0;right:0;height:80px;
+      background:rgba(13,24,38,.95);border-top:1px solid rgba(37,99,235,.2);
+      padding:8px 12px;display:flex;align-items:center;gap:12px;
+      transform:translateY(100%);transition:transform .5s cubic-bezier(.34,1.3,.64,1);z-index:9;
+    }
+    .demo-score{flex-shrink:0;text-align:center;}
+    .demo-score-num{font-size:24px;font-weight:800;color:#2563eb;font-family:monospace;line-height:1;}
+    .demo-score-lbl{font-size:8px;color:rgba(255,255,255,.4);font-family:monospace;margin-top:2px;white-space:nowrap;}
+    .demo-bars{flex:1;display:flex;flex-direction:column;gap:4px;}
+    .demo-bar-row{display:flex;align-items:center;gap:5px;}
+    .db-label{font-size:9px;color:rgba(255,255,255,.4);font-family:monospace;width:46px;flex-shrink:0;}
+    .db-track{flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;}
+    .db-fill{height:100%;width:0%;background:var(--color);border-radius:2px;transition:width .8s ease;}
+    .db-val{font-size:9px;color:rgba(255,255,255,.6);font-family:monospace;width:24px;text-align:right;flex-shrink:0;}
+    .demo-profile{width:120px;height:40px;flex-shrink:0;}
+
+    /* Glow pulse on rect when complete */
+    @keyframes rectGlow{0%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}50%{box-shadow:0 0 0 8px rgba(34,197,94,.2)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+    .demo-rect.complete{border-color:#22c55e;animation:rectGlow 1s ease;}
+
+    /* Mockup body height — needed so the demo canvas fills it */
+    .mockup-body {
+      height: 340px;
+    }
+
+
+    /* ════════════════════════════════════════════════════════
+       RESPONSIVE — single column on < 768px
+    ════════════════════════════════════════════════════════ */
     @media (max-width: 768px) {
-      .products { grid-template-columns: 1fr; }
-      .steps { grid-template-columns: 1fr; gap: 48px; }
-      .metrics-inner { grid-template-columns: repeat(2, 1fr); }
-      .compare-table th,
-      .compare-table td { padding: 12px 16px; font-size: 0.84rem; }
-      .hero { padding: 80px 20px 100px; }
-      .product-card { padding: 32px 24px 28px; }
-      .footer-inner { flex-direction: column; }
-      .nav-links a:not(.cta) { display: none; }
+      /* Nav: hide text links, show hamburger */
+      .nav-links { display: none; }
+      .nav-hamburger { display: flex; }
+
+      /* Hero: reduce vertical padding */
+      .hero { padding: 100px 20px 40px; }
+      .hero h1 { letter-spacing: -1.2px; }
+      .hero-sub { font-size: 1rem; }
+
+      /* Mockup: reduce height on small screens */
+      .mockup-body { height: 240px; }
+
+      /* Stats: 2 columns */
+      .stats-inner { grid-template-columns: repeat(2, 1fr); padding: 40px 20px; }
+
+      /* Features: 1 column */
+      .features-grid { grid-template-columns: 1fr; }
+
+      /* Steps: stack vertically, hide connectors */
+      .steps-row {
+        grid-template-columns: 1fr;
+        gap: 36px 0;
+      }
+      .step-connector { display: none; }
+
+      /* Sources: 1 column */
+      .sources-row { grid-template-columns: 1fr; }
+
+      /* Section padding */
+      .section { padding: 64px 20px; }
+
+      /* Footer */
+      .footer-inner { flex-direction: column; align-items: flex-start; }
+    }
+
+    /* Medium breakpoint — tablet */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+      .sources-row { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
 <body>
 
-<!-- ── NAV ── -->
-<nav>
+<!-- ════════════════════════════════════════════════════════
+     NAV
+════════════════════════════════════════════════════════ -->
+<nav id="nav">
   <a href="index.html" class="nav-logo">Terra<span class="sym">&#9672;</span>Measure</a>
   <div class="nav-links">
     <a href="terrascan.html">TerraScan</a>
     <a href="terraphoto.html">TerraPhoto</a>
     <a href="terranews.html">TerraIntel</a>
-    <a href="terrascan.html" class="cta">Launch App</a>
+    <a href="terrascan.html" class="nav-cta">Open App &rarr;</a>
   </div>
+  <!-- Hamburger shown only on mobile -->
+  <button class="nav-hamburger" id="hamburger" aria-label="Toggle menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
 
+<!-- Mobile nav drawer -->
+<div class="nav-drawer" id="nav-drawer">
+  <a href="terrascan.html">TerraScan</a>
+  <a href="terraphoto.html">TerraPhoto</a>
+  <a href="terranews.html">TerraIntel</a>
+  <a href="terrascan.html" class="nav-cta">Open App &rarr;</a>
+</div>
 
-<!-- ── HERO ── -->
+
+<!-- ════════════════════════════════════════════════════════
+     HERO
+════════════════════════════════════════════════════════ -->
 <section class="hero">
+  <!-- Background glowing orbs -->
+  <div class="hero-orb-1"></div>
+  <div class="hero-orb-2"></div>
+
+  <!-- Animated topographic contour rings (10 of them) -->
+  <div class="contour-ring"></div>
+  <div class="contour-ring"></div>
+  <div class="contour-ring"></div>
+  <div class="contour-ring"></div>
+  <div class="contour-ring"></div>
+  <div class="contour-ring"></div>
+  <div class="contour-ring"></div>
+  <div class="contour-ring"></div>
+  <div class="contour-ring"></div>
+  <div class="contour-ring"></div>
+
   <div class="hero-inner">
-    <div class="hero-badge">Terrain Intelligence &middot; Free &middot; Global</div>
-    <h1>Survey. Farm.<br>Understand land.</h1>
-    <p class="subtitle">
-      Elevation analysis, agricultural suitability, environmental risk factors, and
-      global land intelligence &mdash; no equipment, no waiting, no fees.
-      TerraMeasure does in minutes what takes surveyors days.
+    <!-- Eyebrow tag -->
+    <div class="hero-badge">
+      Terra&#9672;Measure &nbsp;&middot;&nbsp; Free &nbsp;&middot;&nbsp; No Equipment
+    </div>
+
+    <!-- H1 — two lines, second gets the gradient -->
+    <h1>
+      <span class="hero-h1-line1">Land intelligence.</span>
+      <span class="hero-h1-line2">In under a minute.</span>
+    </h1>
+
+    <!-- Subtitle -->
+    <p class="hero-sub">
+      Click any spot on a world map. Get slope analysis, elevation profiles,
+      buildable area, environmental risk scores, and 3D terrain &mdash;
+      from real USGS data.
     </p>
+
+    <!-- Two CTAs -->
     <div class="hero-ctas">
       <a href="terrascan.html" class="btn-primary">Launch TerraScan &rarr;</a>
-      <a href="terranews.html" class="btn-secondary">Global Land News</a>
+      <a href="#how-it-works" class="btn-secondary">Watch how it works</a>
+    </div>
+
+    <!-- Trust row -->
+    <p class="hero-trust">
+      &#10003; Free forever
+      <span>&middot;</span>
+      &#10003; No signup required
+      <span>&middot;</span>
+      &#10003; Works anywhere on Earth
+    </p>
+
+    <!-- App preview mockup -->
+    <div class="mockup-wrap">
+      <div class="mockup-frame">
+        <!-- Fake browser title bar -->
+        <div class="mockup-bar">
+          <div class="mockup-dot"></div>
+          <div class="mockup-dot"></div>
+          <div class="mockup-dot"></div>
+          <div class="mockup-title">TerraMeasure &mdash; Terrain Intelligence</div>
+        </div>
+
+        <!-- Animated demo canvas — replaces the old static mockup body -->
+        <div class="mockup-body">
+          <div class="demo-canvas" id="demo-canvas">
+            <!-- Map grid background -->
+            <div class="demo-map-grid"></div>
+
+            <!-- Cursor -->
+            <div class="demo-cursor" id="demo-cursor">
+              <svg width="20" height="20" viewBox="0 0 20 20"><path d="M2 2 L18 9 L10 11 L7 18 Z" fill="white" stroke="#000" stroke-width="1.2"/></svg>
+            </div>
+
+            <!-- Pin + label -->
+            <div class="demo-pin" id="demo-pin">
+              <div class="demo-pin-dot"></div>
+              <div class="demo-pin-ring"></div>
+              <div class="demo-pin-label">&#128205; Denver, CO</div>
+            </div>
+
+            <!-- Survey rectangle -->
+            <div class="demo-rect" id="demo-rect"></div>
+
+            <!-- Scan overlay -->
+            <div class="demo-scan" id="demo-scan">
+              <svg class="demo-diamond-svg" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+                <path id="dd-outer" d="M30 3 L57 30 L30 57 L3 30 Z" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="153" stroke-dashoffset="153"/>
+                <circle id="dd-inner" cx="30" cy="30" r="8" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="50" stroke-dashoffset="50"/>
+                <circle id="dd-dot" cx="30" cy="30" r="3" fill="#2563eb" opacity="0"/>
+              </svg>
+              <div class="demo-scan-progress">
+                <div class="demo-scan-fill" id="demo-scan-fill"></div>
+              </div>
+              <div class="demo-scan-status" id="demo-scan-status">Fetching terrain&hellip;</div>
+            </div>
+
+            <!-- Toast chip -->
+            <div class="demo-toast" id="demo-toast">&#10003; Survey complete &middot; 87/100</div>
+
+            <!-- Results bottom panel -->
+            <div class="demo-results" id="demo-results">
+              <div class="demo-score">
+                <div class="demo-score-num">87</div>
+                <div class="demo-score-lbl">/ 100 &middot; SUITABLE</div>
+              </div>
+              <div class="demo-bars">
+                <div class="demo-bar-row">
+                  <span class="db-label">Slope</span>
+                  <div class="db-track"><div class="db-fill" style="--pct:45%;--color:#f59e0b"></div></div>
+                  <span class="db-val">12&deg;</span>
+                </div>
+                <div class="demo-bar-row">
+                  <span class="db-label">Buildable</span>
+                  <div class="db-track"><div class="db-fill" style="--pct:73%;--color:#22c55e"></div></div>
+                  <span class="db-val">73%</span>
+                </div>
+                <div class="demo-bar-row">
+                  <span class="db-label">Flood Risk</span>
+                  <div class="db-track"><div class="db-fill" style="--pct:20%;--color:#2563eb"></div></div>
+                  <span class="db-val">LOW</span>
+                </div>
+              </div>
+              <svg class="demo-profile" viewBox="0 0 120 40">
+                <polyline id="demo-profile-line" points="0,35 15,30 25,22 40,18 55,20 65,14 80,10 95,15 110,25 120,30"
+                          fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round"
+                          stroke-dasharray="200" stroke-dashoffset="200"/>
+                <line x1="0" y1="38" x2="120" y2="38" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
 
-<!-- ── PRODUCTS ── -->
-<section class="section">
-  <div class="section-label">Products</div>
-  <h2 class="section-title">Everything land, in one place.</h2>
-  <p class="section-sub">
-    Terrain analysis, agriculture suitability, and global land intelligence &mdash;
-    all from the same engine.
-  </p>
-
-  <div class="products" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">
-
-    <!-- TerraScan -->
-    <div class="product-card card-free">
-      <div class="product-icon">&#x1F6F0;&#xFE0F;</div>
-      <div class="product-header">
-        <h3>TerraScan</h3>
-        <span class="badge badge-free">Free</span>
-      </div>
-      <p class="product-desc">
-        Click any point on the map or draw a polygon. Get DEM elevation data,
-        slope analysis, cut/fill volumes, environmental risk factors, agricultural
-        suitability, and a 3D terrain view.
-      </p>
-      <ul class="feature-checks">
-        <li>Instant terrain analysis</li>
-        <li>Environmental risk factors (Flood, Fire, Heat, Wind)</li>
-        <li>Agriculture suitability scoring</li>
-        <li>3D terrain &amp; contour maps</li>
-        <li>CSV/GeoJSON export</li>
-      </ul>
-      <a href="terrascan.html" class="card-cta card-cta-solid">Open TerraScan</a>
+<!-- ════════════════════════════════════════════════════════
+     STATS BAR
+════════════════════════════════════════════════════════ -->
+<div class="stats-bar">
+  <div class="stats-inner reveal-stagger">
+    <div class="reveal">
+      <!-- data-target / data-suffix are read by the counter JS below -->
+      <div class="stat-value" data-target="30" data-suffix="s" data-prefix="&lt; ">30s</div>
+      <div class="stat-label">Survey time</div>
     </div>
-
-    <!-- TerraPhoto -->
-    <div class="product-card card-premium">
-      <div class="product-icon">&#x1F4F7;</div>
-      <div class="product-header">
-        <h3>TerraPhoto</h3>
-        <span class="badge badge-premium">Premium</span>
-      </div>
-      <p class="product-desc">
-        Upload photos taken with a smartphone. GPS metadata is extracted
-        automatically to locate the site. Get the same full analysis as
-        TerraScan &mdash; no map interaction needed.
-      </p>
-      <ul class="feature-checks">
-        <li>GPS auto-detection from photos</li>
-        <li>Same full terrain + ag analysis</li>
-        <li>Works for remote sites</li>
-        <li>No map knowledge needed</li>
-      </ul>
-      <a href="terraphoto.html" class="card-cta card-cta-outline">Open TerraPhoto</a>
+    <div class="reveal">
+      <div class="stat-value" data-range="1m–30m">1m–30m</div>
+      <div class="stat-label">Resolution</div>
     </div>
-
-    <!-- TerraIntel -->
-    <div class="product-card" style="border-color:rgba(20,184,166,0.3);background:rgba(20,184,166,0.04);">
-      <div class="product-icon">&#x1F4F0;</div>
-      <div class="product-header">
-        <h3>TerraIntel</h3>
-        <span class="badge" style="background:rgba(20,184,166,0.15);border:1px solid rgba(20,184,166,0.35);color:#14b8a6;">Live</span>
-      </div>
-      <p class="product-desc">
-        24/7 global land intelligence feed. Agriculture markets, natural hazards,
-        land policy, and satellite-detected change &mdash; from USGS, USDA, NASA,
-        and NOAA. Every story links directly to its source. No AI-generated claims.
-      </p>
-      <ul class="feature-checks" style="--check-color:#14b8a6;">
-        <li>USGS · USDA · NASA · NOAA</li>
-        <li>Agriculture &amp; crop news</li>
-        <li>Natural hazard alerts</li>
-        <li>Land policy updates</li>
-        <li>Source citation on every story</li>
-      </ul>
-      <a href="terranews.html" class="card-cta" style="background:#14b8a6;color:#000;font-weight:700;text-align:center;display:block;padding:14px 28px;border-radius:999px;">Open TerraIntel</a>
+    <div class="reveal">
+      <div class="stat-value" data-range="±1m">±1m</div>
+      <div class="stat-label">Accuracy</div>
     </div>
-
+    <div class="reveal">
+      <div class="stat-value" data-target="100" data-suffix="%">100%</div>
+      <div class="stat-label">Free core</div>
+    </div>
   </div>
-</section>
+</div>
 
-<!-- ── ENVIRONMENTAL RISK ── -->
-<section class="section" id="environmental-risk" style="padding-top:0;">
-  <div class="section-label">Environmental Intelligence</div>
-  <h2 class="section-title">Know the risk before you go.</h2>
-  <p class="section-sub">
-    Every TerraScan survey now includes four environmental risk factors, scored
-    out of 10 using USGS, NOAA, and NASA public data &mdash; the same way
-    professional due-diligence tools do it.
-  </p>
 
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;">
+<!-- ════════════════════════════════════════════════════════
+     FEATURES
+════════════════════════════════════════════════════════ -->
+<section class="section" id="features">
+  <div class="section-eyebrow reveal">CAPABILITIES</div>
+  <h2 class="section-title reveal">Everything a field assessment needs.</h2>
+  <p class="section-sub reveal">No equipment. No field visit. Real data.</p>
 
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 20px;display:flex;align-items:center;gap:16px;">
-      <div style="font-size:2rem;flex-shrink:0;">&#x1F32A;</div>
-      <div>
-        <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:4px;">Flood Factor</div>
-        <div style="font-size:1.05rem;font-weight:700;">Scored /10</div>
-        <div style="font-size:0.82rem;color:var(--text2);margin-top:4px;">FEMA flood zone + elevation exposure</div>
-      </div>
+  <div class="features-grid reveal-stagger">
+
+    <div class="feature-card reveal">
+      <span class="feature-icon">&#x1F3D4;&#xFE0F;</span>
+      <h3>Terrain Analysis</h3>
+      <p>Slope maps, contour lines, elevation profiles. Know every rise and fall before you break ground.</p>
     </div>
 
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 20px;display:flex;align-items:center;gap:16px;">
-      <div style="font-size:2rem;flex-shrink:0;">&#x1F525;</div>
-      <div>
-        <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#f97316;margin-bottom:4px;">Fire Factor</div>
-        <div style="font-size:1.05rem;font-weight:700;">Scored /10</div>
-        <div style="font-size:0.82rem;color:var(--text2);margin-top:4px;">NASA FIRMS recent fire activity</div>
-      </div>
+    <div class="feature-card reveal">
+      <span class="feature-icon">&#x1F4D0;</span>
+      <h3>Volume Calculator</h3>
+      <p>Cut and fill volumes for grading. Plan earthwork costs with real numbers before boots hit the ground.</p>
     </div>
 
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 20px;display:flex;align-items:center;gap:16px;">
-      <div style="font-size:2rem;flex-shrink:0;">&#x1F321;&#xFE0F;</div>
-      <div>
-        <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#ef4444;margin-bottom:4px;">Heat Factor</div>
-        <div style="font-size:1.05rem;font-weight:700;">Scored /10</div>
-        <div style="font-size:0.82rem;color:var(--text2);margin-top:4px;">NOAA climate normals · heat days/yr</div>
-      </div>
+    <div class="feature-card reveal">
+      <span class="feature-icon">&#x1F331;</span>
+      <h3>Agricultural Score</h3>
+      <p>Soil drainage, crop zone, frost risk, irrigation needs. See if land can feed before you buy it.</p>
     </div>
 
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 20px;display:flex;align-items:center;gap:16px;">
-      <div style="font-size:2rem;flex-shrink:0;">&#x1F4A8;</div>
-      <div>
-        <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:4px;">Wind Factor</div>
-        <div style="font-size:1.05rem;font-weight:700;">Scored /10</div>
-        <div style="font-size:0.82rem;color:var(--text2);margin-top:4px;">Open-Meteo historical wind percentile</div>
-      </div>
+    <div class="feature-card reveal">
+      <span class="feature-icon">&#x26A1;</span>
+      <h3>Environmental Risk</h3>
+      <p>Flood &middot; Fire &middot; Heat &middot; Wind &mdash; four risk factors, each scored /10 from USGS, FEMA, and NASA data.</p>
+    </div>
+
+    <div class="feature-card reveal">
+      <span class="feature-icon">&#x1F5FA;&#xFE0F;</span>
+      <h3>3D Terrain View</h3>
+      <p>Fly over any site in 3D, draped with real satellite imagery. No app to install. Runs in the browser.</p>
+    </div>
+
+    <div class="feature-card reveal">
+      <span class="feature-icon">&#x1F4E1;</span>
+      <h3>Live Climate Data</h3>
+      <p>Current temperature and precipitation overlaid on your map. Color-coded heatmap from Open-Meteo.</p>
     </div>
 
   </div>
 </section>
 
 
-<!-- ── HOW IT WORKS ── -->
-<section class="section" id="how-it-works">
-  <div class="section-label">How it works</div>
-  <h2 class="section-title">Three steps. No equipment.</h2>
-  <p class="section-sub">
-    From picking a location to a downloadable report in under a minute.
-  </p>
+<!-- ════════════════════════════════════════════════════════
+     HOW IT WORKS
+════════════════════════════════════════════════════════ -->
+<div class="how-band" id="how-it-works">
+  <section class="section" style="padding-bottom:80px;">
+    <div class="section-eyebrow reveal">How it works</div>
+    <h2 class="section-title reveal">Three steps. No equipment.</h2>
+    <p class="section-sub reveal">From picking a location to a full report in under a minute.</p>
 
-  <div class="steps">
-    <div class="step">
-      <div class="step-num">1</div>
-      <h3>Pick a location</h3>
-      <p>Click any point on a world map, or draw a polygon around your site.</p>
+    <div class="steps-row">
+
+      <div class="step reveal">
+        <div class="step-num">1</div>
+        <h3>Pick a location</h3>
+        <p>Click any point on a world map, or draw a polygon around your site.</p>
+      </div>
+
+      <!-- Dashed connector between step 1 and 2 -->
+      <div class="step-connector"></div>
+
+      <div class="step reveal">
+        <div class="step-num">2</div>
+        <h3>Fetch terrain data</h3>
+        <p>We pull real USGS 3DEP LiDAR and elevation data for your exact location.</p>
+      </div>
+
+      <!-- Dashed connector between step 2 and 3 -->
+      <div class="step-connector"></div>
+
+      <div class="step reveal">
+        <div class="step-num">3</div>
+        <h3>Get your report</h3>
+        <p>Instant slope, volumes, risk scores, a site score from 0&ndash;100, and downloadable maps.</p>
+      </div>
+
     </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <h3>Fetch terrain data</h3>
-      <p>We pull real USGS LiDAR and elevation data for your exact location.</p>
+  </section>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════
+     DATA SOURCES
+════════════════════════════════════════════════════════ -->
+<section class="section" id="data-sources">
+  <div class="section-eyebrow reveal">Data provenance</div>
+  <h2 class="section-title reveal">Built on trusted public data.</h2>
+  <p class="section-sub reveal">Every number comes from a named government or research source. No black boxes.</p>
+
+  <div class="sources-row reveal-stagger">
+
+    <div class="source-badge reveal">
+      <div class="source-acronym">USGS</div>
+      <div class="source-info">
+        <div class="source-name">US Geological Survey</div>
+        <div class="source-use">Elevation data &middot; 1m LiDAR</div>
+      </div>
     </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <h3>Get your report</h3>
-      <p>Instant slope analysis, cut/fill volumes, a site score, and downloadable maps.</p>
+
+    <div class="source-badge reveal">
+      <div class="source-acronym">FEMA</div>
+      <div class="source-info">
+        <div class="source-name">FEMA NFHL</div>
+        <div class="source-use">Flood zones &middot; Real-time</div>
+      </div>
     </div>
+
+    <div class="source-badge reveal">
+      <div class="source-acronym">NASA</div>
+      <div class="source-info">
+        <div class="source-name">NASA FIRMS</div>
+        <div class="source-use">Fire detection &middot; Satellite</div>
+      </div>
+    </div>
+
+    <div class="source-badge reveal">
+      <div class="source-acronym">METEO</div>
+      <div class="source-info">
+        <div class="source-name">Open-Meteo</div>
+        <div class="source-use">Climate data &middot; Free API</div>
+      </div>
+    </div>
+
+    <div class="source-badge reveal">
+      <div class="source-acronym">Esri</div>
+      <div class="source-info">
+        <div class="source-name">Esri ArcGIS</div>
+        <div class="source-use">Satellite imagery</div>
+      </div>
+    </div>
+
+    <div class="source-badge reveal">
+      <div class="source-acronym">OSM</div>
+      <div class="source-info">
+        <div class="source-name">OpenStreetMap</div>
+        <div class="source-use">Map tiles &middot; Global</div>
+      </div>
+    </div>
+
   </div>
 </section>
 
 
-<!-- ── METRICS ── -->
-<section class="metrics">
-  <div class="metrics-inner">
+<!-- ════════════════════════════════════════════════════════
+     CTA SECTION
+════════════════════════════════════════════════════════ -->
+<div class="cta-section">
+  <div class="cta-inner reveal">
+    <h2 class="cta-title">Start your first survey &rarr;</h2>
+    <p class="cta-sub">No signup. No equipment. Just terrain intelligence.</p>
     <div>
-      <div class="metric-value">&lt; 30 sec</div>
-      <div class="metric-label">Average survey time</div>
+      <a href="terrascan.html" class="btn-cta">Launch TerraScan</a>
     </div>
-    <div>
-      <div class="metric-value">1m&ndash;30m</div>
-      <div class="metric-label">Resolution options</div>
-    </div>
-    <div>
-      <div class="metric-value">&plusmn;5m</div>
-      <div class="metric-label">Vertical accuracy</div>
-    </div>
-    <div>
-      <div class="metric-value">100%</div>
-      <div class="metric-label">Free for basic surveys</div>
-    </div>
+    <p class="cta-note">Free forever &nbsp;&middot;&nbsp; Works globally &nbsp;&middot;&nbsp; USGS data included</p>
   </div>
-</section>
+</div>
 
 
-<!-- ── COMPARISON TABLE ── -->
-<section class="section">
-  <div class="section-label">Compare</div>
-  <h2 class="section-title">Feature comparison.</h2>
-  <p class="section-sub">
-    Both tiers use the same measurement engine. Pick the one that fits your workflow.
-  </p>
-
-  <div class="table-wrap">
-    <table class="compare-table">
-      <thead>
-        <tr>
-          <th>Feature</th>
-          <th>TerraScan (Free)</th>
-          <th>TerraPhoto (Premium)</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>Map-click surveying</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
-        <tr><td>Polygon surveying</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
-        <tr><td>USGS LiDAR data</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
-        <tr><td>Satellite imagery overlay</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
-        <tr><td>Photo-based survey</td><td class="cross">&#10007;</td><td class="check">&#10003;</td></tr>
-        <tr><td>3D terrain view</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
-        <tr><td>CSV/GeoJSON export</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
-        <tr><td>Named survey saves</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
-        <tr><td>Site suitability report</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
-        <tr><td><strong>Agriculture suitability score</strong></td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
-        <tr><td><strong>Soil drainage &amp; crop zone</strong></td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
-        <tr><td><strong>Flood / Fire / Heat / Wind factors</strong></td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
-        <tr><td><strong>TerraIntel news feed</strong></td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
-      </tbody>
-    </table>
-  </div>
-</section>
-
-
-<!-- ── FOOTER ── -->
+<!-- ════════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════════ -->
 <footer>
   <div class="footer-inner">
     <div class="footer-left">
-      &copy; 2025 TerraMeasure &middot; Preliminary surveys only &middot; Not a licensed survey
+      &copy; 2026 TerraMeasure &nbsp;&middot;&nbsp; Preliminary surveys only
     </div>
     <div class="footer-links">
       <a href="terrascan.html">TerraScan</a>
       <a href="terraphoto.html">TerraPhoto</a>
       <a href="terranews.html">TerraIntel</a>
-      <a href="index.html">Home</a>
     </div>
   </div>
   <div class="footer-disclaimer">
-    All TerraMeasure outputs are preliminary and uncertified. A licensed Professional
-    Land Surveyor (PLS) must prepare and seal any legally binding survey.
+    All TerraMeasure outputs are preliminary and uncertified. A licensed Professional Land Surveyor (PLS)
+    must prepare and seal any legally binding survey.
   </div>
 </footer>
+
+
+<!-- ════════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════ -->
+<script>
+  // ── NAV SCROLL OPACITY ──────────────────────────────────
+  // When the user scrolls down even a little, the nav gains a more
+  // opaque background (.scrolled class), so it's easier to read.
+  const navEl = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    navEl.classList.toggle('scrolled', window.scrollY > 20);
+  }, { passive: true });
+
+
+  // ── HAMBURGER MENU ──────────────────────────────────────
+  // On mobile, clicking the three-bar button toggles the nav drawer.
+  const hamburger = document.getElementById('hamburger');
+  const drawer    = document.getElementById('nav-drawer');
+  hamburger.addEventListener('click', () => {
+    drawer.classList.toggle('open');
+  });
+  // Close drawer when any link inside it is clicked
+  drawer.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => drawer.classList.remove('open'));
+  });
+
+
+  // ── SCROLL-REVEAL (IntersectionObserver) ─────────────────
+  // Every element with class .reveal starts hidden (opacity:0, translateY).
+  // When it scrolls into view, we add .revealed to animate it in.
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('revealed');
+        revealObserver.unobserve(entry.target); // only animate once
+      }
+    });
+  }, { threshold: 0.15 });
+
+  document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+
+  // ── STATS COUNTER ANIMATION ──────────────────────────────
+  // When a stat value scrolls into view, it "counts up" from 0 to
+  // its target number using a smooth easing curve.
+  function animateCounter(el, target, prefix, suffix) {
+    const start = performance.now();
+    const dur   = 1200; // milliseconds for the full count
+
+    (function frame(now) {
+      const t    = Math.min((now - start) / dur, 1);
+      // Cubic ease-out: starts fast, slows at the end
+      const ease = 1 - Math.pow(1 - t, 3);
+      const val  = Number.isInteger(target)
+        ? Math.round(ease * target)
+        : (ease * target).toFixed(1);
+
+      el.innerHTML = (prefix || '') + val + (suffix || '');
+
+      if (t < 1) requestAnimationFrame(frame);
+    })(start);
+  }
+
+  // For each stat that has a data-target, watch for it to appear on screen,
+  // then trigger the count-up.
+  const statObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const el     = entry.target;
+      const target = parseFloat(el.dataset.target);
+      if (isNaN(target)) return; // skip range stats like "1m–30m"
+      const prefix = el.dataset.prefix || '';
+      const suffix = el.dataset.suffix || '';
+      animateCounter(el, target, prefix, suffix);
+      statObserver.unobserve(el); // only animate once
+    });
+  }, { threshold: 0.5 });
+
+  document.querySelectorAll('.stat-value[data-target]').forEach(el => {
+    statObserver.observe(el);
+  });
+
+
+  // ── DEMO ANIMATION LOOP ──────────────────────────────────
+  // This drives the 5-phase looping demo inside the hero mockup frame.
+  // Each phase is triggered by a setTimeout; the whole loop repeats
+  // every 13.5 seconds so the visitor always sees something happening.
+  (function demoLoop() {
+    const canvas   = document.getElementById('demo-canvas');
+    if (!canvas) return; // bail if the element doesn't exist
+
+    const cursor   = document.getElementById('demo-cursor');
+    const pin      = document.getElementById('demo-pin');
+    const rect     = document.getElementById('demo-rect');
+    const scanOv   = document.getElementById('demo-scan');
+    const scanFill = document.getElementById('demo-scan-fill');
+    const scanStat = document.getElementById('demo-scan-status');
+    const toast    = document.getElementById('demo-toast');
+    const results  = document.getElementById('demo-results');
+    const profLine = document.getElementById('demo-profile-line');
+    const ddOuter  = document.getElementById('dd-outer');
+    const ddInner  = document.getElementById('dd-inner');
+    const ddDot    = document.getElementById('dd-dot');
+    const fills    = document.querySelectorAll('.db-fill');
+
+    // Where the pin and rect will appear (as a % of the canvas)
+    const TARGET = { left: '55%', top: '40%' };
+
+    // ── reset() puts everything back to its starting (hidden) state ──
+    function reset() {
+      cursor.style.opacity = '0';
+      pin.style.opacity = '0';
+      rect.style.width = '0'; rect.style.height = '0'; rect.style.opacity = '0';
+      rect.classList.remove('complete');
+      scanOv.style.opacity = '0'; scanOv.style.pointerEvents = 'none';
+      toast.style.opacity = '0'; toast.style.transform = 'translateX(-50%) translateY(-40px)';
+      results.style.transform = 'translateY(100%)';
+      if (scanFill) scanFill.style.width = '0%';
+      if (profLine) { profLine.style.transition = 'none'; profLine.style.strokeDashoffset = '200'; }
+      fills.forEach(f => { f.style.transition = 'none'; f.style.width = '0%'; });
+      if (ddOuter) { ddOuter.style.transition = 'none'; ddOuter.style.strokeDashoffset = '153'; }
+      if (ddInner) { ddInner.style.transition = 'none'; ddInner.style.strokeDashoffset = '50'; }
+      if (ddDot)   { ddDot.style.transition = 'none'; ddDot.style.opacity = '0'; }
+    }
+
+    // ── Phase 1: Map ready — cursor appears, blinking at corner ──
+    function phase1() {
+      reset();
+      cursor.style.left = '20%'; cursor.style.top = '25%';
+      cursor.style.transition = 'none';
+      cursor.style.opacity = '1';
+    }
+
+    // ── Phase 2: Site selected — cursor moves, pin drops, rectangle expands ──
+    function phase2() {
+      // Animate cursor gliding to the target spot
+      cursor.style.transition = 'left .8s cubic-bezier(.4,0,.2,1), top .8s cubic-bezier(.4,0,.2,1)';
+      cursor.style.left = TARGET.left; cursor.style.top = TARGET.top;
+      // After cursor arrives, drop the pin
+      setTimeout(() => {
+        pin.style.left = TARGET.left; pin.style.top = TARGET.top;
+        pin.style.opacity = '1';
+        pin.style.animation = 'none';
+        void pin.offsetWidth; // force reflow so animation restarts cleanly
+        pin.style.animation = 'pinDrop .5s cubic-bezier(.34,1.56,.64,1) both';
+      }, 700);
+      // Then expand the dashed survey rectangle out from the pin
+      setTimeout(() => {
+        rect.style.left = TARGET.left; rect.style.top = TARGET.top;
+        rect.style.opacity = '1'; rect.style.width = '90px'; rect.style.height = '70px';
+      }, 900);
+    }
+
+    // ── Phase 3: Scanning — overlay fades in, diamond draws, progress bar fills ──
+    function phase3() {
+      scanOv.style.opacity = '1'; scanOv.style.pointerEvents = 'all';
+      cursor.style.opacity = '0';
+
+      // Draw the TerraMeasure diamond (stroke animation)
+      setTimeout(() => {
+        if (ddOuter) { ddOuter.style.transition = 'stroke-dashoffset .7s cubic-bezier(.4,0,.2,1)'; ddOuter.style.strokeDashoffset = '0'; }
+        setTimeout(() => { if (ddInner) { ddInner.style.transition = 'stroke-dashoffset .4s ease'; ddInner.style.strokeDashoffset = '0'; } }, 600);
+        setTimeout(() => { if (ddDot)   { ddDot.style.transition = 'opacity .3s ease'; ddDot.style.opacity = '1'; } }, 950);
+      }, 50);
+
+      // Fill the progress bar from 0→100% and cycle the status text
+      let pct = 0;
+      const statuses = ['Fetching terrain…', 'Computing slope…', 'Generating 3D mesh…'];
+      let sIdx = 0;
+      if (scanStat) scanStat.textContent = statuses[0];
+      const iv = setInterval(() => {
+        pct += 2.2;
+        if (scanFill) scanFill.style.width = Math.min(pct, 100) + '%';
+        // Switch status label at 40% and 75%
+        const newSIdx = pct < 40 ? 0 : pct < 75 ? 1 : 2;
+        if (newSIdx !== sIdx) { sIdx = newSIdx; if (scanStat) scanStat.textContent = statuses[sIdx]; }
+        if (pct >= 100) clearInterval(iv);
+      }, 70);
+    }
+
+    // ── Phase 4: Results — scan overlay fades, results panel slides up ──
+    function phase4() {
+      scanOv.style.opacity = '0'; scanOv.style.pointerEvents = 'none';
+      results.style.transform = 'translateY(0)';
+      // After panel is in, animate the mini progress bars and terrain profile
+      setTimeout(() => {
+        fills.forEach(f => {
+          f.style.transition = 'width .8s ease';
+          // --pct is set inline on each .db-fill element; read it back
+          f.style.width = f.style.getPropertyValue('--pct');
+        });
+        if (profLine) { profLine.style.transition = 'stroke-dashoffset 1.2s ease'; profLine.style.strokeDashoffset = '0'; }
+      }, 200);
+    }
+
+    // ── Phase 5: Complete — green border glow + success toast ──
+    function phase5() {
+      rect.classList.add('complete');
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateX(-50%) translateY(0)';
+    }
+
+    // Timeline: [delay in ms, function to call]
+    const timeline = [
+      [0,     phase1],
+      [2500,  phase2],
+      [4500,  phase3],
+      [8000,  phase4],
+      [11000, phase5],
+    ];
+
+    function runLoop() {
+      reset();
+      const handles = [];
+      timeline.forEach(([delay, fn]) => { handles.push(setTimeout(fn, delay)); });
+      // After the full 13.5 s cycle, clear any pending timers and restart
+      setTimeout(() => {
+        handles.forEach(clearTimeout);
+        runLoop();
+      }, 13500);
+    }
+
+    // Inject the pinDrop keyframe dynamically (only once per page)
+    if (!document.getElementById('demo-style')) {
+      const s = document.createElement('style');
+      s.id = 'demo-style';
+      s.textContent = `@keyframes pinDrop{from{opacity:0;transform:translate(-50%,-80%) scale(.5)}to{opacity:1;transform:translate(-50%,-100%) scale(1)}}`;
+      document.head.appendChild(s);
+    }
+
+    // Small delay so the page has fully rendered before starting
+    setTimeout(runLoop, 800);
+  })();
+</script>
 
 </body>
 </html>

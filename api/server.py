@@ -75,6 +75,10 @@ class SurveyResponse(BaseModel):
     dominant_aspect_deg: float
     slope_map_png_b64: str
     contour_map_png_b64: str
+    # Clean versions: no axes/colorbar/labels, transparent background.
+    # The map overlay uses these so the image aligns exactly with the drawn area.
+    slope_map_clean_b64: str = ""
+    contour_map_clean_b64: str = ""
     # Real satellite image of the survey area — draped over the 3D terrain
     # to make it look like Google Earth instead of a blurry slope map.
     satellite_texture_b64: str = ""
@@ -197,6 +201,8 @@ def run_survey(dem_result) -> SurveyResponse:
         dominant_aspect_deg=aspect_deg,
         slope_map_png_b64=to_b64(images["slope_map"]),
         contour_map_png_b64=to_b64(images["contour_map"]),
+        slope_map_clean_b64=to_b64(images["slope_map_clean"]),
+        contour_map_clean_b64=to_b64(images["contour_map_clean"]),
         satellite_texture_b64=sat_b64,
         # Geographic bounds of the DEM — the client uses these to pin image
         # overlays (slope map, contour map) exactly over the right spot on the map.

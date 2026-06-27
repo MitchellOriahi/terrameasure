@@ -399,7 +399,36 @@ def render_images(dem: np.ndarray, cell_size: float,
     contour_png = _fig_to_bytes(fig)
     plt.close(fig)
 
-    return {"slope_map": slope_png, "contour_map": contour_png}
+    # --- Clean versions: no axes, no labels, no colorbar, transparent background ---
+    # These are used as map overlays so every pixel lines up exactly with the
+    # geographic bounds. Any whitespace from axes/labels would shift the image.
+
+    fig2, ax2 = plt.subplots(figsize=(8, 8), dpi=100)
+    fig2.patch.set_alpha(0)     # transparent figure background
+    ax2.patch.set_alpha(0)      # transparent axes background
+    ax2.imshow(slopes, cmap=slope_cmap, vmin=0, vmax=45, origin="upper")
+    ax2.set_axis_off()
+    slope_clean_png = _fig_to_bytes_transparent(fig2)
+    plt.close(fig2)
+
+    fig3, ax3 = plt.subplots(figsize=(8, 8), dpi=100)
+    fig3.patch.set_alpha(0)
+    ax3.patch.set_alpha(0)
+    ax3.imshow(hillshade, cmap="gray", origin="upper", alpha=0.6)
+    for level, line in zip(c_result.levels, c_result.lines):
+        xs = [p[0] for p in line]
+        ys = [p[1] for p in line]
+        ax3.plot(xs, ys, color="#1a5276", linewidth=0.7, alpha=0.85)
+    ax3.set_axis_off()
+    contour_clean_png = _fig_to_bytes_transparent(fig3)
+    plt.close(fig3)
+
+    return {
+        "slope_map": slope_png,
+        "contour_map": contour_png,
+        "slope_map_clean": slope_clean_png,
+        "contour_map_clean": contour_clean_png,
+    }
 
 
 def buildable_area_pct(dem: np.ndarray, cell_size: float,
@@ -486,6 +515,20 @@ def _fig_to_bytes(fig) -> bytes:
     import io
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
+    buf.seek(0)
+    return buf.read()
+
+
+def _fig_to_bytes_transparent(fig) -> bytes:
+    """Same as above but with a transparent background and zero padding.
+
+    Used for clean map overlays — every pixel must correspond exactly to the
+    data grid so the image sits flush over the drawn area on the map.
+    """
+    import io
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0,
+                transparent=True)
     buf.seek(0)
     return buf.read()
 

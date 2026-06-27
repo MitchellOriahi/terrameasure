@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TerraMeasure — Sign In</title>
+  <!-- Inter font — same as the main app -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── CSS variables — exact same palette as terrascan.html ─── */
+    :root {
+      --bg:        #060c17;
+      --surface:   #0d1826;
+      --surface2:  #111f33;
+      --border:    rgba(0,212,255,0.15);
+      --accent:    #00d4ff;
+      --accent-dim: rgba(0,212,255,0.12);
+      --accent-glow: rgba(0,212,255,0.25);
+      --text:      #e2e8f0;
+      --text-dim:  #64748b;
+      --green:     #22c55e;
+      --red:       #ef4444;
+      --transition: 320ms cubic-bezier(0.4,0,0.2,1);
+    }
+
+    /* ─── Base reset ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden; /* we manage scrolling per-state */
+    }
+
+    /* ─── Animated background contour rings ───
+       These are just bare ellipse borders — no fill — that slowly
+       rotate and breathe. Keep them barely visible (opacity 0.04–0.07)
+       so they feel like a distant landscape, not a distraction. ─── */
+    .contour-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+    .contour-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1.5px solid rgba(0,212,255,0.055);
+      transform-origin: center center;
+    }
+    /* Each ring gets unique sizing, positioning, and animation phase */
+    .contour-ring:nth-child(1)  { width:1100px; height:500px; top: 10%; left:-15%; animation: drift1 28s ease-in-out infinite; }
+    .contour-ring:nth-child(2)  { width: 800px; height:380px; top: 35%; left: 20%; animation: drift2 34s ease-in-out infinite; opacity:.035; }
+    .contour-ring:nth-child(3)  { width:1400px; height:620px; top:-10%; left: 10%; animation: drift3 40s ease-in-out infinite; opacity:.03; }
+    .contour-ring:nth-child(4)  { width: 650px; height:280px; top: 60%; left: 50%; animation: drift4 22s ease-in-out infinite; opacity:.05; }
+    .contour-ring:nth-child(5)  { width:1000px; height:440px; top: 75%; left:-5%;  animation: drift1 36s ease-in-out infinite reverse; opacity:.04; }
+    .contour-ring:nth-child(6)  { width: 550px; height:240px; top: 20%; left: 65%; animation: drift2 30s ease-in-out infinite 8s; opacity:.045; }
+    .contour-ring:nth-child(7)  { width:1200px; height:540px; top: 45%; left:-20%; animation: drift3 44s ease-in-out infinite 4s; opacity:.03; }
+    .contour-ring:nth-child(8)  { width: 750px; height:320px; top:  5%; left: 40%; animation: drift4 26s ease-in-out infinite 12s; opacity:.038; }
+    .contour-ring:nth-child(9)  { width: 900px; height:400px; top: 85%; left: 25%; animation: drift1 32s ease-in-out infinite 6s; opacity:.042; }
+    .contour-ring:nth-child(10) { width: 480px; height:200px; top: 50%; left: 75%; animation: drift2 38s ease-in-out infinite 2s; opacity:.05; }
+
+    @keyframes drift1 {
+      0%,100% { transform: rotate(-8deg) scale(1.0); }
+      50%      { transform: rotate( 8deg) scale(1.08); }
+    }
+    @keyframes drift2 {
+      0%,100% { transform: rotate(12deg) scale(1.04); }
+      50%      { transform: rotate(-4deg) scale(0.96); }
+    }
+    @keyframes drift3 {
+      0%,100% { transform: rotate(-3deg) scale(0.97); }
+      50%      { transform: rotate(10deg) scale(1.05); }
+    }
+    @keyframes drift4 {
+      0%,100% { transform: rotate(6deg) scale(1.02); }
+      33%      { transform: rotate(-10deg) scale(0.95); }
+      66%      { transform: rotate(14deg) scale(1.06); }
+    }
+
+    /* ─── App shell — full-screen, states stack on top of each other ─── */
+    #app {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+
+    /* Each state fills the whole viewport and centers its content */
+    .state {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .state.active { display: flex; }
+
+    /* ─── State transition animations ─── */
+    @keyframes stateEnterRight {
+      from { transform: translateX(50px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+    @keyframes stateExitLeft {
+      from { transform: translateX(0);    opacity: 1; }
+      to   { transform: translateX(-50px); opacity: 0; }
+    }
+    .state.entering { animation: stateEnterRight var(--transition) forwards; }
+    .state.exiting  { animation: stateExitLeft  var(--transition) forwards; }
+
+    /* ─── Card — the centered content box ─── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 440px;
+      /* Card enters with a subtle lift animation on first render */
+      animation: cardEntrance 500ms cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    .card-wide { max-width: 560px; }
+
+    @keyframes cardEntrance {
+      from { transform: translateY(24px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    /* Shake animation — applied on login failure */
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      15%     { transform: translateX(-8px); }
+      30%     { transform: translateX(8px); }
+      45%     { transform: translateX(-6px); }
+      60%     { transform: translateX(6px); }
+      75%     { transform: translateX(-3px); }
+      90%     { transform: translateX(3px); }
+    }
+    .card.shake { animation: shake 500ms ease both; }
+
+    /* ─── Logo ─── */
+    .logo {
+      font-size: 1.55rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+    .logo-diamond { color: var(--accent); }
+
+    /* Tagline below the logo */
+    .tagline {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    /* ─── Stats row (login screen only) ─── */
+    .stats-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.75rem;
+      color: var(--accent);
+      font-weight: 500;
+      margin-bottom: 28px;
+      padding: 10px 16px;
+      background: var(--accent-dim);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .stats-row .dot { color: var(--text-dim); }
+
+    /* ─── Form elements ─── */
+    .field {
+      margin-bottom: 16px;
+    }
+    .field label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .field input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 14px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .field input::placeholder { color: var(--text-dim); }
+    /* Cyan focus glow — the signature of this design system */
+    .field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    /* Remember-me row */
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .checkbox-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .checkbox-row label {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* ─── Buttons ─── */
+    .btn-primary {
+      width: 100%;
+      padding: 13px 20px;
+      background: var(--accent);
+      color: #000;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: filter var(--transition), transform var(--transition);
+    }
+    .btn-primary:hover  { filter: brightness(1.12); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); filter: brightness(0.95); }
+    .btn-primary:disabled {
+      background: var(--surface2);
+      color: var(--text-dim);
+      cursor: not-allowed;
+      transform: none;
+      filter: none;
+    }
+    .btn-pill { border-radius: 100px; }
+
+    /* Ripple effect — spawned by JS on click */
+    .ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      width: 0; height: 0;
+      transform: translate(-50%,-50%) scale(0);
+      animation: rippleExpand 600ms ease-out forwards;
+      pointer-events: none;
+    }
+    @keyframes rippleExpand {
+      to { width: 400px; height: 400px; opacity: 0; transform: translate(-50%,-50%) scale(1); }
+    }
+
+    /* ─── Error message ─── */
+    .error-msg {
+      font-size: 0.82rem;
+      color: var(--red);
+      min-height: 18px;
+      margin-bottom: 14px;
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+
+    /* ─── Footer links (below form) ─── */
+    .form-footer {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 0.87rem;
+      color: var(--text-dim);
+    }
+    .form-footer a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .form-footer a:hover { text-decoration: underline; }
+
+    /* Demo link gets slightly different treatment */
+    .demo-link {
+      color: var(--green) !important;
+      font-size: 0.88rem;
+    }
+
+    /* ─── Section headings used in signup/onboarding ─── */
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+    .card-subtitle {
+      font-size: 0.83rem;
+      color: var(--text-dim);
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    /* ─── Onboarding: persona grid (6 tiles, 2 per row on desktop) ─── */
+    .survey-section { margin-bottom: 24px; }
+    .survey-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    .persona-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .persona-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 14px 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: border-color var(--transition), background var(--transition), transform var(--transition);
+      user-select: none;
+    }
+    .persona-tile:hover { border-color: rgba(0,212,255,0.4); transform: translateY(-2px); }
+    .persona-tile.selected {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    .persona-icon { font-size: 1.4rem; }
+    .persona-label { font-size: 0.73rem; font-weight: 500; text-align: center; color: var(--text); }
+
+    /* ─── Onboarding: goal chips (multi-select) ─── */
+    .goals-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .goal-chip {
+      padding: 7px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: border-color var(--transition), color var(--transition), background var(--transition);
+      user-select: none;
+    }
+    .goal-chip:hover { border-color: rgba(0,212,255,0.4); color: var(--text); }
+    .goal-chip.selected {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    /* ─── Welcome screen — full-viewport, no card ─── */
+    #state-welcome {
+      flex-direction: column;
+      text-align: center;
+      gap: 0;
+      background: var(--bg);
+    }
+    .welcome-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      padding: 40px 20px;
+    }
+
+    /* Logo in welcome screen starts invisible — JS adds .visible to trigger animation */
+    .welcome-logo {
+      font-size: 2rem;
+      font-weight: 800;
+      opacity: 0;
+      transform: scale(0.6);
+      transition: opacity 600ms cubic-bezier(0.34,1.56,0.64,1),
+                  transform 600ms cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .welcome-logo.visible { opacity: 1; transform: scale(1); }
+
+    .welcome-text {
+      font-size: 1.3rem;
+      font-weight: 500;
+      color: var(--text-dim);
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 500ms ease, transform 500ms ease;
+    }
+    .welcome-text.visible { opacity: 1; transform: translateY(0); }
+    .welcome-text strong { color: var(--text); font-weight: 700; }
+
+    /* Three stat cards in welcome screen */
+    .welcome-stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .welcome-stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 28px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 400ms ease, transform 400ms ease;
+      min-width: 120px;
+    }
+    .welcome-stat-card.visible { opacity: 1; transform: translateY(0); }
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-label {
+      font-size: 0.77rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    /* Progress bar */
+    .welcome-progress-bar {
+      width: 280px;
+      height: 4px;
+      background: var(--surface);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+    .welcome-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), #0095b3);
+      border-radius: 100px;
+      transition: width 2.5s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    /* Start button — invisible until progress is mostly done */
+    #start-btn {
+      width: auto;
+      padding: 14px 40px;
+      font-size: 1rem;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 400ms ease, transform 400ms ease;
+    }
+    #start-btn.visible { opacity: 1; transform: translateY(0); }
+
+    /* ─── Responsive — on small phones, reduce padding and tighten grid ─── */
+    @media (max-width: 480px) {
+      .card { padding: 28px 20px; }
+      .persona-grid { grid-template-columns: repeat(2, 1fr); }
+      .welcome-logo { font-size: 1.5rem; }
+      .welcome-text { font-size: 1.1rem; }
+      .welcome-stat-card { padding: 16px 20px; }
+      .stat-number { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Animated background: contour-like ellipse rings drifting slowly -->
+  <div class="contour-bg" aria-hidden="true">
+    <div class="contour-ring"></div>
+    <div class="contour-ring"></div>
+    <div class="contour-ring"></div>
+    <div class="contour-ring"></div>
+    <div class="contour-ring"></div>
+    <div class="contour-ring"></div>
+    <div class="contour-ring"></div>
+    <div class="contour-ring"></div>
+    <div class="contour-ring"></div>
+    <div class="contour-ring"></div>
+  </div>
+
+  <!-- App — all states live here, only one is .active at a time -->
+  <div id="app">
+
+    <!-- ═══════════════ STATE 1: LOGIN ═══════════════ -->
+    <div id="state-login" class="state active">
+      <div class="card" id="login-card">
+
+        <div class="logo">Terra<span class="logo-diamond">◈</span>Measure</div>
+        <div class="tagline">Precision Terrain Intelligence</div>
+
+        <div class="stats-row">
+          <span>±1m Accuracy</span>
+          <span class="dot">·</span>
+          <span>Global Coverage</span>
+          <span class="dot">·</span>
+          <span>Free Forever</span>
+        </div>
+
+        <form id="login-form" novalidate>
+          <div class="field">
+            <label for="login-user">Username or Email</label>
+            <input type="text" id="login-user" placeholder="username or email"
+                   autocomplete="username" spellcheck="false" />
+          </div>
+          <div class="field">
+            <label for="login-pass">Password</label>
+            <input type="password" id="login-pass" placeholder="••••••••"
+                   autocomplete="current-password" />
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="remember-me" checked />
+            <label for="remember-me">Remember me</label>
+          </div>
+          <div class="error-msg" id="login-error" role="alert"></div>
+          <button type="submit" class="btn-primary ripple-btn">Sign In</button>
+        </form>
+
+        <div class="form-footer">
+          <a href="#" class="demo-link" id="demo-btn">Try the demo →</a>
+        </div>
+        <div class="form-footer">
+          New here? <a href="#" id="go-signup">Create account</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ STATE 2: SIGN UP ═══════════════ -->
+    <div id="state-signup" class="state">
+      <div class="card" id="signup-card">
+
+        <div class="logo">Terra<span class="logo-diamond">◈</span>Measure</div>
+        <div class="card-title">Create Account</div>
+        <div class="card-subtitle">Step 1 of 2 — Account Details</div>
+
+        <form id="signup-form" novalidate>
+          <div class="field">
+            <label for="signup-name">Full Name</label>
+            <input type="text" id="signup-name" placeholder="Alex Johnson"
+                   autocomplete="name" />
+          </div>
+          <div class="field">
+            <label for="signup-email">Email</label>
+            <input type="email" id="signup-email" placeholder="you@example.com"
+                   autocomplete="email" spellcheck="false" />
+          </div>
+          <div class="field">
+            <label for="signup-username">Username</label>
+            <input type="text" id="signup-username" placeholder="alex_j"
+                   autocomplete="username" spellcheck="false" />
+          </div>
+          <div class="field">
+            <label for="signup-pass">Password</label>
+            <input type="password" id="signup-pass" placeholder="••••••••"
+                   autocomplete="new-password" />
+          </div>
+          <div class="field">
+            <label for="signup-confirm">Confirm Password</label>
+            <input type="password" id="signup-confirm" placeholder="••••••••"
+                   autocomplete="new-password" />
+          </div>
+          <div class="error-msg" id="signup-error" role="alert"></div>
+          <button type="submit" class="btn-primary ripple-btn">Create Account</button>
+        </form>
+
+        <div class="form-footer">
+          Already have an account? <a href="#" id="go-login">Sign in</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ STATE 3: ONBOARDING ═══════════════ -->
+    <div id="state-onboarding" class="state">
+      <div class="card card-wide" id="onboarding-card">
+
+        <div class="logo">Terra<span class="logo-diamond">◈</span>Measure</div>
+        <div class="card-title" id="onboarding-greeting">One quick question 👋</div>
+        <div class="card-subtitle">Help us personalize your experience.</div>
+
+        <!-- Q1: persona — single select tiles -->
+        <div class="survey-section">
+          <div class="survey-label">What best describes you?</div>
+          <div class="persona-grid" id="persona-grid">
+            <!-- tiles injected by JS so we can manage state cleanly -->
+          </div>
+        </div>
+
+        <!-- Q2: goals — multi-select chips -->
+        <div class="survey-section">
+          <div class="survey-label">What will you mostly use TerraMeasure for?</div>
+          <div class="goals-chips" id="goals-chips">
+            <!-- chips injected by JS -->
+          </div>
+        </div>
+
+        <button class="btn-primary ripple-btn" id="onboarding-continue" disabled>
+          Continue
+        </button>
+        <div class="form-footer">
+          <a href="#" id="onboarding-skip">Skip for now</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ STATE 4: WELCOME ANIMATION ═══════════════ -->
+    <div id="state-welcome" class="state">
+      <div class="welcome-content">
+        <div class="welcome-logo" id="welcome-logo">
+          Terra<span class="logo-diamond">◈</span>Measure
+        </div>
+        <div class="welcome-text" id="welcome-text">
+          Welcome to TerraMeasure, <strong id="welcome-name"></strong>
+        </div>
+        <div class="welcome-stats" id="welcome-stats">
+          <!-- Three stat cards, data-target drives the counter animation -->
+          <div class="welcome-stat-card" id="wstat-0">
+            <div class="stat-number" data-prefix="±" data-target="1" data-suffix="m">±0m</div>
+            <div class="stat-label">Elevation accuracy</div>
+          </div>
+          <div class="welcome-stat-card" id="wstat-1">
+            <div class="stat-number" data-target="2" data-suffix=" min">0 min</div>
+            <div class="stat-label">Time to first survey</div>
+          </div>
+          <div class="welcome-stat-card" id="wstat-2">
+            <div class="stat-number" data-target="6" data-suffix="+">0+</div>
+            <div class="stat-label">Analysis types</div>
+          </div>
+        </div>
+        <div class="welcome-progress-bar">
+          <div class="welcome-progress-fill" id="progress-fill"></div>
+        </div>
+        <button class="btn-primary btn-pill ripple-btn" id="start-btn">
+          Start Surveying →
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /#app -->
+
+  <script>
+    // ─────────────────────────────────────────────────────────────
+    // UTILITY HELPERS
+    // ─────────────────────────────────────────────────────────────
+
+    // escHtml — always use this before injecting any user-supplied string
+    // into innerHTML.  It converts < > & " ' into harmless entities so no
+    // one can inject a <script> tag through a username field.
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#39;');
+    }
+
+    // Safe localStorage wrappers — if the browser blocks localStorage
+    // (private mode in some browsers) these just return safe defaults.
+    function lsGet(key) {
+      try { return localStorage.getItem(key); } catch(e) { return null; }
+    }
+    function lsSet(key, val) {
+      try { localStorage.setItem(key, val); } catch(e) {}
+    }
+    function ssGet(key) {
+      try { return sessionStorage.getItem(key); } catch(e) { return null; }
+    }
+    function ssSet(key, val) {
+      try { sessionStorage.setItem(key, val); } catch(e) {}
+    }
+
+    // Get the array of all registered users from localStorage
+    function getUsers() {
+      try { return JSON.parse(lsGet('terrameasure_users') || '[]'); }
+      catch(e) { return []; }
+    }
+
+    // Persist the user array back to localStorage
+    function saveUsers(users) {
+      lsSet('terrameasure_users', JSON.stringify(users));
+    }
+
+    // Save the "current logged-in user" — localStorage if rememberMe,
+    // sessionStorage if not (sessionStorage clears when the tab closes).
+    function setCurrentUser(user, rememberMe) {
+      const serialized = JSON.stringify(user);
+      if (rememberMe) lsSet('terrameasure_current_user', serialized);
+      else            ssSet('terrameasure_current_user', serialized);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // DEMO ACCOUNT
+    // This is always available, regardless of what's in localStorage.
+    // It's the quickest way for someone to explore the app.
+    // ─────────────────────────────────────────────────────────────
+    const DEMO_ACCOUNT = {
+      id: 'u_demo',
+      name: 'Terra User',
+      username: 'terrameasure',
+      email: 'demo@terrameasure.app',
+      password: 'lucasrules',
+      persona: 'Just Exploring',
+      goals: ['Assess buildability', 'Plan drainage & grading'],
+      created: Date.now(),
+      lastLogin: Date.now(),
+      surveyCount: 0,
+      settings: { theme: 'dark', units: 'imperial', defaultRes: 10, defaultArea: 300 }
+    };
+
+    // ─────────────────────────────────────────────────────────────
+    // STATE MACHINE
+    // One state is visible at a time.  transitionTo() slides out the
+    // current card left and slides in the new card from the right.
+    // ─────────────────────────────────────────────────────────────
+    let currentStateName = 'login';
+
+    // pendingUser holds the new user being built across signup → onboarding
+    let pendingUser = null;
+
+    function transitionTo(newName) {
+      if (newName === currentStateName) return;
+
+      const outEl = document.getElementById('state-' + currentStateName);
+      const inEl  = document.getElementById('state-' + newName);
+
+      // Exit animation for current state
+      outEl.classList.add('exiting');
+
+      // Prepare incoming state (off-screen to the right at opacity 0)
+      inEl.style.display = 'flex';
+      inEl.classList.add('entering');
+
+      const DURATION = 320;
+      setTimeout(() => {
+        outEl.classList.remove('active', 'exiting');
+        outEl.style.display = '';
+        inEl.classList.remove('entering');
+        inEl.classList.add('active');
+        currentStateName = newName;
+
+        // Run any state-specific initialization after the transition
+        if (newName === 'welcome') runWelcomeAnimation();
+      }, DURATION);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // RIPPLE EFFECT
+    // On any .ripple-btn click, spawn a radial ripple from cursor pos
+    // ─────────────────────────────────────────────────────────────
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('.ripple-btn');
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      const ripple = document.createElement('span');
+      ripple.className = 'ripple';
+      ripple.style.left = (e.clientX - rect.left) + 'px';
+      ripple.style.top  = (e.clientY - rect.top)  + 'px';
+      btn.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 650);
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // SHOW / HIDE ERROR MESSAGES
+    // ─────────────────────────────────────────────────────────────
+    function showError(elId, msg) {
+      const el = document.getElementById(elId);
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+    function clearError(elId) {
+      const el = document.getElementById(elId);
+      el.textContent = '';
+      el.classList.remove('visible');
+    }
+
+    // Shake the login card to signal a bad login attempt
+    function shakeCard(cardId) {
+      const card = document.getElementById(cardId);
+      card.classList.remove('shake');
+      // Force reflow so the animation re-triggers if already applied
+      void card.offsetWidth;
+      card.classList.add('shake');
+      card.addEventListener('animationend', () => card.classList.remove('shake'), { once: true });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // LOGIN LOGIC
+    // ─────────────────────────────────────────────────────────────
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      clearError('login-error');
+
+      const identifier = document.getElementById('login-user').value.trim().toLowerCase();
+      const password   = document.getElementById('login-pass').value;
+      const rememberMe = document.getElementById('remember-me').checked;
+
+      if (!identifier || !password) {
+        showError('login-error', 'Please enter your username/email and password.');
+        shakeCard('login-card');
+        return;
+      }
+
+      // Check demo account first
+      const isDemoUser = identifier === 'terrameasure' || identifier === 'demo@terrameasure.app';
+      const isDemoPass = password === 'lucasrules';
+
+      if (isDemoUser && isDemoPass) {
+        const demo = { ...DEMO_ACCOUNT, lastLogin: Date.now() };
+        // Upsert the demo account into the users array so it shows up in any user lists
+        const users = getUsers().filter(u => u.id !== 'u_demo');
+        users.push(demo);
+        saveUsers(users);
+        setCurrentUser(demo, rememberMe);
+        document.getElementById('welcome-name').textContent = 'Terra User';
+        transitionTo('welcome');
+        return;
+      }
+
+      // Check real registered users
+      const users = getUsers();
+      const user = users.find(u =>
+        (u.username.toLowerCase() === identifier || u.email.toLowerCase() === identifier)
+        && u.password === password
+      );
+
+      if (!user) {
+        showError('login-error', 'Incorrect credentials — try the demo account →');
+        shakeCard('login-card');
+        return;
+      }
+
+      // Update lastLogin timestamp and re-save
+      user.lastLogin = Date.now();
+      const idx = users.findIndex(u => u.id === user.id);
+      users[idx] = user;
+      saveUsers(users);
+      setCurrentUser(user, rememberMe);
+
+      // Show first name only for a friendlier greeting
+      document.getElementById('welcome-name').textContent = user.name.split(' ')[0];
+      transitionTo('welcome');
+    });
+
+    // "Try the demo" auto-fills the form and submits
+    document.getElementById('demo-btn').addEventListener('click', function(e) {
+      e.preventDefault();
+      document.getElementById('login-user').value = 'terrameasure';
+      document.getElementById('login-pass').value = 'lucasrules';
+      document.getElementById('login-form').dispatchEvent(new Event('submit'));
+    });
+
+    // Switch to signup
+    document.getElementById('go-signup').addEventListener('click', function(e) {
+      e.preventDefault();
+      clearError('login-error');
+      transitionTo('signup');
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // SIGN-UP LOGIC
+    // ─────────────────────────────────────────────────────────────
+    document.getElementById('go-login').addEventListener('click', function(e) {
+      e.preventDefault();
+      clearError('signup-error');
+      transitionTo('login');
+    });
+
+    document.getElementById('signup-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      clearError('signup-error');
+
+      const name     = document.getElementById('signup-name').value.trim();
+      const email    = document.getElementById('signup-email').value.trim().toLowerCase();
+      const username = document.getElementById('signup-username').value.trim();
+      const pass     = document.getElementById('signup-pass').value;
+      const confirm  = document.getElementById('signup-confirm').value;
+
+      // — Validate every field —
+      if (!name || !email || !username || !pass || !confirm) {
+        showError('signup-error', 'All fields are required.');
+        shakeCard('signup-card');
+        return;
+      }
+      if (pass !== confirm) {
+        showError('signup-error', 'Passwords do not match.');
+        shakeCard('signup-card');
+        return;
+      }
+      // Username: 3+ chars, only letters / digits / underscores
+      if (!/^[a-zA-Z0-9_]{3,}$/.test(username)) {
+        showError('signup-error', 'Username must be ≥ 3 chars: letters, digits, and _ only.');
+        shakeCard('signup-card');
+        return;
+      }
+      // Basic email shape check
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showError('signup-error', 'Please enter a valid email address.');
+        shakeCard('signup-card');
+        return;
+      }
+
+      // Prevent duplicate username or email
+      const users = getUsers();
+      if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+        showError('signup-error', 'That username is already taken.');
+        shakeCard('signup-card');
+        return;
+      }
+      if (users.some(u => u.email.toLowerCase() === email)) {
+        showError('signup-error', 'An account with that email already exists.');
+        shakeCard('signup-card');
+        return;
+      }
+
+      // Build the new user object — won't be saved until after onboarding
+      pendingUser = {
+        id: 'u_' + Date.now(),
+        name,
+        username,
+        email,
+        password: pass,
+        persona: '',
+        goals: [],
+        created: Date.now(),
+        lastLogin: Date.now(),
+        surveyCount: 0,
+        settings: { theme: 'dark', units: 'imperial', defaultRes: 10, defaultArea: 300 }
+      };
+
+      // Personalize the onboarding greeting with the user's first name
+      const firstName = name.split(' ')[0];
+      document.getElementById('onboarding-greeting').textContent =
+        'One quick question, ' + escHtml(firstName) + ' 👋';
+
+      transitionTo('onboarding');
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // ONBOARDING LOGIC — build persona tiles and goal chips
+    // ─────────────────────────────────────────────────────────────
+    const PERSONAS = [
+      { icon: '🏗️', label: 'Land Developer' },
+      { icon: '🌾', label: 'Farmer / Ag Use' },
+      { icon: '🏠', label: 'Homeowner' },
+      { icon: '🔬', label: 'Researcher' },
+      { icon: '📐', label: 'Pro Surveyor' },
+      { icon: '🗺️', label: 'Just Exploring' },
+    ];
+    const GOALS = [
+      'Assess buildability',
+      'Plan drainage & grading',
+      'Earthwork volumes',
+      'Environmental risk',
+      'Agricultural planning',
+      'Property analysis',
+      'Academic / Research',
+    ];
+
+    // Build the persona tiles
+    const personaGrid = document.getElementById('persona-grid');
+    PERSONAS.forEach(p => {
+      const tile = document.createElement('div');
+      tile.className = 'persona-tile ripple-btn';
+      tile.dataset.label = p.label;
+      // Safe to inject these — they come from our own constants, not user input
+      tile.innerHTML = `<span class="persona-icon">${p.icon}</span><span class="persona-label">${p.label}</span>`;
+      tile.addEventListener('click', () => selectPersona(tile, p.label));
+      personaGrid.appendChild(tile);
+    });
+
+    // Build the goal chips
+    const goalsChips = document.getElementById('goals-chips');
+    GOALS.forEach(g => {
+      const chip = document.createElement('div');
+      chip.className = 'goal-chip';
+      chip.textContent = g;
+      chip.addEventListener('click', () => toggleGoal(chip, g));
+      goalsChips.appendChild(chip);
+    });
+
+    let selectedPersona = null;
+
+    function selectPersona(tile, label) {
+      // Deselect any previously chosen tile
+      document.querySelectorAll('.persona-tile').forEach(t => t.classList.remove('selected'));
+      tile.classList.add('selected');
+      selectedPersona = label;
+      // Enable Continue once Q1 is answered
+      document.getElementById('onboarding-continue').disabled = false;
+    }
+
+    const selectedGoals = new Set();
+
+    function toggleGoal(chip, label) {
+      if (selectedGoals.has(label)) {
+        selectedGoals.delete(label);
+        chip.classList.remove('selected');
+      } else {
+        selectedGoals.add(label);
+        chip.classList.add('selected');
+      }
+    }
+
+    // Continue button — save survey answers to pendingUser, store user, go to welcome
+    document.getElementById('onboarding-continue').addEventListener('click', function() {
+      if (!selectedPersona) return; // shouldn't happen since button is disabled, but be safe
+      finishOnboarding();
+    });
+
+    document.getElementById('onboarding-skip').addEventListener('click', function(e) {
+      e.preventDefault();
+      finishOnboarding();
+    });
+
+    function finishOnboarding() {
+      if (!pendingUser) return;
+
+      pendingUser.persona = selectedPersona || '';
+      pendingUser.goals   = [...selectedGoals];
+
+      // Save to the users array
+      const users = getUsers();
+      users.push(pendingUser);
+      saveUsers(users);
+
+      // Mark them as currently logged in (remember by default for new accounts)
+      setCurrentUser(pendingUser, true);
+
+      // Welcome them by first name
+      const firstName = pendingUser.name.split(' ')[0];
+      document.getElementById('welcome-name').textContent = firstName;
+
+      transitionTo('welcome');
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // WELCOME ANIMATION — runs when STATE 4 becomes active
+    // Each step is triggered with a setTimeout chain so things
+    // appear in a satisfying sequence.
+    // ─────────────────────────────────────────────────────────────
+    function runWelcomeAnimation() {
+      // Reset everything to start state
+      const logo     = document.getElementById('welcome-logo');
+      const text     = document.getElementById('welcome-text');
+      const stats    = [0,1,2].map(i => document.getElementById('wstat-' + i));
+      const fill     = document.getElementById('progress-fill');
+      const startBtn = document.getElementById('start-btn');
+
+      logo.classList.remove('visible');
+      text.classList.remove('visible');
+      stats.forEach(s => s.classList.remove('visible'));
+      fill.style.width = '0%';
+      startBtn.classList.remove('visible');
+
+      // Step 1 — Logo pulses in
+      setTimeout(() => logo.classList.add('visible'), 100);
+
+      // Step 2 — Welcome text slides up
+      setTimeout(() => text.classList.add('visible'), 700);
+
+      // Step 3 — Stat cards appear staggered
+      setTimeout(() => { stats[0].classList.add('visible'); animateCounter(stats[0]); }, 1100);
+      setTimeout(() => { stats[1].classList.add('visible'); animateCounter(stats[1]); }, 1200);
+      setTimeout(() => { stats[2].classList.add('visible'); animateCounter(stats[2]); }, 1300);
+
+      // Step 4 — Progress bar fills over 2.5 seconds
+      // (small delay so the fill transition sees the 0% starting state)
+      setTimeout(() => { fill.style.width = '100%'; }, 1400);
+
+      // Step 5 — "Start Surveying" button appears
+      setTimeout(() => startBtn.classList.add('visible'), 3800);
+
+      // Auto-advance after 4.5s in case the user sits and watches
+      let autoAdvanced = false;
+      const autoTimer = setTimeout(() => {
+        autoAdvanced = true;
+        goToApp();
+      }, 4500);
+
+      startBtn.onclick = function() {
+        if (!autoAdvanced) { clearTimeout(autoTimer); }
+        goToApp();
+      };
+    }
+
+    // Counts a stat card number up from 0 to its data-target value
+    // using requestAnimationFrame for a smooth, buttery animation
+    function animateCounter(cardEl) {
+      const numEl  = cardEl.querySelector('.stat-number');
+      const target = parseInt(numEl.dataset.target, 10);
+      const prefix = numEl.dataset.prefix || '';
+      const suffix = numEl.dataset.suffix || '';
+      const duration = 1400; // ms
+      const startTime = performance.now();
+
+      function step(now) {
+        const elapsed  = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // easeOutQuart — fast start, gentle landing
+        const eased   = 1 - Math.pow(1 - progress, 4);
+        const current = Math.round(eased * target);
+        numEl.textContent = prefix + current + suffix;
+        if (progress < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    // Finally navigate to the main app
+    function goToApp() {
+      window.location.href = 'terrascan.html';
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // INIT — if a user is already logged in (localStorage), skip login
+    // and go straight to the app.
+    // ─────────────────────────────────────────────────────────────
+    (function init() {
+      const stored = lsGet('terrameasure_current_user') || ssGet('terrameasure_current_user');
+      if (stored) {
+        try {
+          const user = JSON.parse(stored);
+          if (user && user.id) {
+            // Already authenticated — send them straight to the app
+            window.location.href = 'terrascan.html';
+            return;
+          }
+        } catch(e) { /* corrupt data — just show login */ }
+      }
+      // Otherwise, the login card fades in naturally via its CSS animation
+    })();
+  </script>
+</body>
+</html>
