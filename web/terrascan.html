@@ -668,7 +668,39 @@ html,body{height:100%;background:var(--bg);color:var(--text);overflow:hidden;}
 .sp-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
 .sp-row:last-child{margin-bottom:0;}
 .sp-lbl{font-size:11px;color:var(--text2);font-family:var(--font-ui);flex:1;white-space:nowrap;}
-body.light .settings-popover{background:rgba(248,249,250,.97);}
+/* ===================================================================
+   LIGHT MODE — override every variable + hardcoded rgba backgrounds
+   Toggle via body.light class (toggleTheme in JS)
+   =================================================================== */
+body.light{
+  --bg:#f5f5f7; --bg2:#ebebed;
+  --surface:#ffffff; --surface2:#e8e8ed; --surface3:#d1d1d6;
+  --border:rgba(0,0,0,.1); --border2:rgba(0,0,0,.15); --border3:rgba(0,0,0,.07);
+  --text:#1d1d1f; --text2:rgba(29,29,31,.65); --text3:rgba(29,29,31,.4);
+  --accentDim:rgba(37,99,235,.1); --accentHov:rgba(37,99,235,.18);
+  background:#f5f5f7; color:#1d1d1f;
+}
+/* Topbar — frosted light glass */
+body.light .topbar{background:rgba(255,255,255,.88);}
+/* Overlays panel */
+body.light .overlays-panel{background:rgba(255,255,255,.96);box-shadow:0 16px 48px rgba(0,0,0,.14);}
+/* Search results dropdown (hardcoded dark bg) */
+body.light .search-results{background:rgba(255,255,255,.98);box-shadow:0 8px 32px rgba(0,0,0,.14);}
+body.light .search-item:hover{background:rgba(0,0,0,.04);}
+/* Overlay list items hover (was rgba(255,255,255,.06) which is invisible on white) */
+body.light .ol-item:hover,body.light .ol-action:hover{background:rgba(0,0,0,.04);}
+/* Leaflet bg tile gap colour */
+body.light .leaflet-container{background:#dce9f7 !important;}
+/* Settings popover */
+body.light .settings-popover{background:rgba(248,249,250,.98);border-color:rgba(0,0,0,.12);}
+/* Scan / loading overlay */
+body.light .scan-overlay{background:rgba(245,245,247,.97);}
+body.light .scan-progress-bar{background:rgba(37,99,235,.25);}
+/* Toast */
+body.light .tm-toast{background:rgba(255,255,255,.96);color:#1d1d1f;border-color:rgba(0,0,0,.12);box-shadow:0 4px 16px rgba(0,0,0,.12);}
+/* Close buttons in panels */
+body.light .op-hdr-close{background:rgba(0,0,0,.07);color:var(--text2);}
+body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
 
 /* GPS Leaflet control button */
 .gps-ctrl-btn{
@@ -1785,15 +1817,20 @@ document.addEventListener("click",e=>{
 
 /* ── BASE MAP ── */
 function setBaseMap(type,el){
-  _currentBaseMap = type; // FIX 5: keep track so settings dropdown can sync on open
+  _currentBaseMap = type;
   document.querySelectorAll(".ol-item[id^='bm-']").forEach(x=>x.classList.remove("active"));
   el.classList.add("active");
+  const radio = el.querySelector('.ol-radio');
+  if(radio) radio.checked = true;
   [streetTile,satTile,topoTile].forEach(l=>l&&map.hasLayer(l)&&map.removeLayer(l));
   if(hybridLabel){map.removeLayer(hybridLabel);hybridLabel=null;}
   if(type==="street") streetTile.addTo(map);
   else if(type==="satellite") satTile.addTo(map);
   else if(type==="hybrid"){satTile.addTo(map);hybridLabel=labelTile;labelTile.addTo(map);}
   else if(type==="topo") topoTile.addTo(map);
+  // Keep Settings dropdown in sync
+  const settingsSel = document.getElementById('set-basemap');
+  if(settingsSel) settingsSel.value = type;
 }
 
 /* ── OVERLAY PANEL ACCORDION ── */
@@ -3374,28 +3411,32 @@ function discardSettings() {
 }
 
 function applyBaseMap(style) {
-  _currentBaseMap = style; // FIX 5: keep module-level variable in sync
+  _currentBaseMap = style;
   // Remove whichever base tiles are currently on the map
   [streetTile, satTile, topoTile, labelTile].forEach(t => { if(map.hasLayer(t)) map.removeLayer(t); });
   if(hybridLabel && map.hasLayer(hybridLabel)) map.removeLayer(hybridLabel);
 
   switch(style) {
-    case 'satellite':
-      satTile.addTo(map);
-      break;
+    case 'satellite': satTile.addTo(map); break;
     case 'hybrid':
       satTile.addTo(map);
-      // Add semi-transparent OSM labels on top
       hybridLabel = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         {attribution:'© OSM',maxZoom:19,opacity:0.45,noWrap:true});
       hybridLabel.addTo(map);
       break;
-    case 'topo':
-      topoTile.addTo(map);
-      break;
-    default: // 'street'
-      streetTile.addTo(map);
+    case 'topo': topoTile.addTo(map); break;
+    default: streetTile.addTo(map);
   }
+
+  // Keep overlays panel radio buttons in sync with the settings dropdown
+  document.querySelectorAll(".ol-item[id^='bm-']").forEach(x => x.classList.remove("active"));
+  const bmEl = document.getElementById('bm-' + style);
+  if(bmEl) {
+    bmEl.classList.add('active');
+    const radio = bmEl.querySelector('.ol-radio');
+    if(radio) radio.checked = true;
+  }
+
   _pendingSettings.baseMap = style;
   saveUserSetting('baseMap', style);
   toast('Map style: ' + style, 'info', 1500);
