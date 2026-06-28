@@ -1011,6 +1011,10 @@ body.light .settings-popover{background:rgba(248,249,250,.97);}
     <a href="terraphoto.html" class="t-link">TerraPhoto</a>
     <a href="terranews.html" class="t-link">TerraIntel</a>
     <a href="index.html" class="t-link" style="margin-left:3px;">Home</a>
+    <div class="t-sep"></div>
+    <!-- Theme toggle — instant, no save required -->
+    <button id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark mode"
+      style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 6px;line-height:1;flex-shrink:0;">☀️</button>
 
   </div><!-- /topbar -->
 
@@ -1340,9 +1344,9 @@ document.getElementById('user-name').textContent = 'Hi, ' + _firstName;
 //
 // When deployed to GitHub Pages, the HTML is on githubio but the API is on
 // Railway — so we use the Railway URL instead.
-const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? window.location.origin           // local: FastAPI serves everything
-  : "REPLACE_WITH_RAILWAY_URL";      // deployed: set this to your Railway URL
+// FastAPI serves both the HTML files AND the API from the same origin,
+// both locally and on Render — so window.location.origin is always correct.
+const API = window.location.origin;
 const OVERPASS = "https://overpass-api.de/api/interpreter";
 
 /* ── UTILITIES ── */
@@ -1646,6 +1650,29 @@ function calcBearing(lat1,lon1,lat2,lon2){
 // openSettings() and closeSettings() are defined later in the Settings JS block below.
 // Stub here so any early calls don't throw before the full definitions load.
 function toggleSettingsPopover(){ openSettings(); } // legacy alias
+
+/* ── THEME TOGGLE (topbar button — instant, no save required) ── */
+function toggleTheme(){
+  const isLight = document.body.classList.toggle('light');
+  const btn = document.getElementById('theme-btn');
+  if(btn) btn.textContent = isLight ? '🌙' : '☀️';
+  localStorage.setItem('terrascan_theme', isLight ? 'light' : 'dark');
+  // Keep settings panel in sync if open
+  const darkOpt  = document.getElementById('theme-dark');
+  const lightOpt = document.getElementById('theme-light');
+  if(darkOpt)  darkOpt.classList.toggle('active', !isLight);
+  if(lightOpt) lightOpt.classList.toggle('active', isLight);
+  if(_currentUser) saveUserSetting('theme', isLight ? 'light' : 'dark');
+}
+// Restore theme on load
+(()=>{
+  const saved = localStorage.getItem('terrascan_theme') || _currentUser?.settings?.theme;
+  if(saved === 'light'){
+    document.body.classList.add('light');
+    const btn = document.getElementById('theme-btn');
+    if(btn) btn.textContent = '🌙';
+  }
+})();
 
 /* ── QUICK DEMO MODE ── */
 // Cycles through iconic locations and auto-runs a survey — perfect for demos
@@ -3319,9 +3346,30 @@ function discardSettings() {
 }
 
 function applyBaseMap(style) {
-  // Switch base tile layer (for now just store the preference — full swap would remove/re-add tile layer)
+  // Remove whichever base tiles are currently on the map
+  [streetTile, satTile, topoTile, labelTile].forEach(t => { if(map.hasLayer(t)) map.removeLayer(t); });
+  if(hybridLabel && map.hasLayer(hybridLabel)) map.removeLayer(hybridLabel);
+
+  switch(style) {
+    case 'satellite':
+      satTile.addTo(map);
+      break;
+    case 'hybrid':
+      satTile.addTo(map);
+      // Add semi-transparent OSM labels on top
+      hybridLabel = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {attribution:'© OSM',maxZoom:19,opacity:0.45,noWrap:true});
+      hybridLabel.addTo(map);
+      break;
+    case 'topo':
+      topoTile.addTo(map);
+      break;
+    default: // 'street'
+      streetTile.addTo(map);
+  }
   _pendingSettings.baseMap = style;
   saveUserSetting('baseMap', style);
+  toast('Map style: ' + style, 'info', 1500);
 }
 
 function switchSettingsTab(section, btn) {
