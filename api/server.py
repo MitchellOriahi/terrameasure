@@ -88,6 +88,9 @@ class SurveyResponse(BaseModel):
     dem_center_lon: float = 0.0
     dem_width_m: float = 0.0
     dem_height_m: float = 0.0
+    # Average ground height — used by the frontend agriculture panel to
+    # estimate irrigation potential (flat, low-lying land irrigates easiest).
+    avg_height: float = 0.0
     # Extra fields for photo surveys
     photo_count: Optional[int] = None
     gps_found: Optional[bool] = None
@@ -192,6 +195,7 @@ def run_survey(dem_result) -> SurveyResponse:
         cell_size_m=dem_result.cell_size,
         min_height=float(np.nanmin(dem)),
         max_height=float(np.nanmax(dem)),
+        avg_height=float(np.nanmean(dem)),
         dem_grid=dem_for_json,
         avg_slope=mout(avg),
         cut_volume=mout(vols["cut"]),

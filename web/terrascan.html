@@ -551,7 +551,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);overflow:hidden;}
 .v3c-btn.active{background:var(--accentDim);color:var(--accent);border-color:var(--accent);}
 .v3c-label{font-size:10px;color:var(--text3);display:flex;align-items:center;gap:5px;font-family:var(--font-ui);}
 .v3c-label input[type=range]{width:60px;accent-color:var(--accent);}
-#canvas3d{flex:1;min-height:0;background:#040a14;display:block;width:100%;}
+#canvas3d{background:#040a14;display:block;width:100%;height:100%;}
 
 /* ── SCAN LOADING OVERLAY ── */
 .scan-overlay{
@@ -948,8 +948,8 @@ body.light .settings-popover{background:rgba(248,249,250,.97);}
       <button class="dt" id="dt-rect" title="Draw rectangle" onclick="setDrawMode('rectangle')">
         <span class="dt-icon">▭</span><span class="dt-lbl">Rect</span>
       </button>
-      <button class="dt" id="dt-free" title="Freehand draw" onclick="setDrawMode('freehand')">
-        <span class="dt-icon">〰</span><span class="dt-lbl">Lasso</span>
+      <button class="dt" id="dt-free" title="Free polygon — click to place points, double-click to close" onclick="setDrawMode('freehand')">
+        <span class="dt-icon">〰</span><span class="dt-lbl">Free</span>
       </button>
       <button class="dt" id="dt-meas" title="Measure distance" onclick="setDrawMode('measure')">
         <span class="dt-icon">↔</span><span class="dt-lbl">Dist</span>
@@ -1026,7 +1026,7 @@ body.light .settings-popover{background:rgba(248,249,250,.97);}
     <!-- Floating overlays panel — starts open, sits on top of map -->
     <div class="overlays-panel open" id="overlays-panel">
       <div class="op-hdr">
-        <span class="op-hdr-title">MAP LAYERS</span>
+        <span class="op-hdr-title">OVERLAYS</span>
         <button class="op-hdr-close" onclick="toggleOverlaysPanel()">✕</button>
       </div>
       <div class="op-search">
@@ -1113,15 +1113,15 @@ body.light .settings-popover{background:rgba(248,249,250,.97);}
           <span class="op-sec-chevron" id="sec-chev-climate">▶</span>
         </div>
         <div class="op-sec-body" id="sec-body-climate">
-          <div class="ol-item" id="li-climate-temp" onclick="toggleClimate('temp',this)" title="Annual average temperature heatmap from Open-Meteo">
+          <div class="ol-item" id="li-climate-temp" onclick="toggleClimate('temp',this)" title="Current temperature heatmap from Open-Meteo">
             <input type="checkbox" id="chk-climate-temp" class="ol-chk"/>
             <span class="ol-dot" style="background:linear-gradient(90deg,#3b82f6,#22c55e,#ef4444);border-radius:50%;"></span>
-            <span class="ol-name">Avg Temperature</span>
+            <span class="ol-name">Current Temp.</span>
           </div>
-          <div class="ol-item" id="li-climate-precip" onclick="toggleClimate('precip',this)" title="Annual average precipitation heatmap from Open-Meteo">
+          <div class="ol-item" id="li-climate-precip" onclick="toggleClimate('precip',this)" title="Current precipitation heatmap from Open-Meteo">
             <input type="checkbox" id="chk-climate-precip" class="ol-chk"/>
             <span class="ol-dot" style="background:linear-gradient(90deg,#f5e642,#3b82f6);border-radius:50%;"></span>
-            <span class="ol-name">Avg Precipitation</span>
+            <span class="ol-name">Current Precip.</span>
           </div>
         </div>
 
@@ -1195,7 +1195,7 @@ body.light .settings-popover{background:rgba(248,249,250,.97);}
       <div id="climate-legend-title" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
            color:rgba(250,250,250,.6);margin-bottom:10px;display:flex;align-items:center;gap:6px;">
         <span id="climate-legend-icon">🌡️</span>
-        <span id="climate-legend-title-text">Avg Temperature</span>
+        <span id="climate-legend-title-text">Current Temperature</span>
       </div>
       <!-- Gradient bar -->
       <div id="climate-legend-bar" style="height:14px;border-radius:7px;margin-bottom:8px;
@@ -1304,7 +1304,14 @@ body.light .settings-popover{background:rgba(248,249,250,.97);}
             <button class="v3c-btn" id="btn-wire" onclick="setColor('wire')">Wire</button>
           </div>
         </div>
-        <canvas id="canvas3d"></canvas>
+        <div style="position:relative;flex:1;min-height:0;">
+          <!-- FIX 7: empty state shown before any survey is run -->
+          <div id="terrain3d-empty" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;z-index:1;">
+            <div style="font-size:28px;opacity:0.2;">⛰️</div>
+            <div style="font-size:11px;color:var(--text3);font-family:var(--font-ui);">Run a survey to load 3D terrain</div>
+          </div>
+          <canvas id="canvas3d" style="display:block;width:100%;height:100%;"></canvas>
+        </div>
       </div><!-- /strip-right -->
 
     </div><!-- /strip-cols -->
@@ -1392,6 +1399,8 @@ let osmLayers={}, overlays={}, wmsLayers={};
 let surveyBbox=null;
 let measureMode=false, measurePts=[], measureMarkers=[], measureLine=null, measurePopup=null;
 let currentDrawMode="click";
+let _hazardCardHTML = ''; // FIX 3: store subsurface hazard card so it survives tab re-renders
+let _currentBaseMap = 'street'; // FIX 5: track the active base map for settings sync
 
 /* ── UNITS SYSTEM (metric / imperial) ── */
 let _units='imperial'; // default to imperial for US contractors
@@ -1776,6 +1785,7 @@ document.addEventListener("click",e=>{
 
 /* ── BASE MAP ── */
 function setBaseMap(type,el){
+  _currentBaseMap = type; // FIX 5: keep track so settings dropdown can sync on open
   document.querySelectorAll(".ol-item[id^='bm-']").forEach(x=>x.classList.remove("active"));
   el.classList.add("active");
   [streetTile,satTile,topoTile].forEach(l=>l&&map.hasLayer(l)&&map.removeLayer(l));
@@ -2197,7 +2207,7 @@ function celebrateSurvey(score) {
 
 function calcSiteScore(d){
   let s=72;const sl=d.avg_slope?.value||0;
-  if(sl<3)s+=15;else if(sl<8)s+=8;else if(sl>15)s-=12;else if(sl>25)s-=22;
+  if(sl<3)s+=15;else if(sl<8)s+=8;else if(sl>25)s-=22;else if(sl>15)s-=12;
   const rng=(d.max_height||0)-(d.min_height||0);
   if(rng<10)s+=5;else if(rng>50)s-=8;else if(rng>100)s-=18;
   s+=Math.min((d.buildable_area_pct||0)/100*10,10);
@@ -2218,7 +2228,7 @@ function renderScoreSection(d){
     </div>
     <div class="score-track"><div class="score-fill" style="width:${score}%;background:${col}"></div></div>
     <div class="score-sub">${(d.buildable_area_pct||0).toFixed(0)}% buildable · ${aspectLabel(d.dominant_aspect_deg)}-facing · ±${d.vertical_error_m}m vert · ${uElev((d.max_height||0)-(d.min_height||0))} relief</div>
-    <div style="font-size:9px;color:var(--text3);margin-top:2px;">Use 'Slope Heatmap' in Overlays to see this on the map</div>`;
+    ${overlays['slope'] ? '' : `<div style="font-size:9px;color:var(--text3);margin-top:2px;">Tip: enable Slope Heatmap in Overlays to overlay this on the map</div>`}`;
 }
 
 function fmt(n){return typeof n==="number"?n.toLocaleString("en-US",{maximumFractionDigits:1}):n;}
@@ -2254,7 +2264,7 @@ function renderMetrics(d){
       <div class="mg-cell"><div class="mg-lbl">Elev Max</div><div class="mg-val">${uElev(d.max_height)}</div><div class="mg-sub">±${uElev(d.vertical_error_m)}</div></div>
       <div class="mg-cell"><div class="mg-lbl">Slope ±err</div><div class="mg-val">±${fmt(d.avg_slope?.error)}°</div><div class="mg-sub">propagated</div></div>
       <div class="mg-cell"><div class="mg-lbl">Aspect</div><div class="mg-val">${aspectLabel(d.dominant_aspect_deg)}</div><div class="mg-sub">${(d.dominant_aspect_deg||0).toFixed(0)}°</div></div>
-      <div class="mg-cell"><div class="mg-lbl">Earthwork Est.</div><div class="mg-val">$${earthCost.toLocaleString("en-US",{maximumFractionDigits:0})}</div><div class="mg-sub">cut+fill labor</div></div>
+      <div class="mg-cell"><div class="mg-lbl">Earthwork Est.</div><div class="mg-val">$${earthCost.toLocaleString("en-US",{maximumFractionDigits:0})}</div><div class="mg-sub">cut+fill labor</div><div style="font-size:9px;color:var(--text3);margin-top:2px;">Estimate based on US avg rates ($18/m³ cut, $14/m³ fill). Regional costs vary significantly.</div></div>
       <div class="mg-cell"><div class="mg-lbl">Grid</div><div class="mg-val">${d.grid_shape?.[0]}×${d.grid_shape?.[1]}</div><div class="mg-sub">${d.cell_size_m}m/cell · ±${d.vertical_error_m}m vert</div></div>
     </div>
     <div class="disclaimer">⚠ Preliminary & uncertified. A licensed PLS must seal all legal surveys.</div>`;
@@ -2266,13 +2276,18 @@ function renderProfile(d){
   const ctx=document.getElementById("profile-canvas").getContext("2d");
   const grad=ctx.createLinearGradient(0,0,0,180);
   grad.addColorStop(0,"rgba(37,99,235,.2)"); grad.addColorStop(1,"rgba(37,99,235,.01)");
+  // FIX 4: use unit-aware axis labels and convert data when imperial is selected
+  const elevLabel = _units === 'imperial' ? 'Elevation (ft)' : 'Elevation (m)';
+  const distLabel = _units === 'imperial' ? 'Distance (ft)' : 'Distance (m)';
+  const convDist = _units === 'imperial' ? 3.28084 : 1;
+  const convElev = _units === 'imperial' ? 3.28084 : 1;
   profileChart=new Chart(document.getElementById("profile-canvas"),{
     type:"line",
-    data:{labels:d.elevation_profile.map(p=>p[0].toFixed(0)),datasets:[{label:"Elevation (m)",data:d.elevation_profile.map(p=>p[1]),fill:true,backgroundColor:grad,borderColor:"#2563eb",borderWidth:1.5,pointRadius:0,tension:.3}]},
+    data:{labels:d.elevation_profile.map(p=>(p[0]*convDist).toFixed(0)),datasets:[{label:elevLabel,data:d.elevation_profile.map(p=>+(p[1]*convElev).toFixed(1)),fill:true,backgroundColor:grad,borderColor:"#2563eb",borderWidth:1.5,pointRadius:0,tension:.3}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
       scales:{
-        x:{ticks:{color:"rgba(235,235,245,.3)",maxTicksLimit:6,font:{size:9,family:"monospace"}},grid:{color:"rgba(84,84,88,.35)"},title:{display:true,text:"Distance (m)",color:"rgba(235,235,245,.3)",font:{size:9,family:"monospace"}}},
-        y:{ticks:{color:"rgba(235,235,245,.3)",font:{size:9,family:"monospace"}},grid:{color:"rgba(84,84,88,.35)"},title:{display:true,text:"Elevation (m)",color:"rgba(235,235,245,.3)",font:{size:9,family:"monospace"}}}
+        x:{ticks:{color:"rgba(235,235,245,.3)",maxTicksLimit:6,font:{size:9,family:"monospace"}},grid:{color:"rgba(84,84,88,.35)"},title:{display:true,text:distLabel,color:"rgba(235,235,245,.3)",font:{size:9,family:"monospace"}}},
+        y:{ticks:{color:"rgba(235,235,245,.3)",font:{size:9,family:"monospace"}},grid:{color:"rgba(84,84,88,.35)"},title:{display:true,text:elevLabel,color:"rgba(235,235,245,.3)",font:{size:9,family:"monospace"}}}
       }
     }
   });
@@ -2297,6 +2312,13 @@ function renderInsights(d){
     <div class="insight-card"><div class="ic-title">Construction Cost Est.</div><div class="ic-val">$${totalCost.toLocaleString("en-US",{maximumFractionDigits:0})}</div><div class="ic-note">Cut + Fill + Site prep + Utility hook-up (rough estimate only)</div></div>
     <div class="insight-card"><div class="ic-title">Best Use Recommendation</div><div class="ic-val">${bestUse}</div><div class="ic-note">${sl.toFixed(1)}° avg slope · ${(d.buildable_area_pct||0).toFixed(0)}% buildable · ${aspectLabel(asp)}-facing · ±${d.vertical_error_m}m vertical accuracy</div></div>
     <div class="disclaimer">All estimates are indicative only. Consult a licensed PE/PLS before any decisions.</div>`;
+  // FIX 3C: re-inject subsurface hazard card if it was already fetched (survives tab switching)
+  if(_hazardCardHTML) {
+    const insEl = document.getElementById('rtab-insights');
+    if(insEl && !insEl.querySelector('.hazard-card')) {
+      insEl.insertAdjacentHTML('afterbegin', _hazardCardHTML);
+    }
+  }
 }
 
 /* ── SUBSURFACE HAZARD DETECTION ── */
@@ -2329,7 +2351,10 @@ async function fetchSubsurfaceHazards(lat,lon){
     let html=`<div class="hazard-card"><div class="hc-title">⚠ Subsurface Hazards Detected (${j.elements.length} feature${j.elements.length>1?"s":""})</div>`;
     Object.entries(types).forEach(([t,n])=>{html+=`<div class="hc-item">${t}: ${n}</div>`;});
     html+=`<div style="font-size:10px;color:var(--text3);margin-top:6px;font-family:var(--font-ui)">Data: OpenStreetMap Overpass. Verify with local utility and geological surveys before excavation.</div></div>`;
-    pane.insertAdjacentHTML("afterbegin",html);
+    // FIX 3B: store the card so it can be re-injected when the Insights tab is re-rendered
+    _hazardCardHTML = html;
+    const insightsEl = document.getElementById('rtab-insights');
+    if(insightsEl) insightsEl.insertAdjacentHTML("afterbegin", _hazardCardHTML);
   }catch(e){/* Silently ignore — hazard detection is best-effort */}
 }
 
@@ -2535,14 +2560,14 @@ async function toggleClimate(mode, item) {
     const ttl=document.getElementById('climate-legend-title-text');
     const barEl=document.getElementById('climate-legend-bar');
     if(ico)ico.textContent='🌡️';
-    if(ttl)ttl.textContent='Avg Temperature';
+    if(ttl)ttl.textContent='Current Temperature'; // FIX 10
     if(barEl)barEl.style.background='linear-gradient(to right,#60a5fa,#818cf8,#f472b6,#f87171,#ef4444)';
   } else {
     const ico=document.getElementById('climate-legend-icon');
     const ttl=document.getElementById('climate-legend-title-text');
     const barEl=document.getElementById('climate-legend-bar');
     if(ico)ico.textContent='🌧️';
-    if(ttl)ttl.textContent='Avg Precipitation';
+    if(ttl)ttl.textContent='Current Precipitation'; // FIX 10
     if(barEl)barEl.style.background='linear-gradient(to right,#fafafa,#bfdbfe,#60a5fa,#1d4ed8,#1e3a5f)';
   }
 
@@ -2695,7 +2720,7 @@ function showClimateLegend(mode, minVal, maxVal) {
 
   if(mode === 'temp') {
     if(icon) icon.textContent = '🌡️';
-    if(titleEl) titleEl.textContent = 'Avg Temperature';
+    if(titleEl) titleEl.textContent = 'Current Temperature'; // FIX 10
     if(bar) bar.style.background = 'linear-gradient(to right, #60a5fa, #818cf8, #f472b6, #f87171, #ef4444)';
     if(minVal_el) minVal_el.textContent = minVal !== null ? `${minVal.toFixed(1)}°C` : '—';
     if(midVal_el) midVal_el.textContent = minVal !== null && maxVal !== null ? `${((minVal+maxVal)/2).toFixed(1)}°C` : '—';
@@ -2712,7 +2737,7 @@ function showClimateLegend(mode, minVal, maxVal) {
   } else {
     // Precipitation
     if(icon) icon.textContent = '🌧️';
-    if(titleEl) titleEl.textContent = 'Avg Precipitation';
+    if(titleEl) titleEl.textContent = 'Current Precipitation'; // FIX 10
     if(bar) bar.style.background = 'linear-gradient(to right, #fafafa, #bfdbfe, #60a5fa, #1d4ed8, #1e3a5f)';
     if(minVal_el) minVal_el.textContent = minVal !== null ? `${minVal.toFixed(1)} mm` : '—';
     if(midVal_el) midVal_el.textContent = minVal !== null && maxVal !== null ? `${((minVal+maxVal)/2).toFixed(1)} mm` : '—';
@@ -2969,7 +2994,7 @@ function renderAgriculture(data) {
   const lat = data.lat || selectedLat;
   const lon = data.lon || selectedLon;
   const slope  = data.avg_slope?.value || 0;
-  const elev   = data.avg_height || 0;
+  const elev   = data.avg_height || ((data.min_height||0) + (data.max_height||0)) / 2;
   const range  = (data.max_height||0) - (data.min_height||0);
 
   // ── USDA Land Capability Class ───────────────────────────────
@@ -3278,6 +3303,9 @@ function openSettings(section) {
   // Sync res/area selectors
   document.getElementById('set-res').value = document.getElementById('res-sel')?.value || '10';
   document.getElementById('set-area').value = document.getElementById('area-sel')?.value || '300';
+  // FIX 5: sync basemap dropdown to whichever base map is currently active
+  const basemapSel = document.getElementById('set-basemap');
+  if(basemapSel) basemapSel.value = _currentBaseMap;
 }
 function closeSettings() {
   const ov=document.getElementById('settings-overlay');
@@ -3346,6 +3374,7 @@ function discardSettings() {
 }
 
 function applyBaseMap(style) {
+  _currentBaseMap = style; // FIX 5: keep module-level variable in sync
   // Remove whichever base tiles are currently on the map
   [streetTile, satTile, topoTile, labelTile].forEach(t => { if(map.hasLayer(t)) map.removeLayer(t); });
   if(hybridLabel && map.hasLayer(hybridLabel)) map.removeLayer(hybridLabel);
@@ -3625,7 +3654,11 @@ function applyColor(){
 
 window._tm3d={
   load(d){
-    elevData=d;const loader=new THREE.TextureLoader();
+    elevData=d;
+    // FIX 7: hide empty state once real terrain data arrives
+    const emptyEl = document.getElementById('terrain3d-empty');
+    if(emptyEl) emptyEl.style.display = 'none';
+    const loader=new THREE.TextureLoader();
     if(d.satellite_texture_b64){loader.load("data:image/jpeg;base64,"+d.satellite_texture_b64,tex=>{tex.minFilter=THREE.LinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=false;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();satTex=tex;applyColor();});}
     if(d.slope_map_png_b64){loader.load("data:image/png;base64,"+d.slope_map_png_b64,tex=>{tex.minFilter=THREE.LinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=false;slopeTex=tex;});}
     buildMesh(d.dem_grid,d.cell_size_m,d.min_height,d.max_height);

@@ -530,7 +530,7 @@
           </div>
           <div class="checkbox-row">
             <input type="checkbox" id="remember-me" checked />
-            <label for="remember-me">Remember me</label>
+            <label for="remember-me">Stay logged in</label>
           </div>
           <div class="error-msg" id="login-error" role="alert"></div>
           <button type="submit" class="btn-primary ripple-btn">Sign In</button>
@@ -844,7 +844,9 @@
       );
 
       if (!user) {
-        showError('login-error', 'Incorrect credentials — try the demo account →');
+        // showError uses textContent internally, so HTML tags won't render —
+        // keep this plain text with the credentials spelled out directly.
+        showError('login-error', 'Incorrect credentials. Try demo: terrameasure / lucasrules');
         shakeCard('login-card');
         return;
       }
@@ -901,6 +903,12 @@
         shakeCard('signup-card');
         return;
       }
+      // Minimum password length — 8 chars is the NIST-recommended floor
+      if (pass.length < 8) {
+        showError('signup-error', 'Password must be at least 8 characters.');
+        shakeCard('signup-card');
+        return;
+      }
       if (pass !== confirm) {
         showError('signup-error', 'Passwords do not match.');
         shakeCard('signup-card');
@@ -949,8 +957,10 @@
 
       // Personalize the onboarding greeting with the user's first name
       const firstName = name.split(' ')[0];
+      // textContent already prevents XSS — escHtml() here would cause
+      // apostrophes and ampersands to appear as &#39; and &amp; literally.
       document.getElementById('onboarding-greeting').textContent =
-        'One quick question, ' + escHtml(firstName) + ' 👋';
+        'One quick question, ' + firstName + ' 👋';
 
       transitionTo('onboarding');
     });
