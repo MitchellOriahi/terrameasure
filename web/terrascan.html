@@ -3137,7 +3137,7 @@ function renderAgriculture(data) {
           <div>
             <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);margin-bottom:2px;">Drainage Class</div>
             <div style="font-size:0.95rem;font-weight:700;color:${drainColor};">${drainClass}</div>
-            <div style="font-size:0.72rem;color:var(--text3);margin-top:3px;">Terrain range: ${range.toFixed(0)}m · Avg slope: ${slope.toFixed(1)}°</div>
+            <div style="font-size:0.72rem;color:var(--text3);margin-top:3px;">Terrain range: ${uElev(range)} · Avg slope: ${slope.toFixed(1)}°</div>
           </div>
           <div style="font-size:1.5rem;">💧</div>
         </div>
@@ -3149,7 +3149,7 @@ function renderAgriculture(data) {
           <div>
             <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);margin-bottom:2px;">Irrigation Potential</div>
             <div style="font-size:0.95rem;font-weight:700;color:${irrigColor};">${irrigPotential}</div>
-            <div style="font-size:0.72rem;color:var(--text3);margin-top:3px;">Elevation: ${elev.toFixed(0)}m · Slope: ${slope.toFixed(1)}°</div>
+            <div style="font-size:0.72rem;color:var(--text3);margin-top:3px;">Elevation: ${uElev(elev)} · Slope: ${slope.toFixed(1)}°</div>
           </div>
           <div style="font-size:1.5rem;">🚿</div>
         </div>
@@ -3203,7 +3203,8 @@ function compareSite(){
   showCompare(savedSite,lastData);savedSite=null;
 }
 function showCompare(a,b){
-  function col(d){const sc=calcSiteScore(d);return`<div class="compare-col"><div class="cc-title">Site — ${d.source||"?"}</div><div class="compare-row"><span>Score</span><strong>${sc}/100</strong></div><div class="compare-row"><span>Elev Range</span><strong>${fmt(d.min_height)}–${fmt(d.max_height)}m</strong></div><div class="compare-row"><span>Avg Slope</span><strong>${fmt(d.avg_slope?.value)}°</strong></div><div class="compare-row"><span>Cut Vol</span><strong>${fmt(d.cut_volume?.value)} m³</strong></div><div class="compare-row"><span>Buildable</span><strong>${(d.buildable_area_pct||0).toFixed(0)}%</strong></div></div>`;}
+  // FIX 1: use unit-aware helpers so the compare modal respects the current unit setting
+  function col(d){const sc=calcSiteScore(d);return`<div class="compare-col"><div class="cc-title">Site — ${d.source||"?"}</div><div class="compare-row"><span>Score</span><strong>${sc}/100</strong></div><div class="compare-row"><span>Elev Range</span><strong>${uElev(d.min_height)}–${uElev(d.max_height)}</strong></div><div class="compare-row"><span>Avg Slope</span><strong>${fmt(d.avg_slope?.value)}°</strong></div><div class="compare-row"><span>Cut Vol</span><strong>${uVol(d.cut_volume?.value||0)}</strong></div><div class="compare-row"><span>Buildable</span><strong>${(d.buildable_area_pct||0).toFixed(0)}%</strong></div></div>`;}
   document.getElementById("compare-grid").innerHTML=col(a)+col(b);
   document.getElementById("compare-modal").classList.add("open");
 }
