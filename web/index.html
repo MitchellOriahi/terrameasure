@@ -918,7 +918,7 @@
     .demo-cursor{
       position:absolute;width:20px;height:20px;
       transform:translate(-50%,-50%);
-      transition:left .8s cubic-bezier(.4,0,.2,1), top .8s cubic-bezier(.4,0,.2,1);
+      transition:left .8s cubic-bezier(.4,0,.2,1), top .8s cubic-bezier(.4,0,.2,1), opacity .3s ease;
       z-index:10;pointer-events:none;opacity:0;
     }
 
@@ -992,9 +992,6 @@
     .demo-rect.complete{border-color:#22c55e;animation:rectGlow 1s ease;}
 
     /* Mockup body height — needed so the demo canvas fills it */
-    .mockup-body {
-      height: 340px;
-    }
 
 
     /* ════════════════════════════════════════════════════════
@@ -1054,7 +1051,7 @@
     <a href="terrascan.html">TerraScan</a>
     <a href="terraphoto.html">TerraPhoto</a>
     <a href="terranews.html">TerraIntel</a>
-    <a href="terrascan.html" class="nav-cta">Open App &rarr;</a>
+    <a href="auth.html" class="nav-cta">Open App &rarr;</a>
   </div>
   <!-- Hamburger shown only on mobile -->
   <button class="nav-hamburger" id="hamburger" aria-label="Toggle menu">
@@ -1067,7 +1064,7 @@
   <a href="terrascan.html">TerraScan</a>
   <a href="terraphoto.html">TerraPhoto</a>
   <a href="terranews.html">TerraIntel</a>
-  <a href="terrascan.html" class="nav-cta">Open App &rarr;</a>
+  <a href="auth.html" class="nav-cta">Open App &rarr;</a>
 </div>
 
 
@@ -1112,7 +1109,7 @@
 
     <!-- Two CTAs -->
     <div class="hero-ctas">
-      <a href="terrascan.html" class="btn-primary">Launch TerraScan &rarr;</a>
+      <a href="auth.html" class="btn-primary">Launch TerraScan &rarr;</a>
       <a href="#how-it-works" class="btn-secondary">Watch how it works</a>
     </div>
 
@@ -1397,7 +1394,7 @@
     <h2 class="cta-title">Start your first survey &rarr;</h2>
     <p class="cta-sub">No signup. No equipment. Just terrain intelligence.</p>
     <div>
-      <a href="terrascan.html" class="btn-cta">Launch TerraScan</a>
+      <a href="auth.html" class="btn-cta">Launch TerraScan</a>
     </div>
     <p class="cta-note">Free forever &nbsp;&middot;&nbsp; Works globally &nbsp;&middot;&nbsp; USGS data included</p>
   </div>
@@ -1481,7 +1478,7 @@
         ? Math.round(ease * target)
         : (ease * target).toFixed(1);
 
-      el.innerHTML = (prefix || '') + val + (suffix || '');
+      el.textContent = (prefix || '') + val + (suffix || '');
 
       if (t < 1) requestAnimationFrame(frame);
     })(start);

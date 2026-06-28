@@ -634,7 +634,7 @@
         <div class="welcome-stats" id="welcome-stats">
           <!-- Three stat cards, data-target drives the counter animation -->
           <div class="welcome-stat-card" id="wstat-0">
-            <div class="stat-number" data-prefix="±" data-target="1" data-suffix="m">±0m</div>
+            <div class="stat-number" data-target="100" data-suffix="cm">0cm</div>
             <div class="stat-label">Elevation accuracy</div>
           </div>
           <div class="welcome-stat-card" id="wstat-1">
@@ -1043,7 +1043,7 @@
     });
 
     function finishOnboarding() {
-      if (!pendingUser) return;
+      if (!pendingUser) { transitionTo('login'); return; }
 
       pendingUser.persona = selectedPersona || '';
       pendingUser.goals   = [...selectedGoals];

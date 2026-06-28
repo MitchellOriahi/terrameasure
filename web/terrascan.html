@@ -697,7 +697,12 @@ body.light .settings-popover{background:rgba(248,249,250,.98);border-color:rgba(
 body.light .scan-overlay{background:rgba(245,245,247,.97);}
 body.light .scan-progress-bar{background:rgba(37,99,235,.25);}
 /* Toast */
-body.light .tm-toast{background:rgba(255,255,255,.96);color:#1d1d1f;border-color:rgba(0,0,0,.12);box-shadow:0 4px 16px rgba(0,0,0,.12);}
+body.light .toast{background:rgba(255,255,255,.96);color:#1d1d1f;border-color:rgba(0,0,0,.12);box-shadow:0 4px 16px rgba(0,0,0,.12);}
+body.light .op-sec-hdr:hover{background:rgba(0,0,0,.04);}
+body.light #climate-legend{background:rgba(255,255,255,.97)!important;border-color:rgba(0,0,0,.12)!important;box-shadow:0 8px 32px rgba(0,0,0,.12);color:#1d1d1f!important;}
+body.light #climate-legend-min-lbl,body.light #climate-legend-max-lbl,body.light #climate-legend-mid-val{color:rgba(29,29,31,.5)!important;}
+body.light #climate-legend-min-val{color:#1d4ed8!important;}
+body.light #climate-legend-max-val{color:#dc2626!important;}
 /* Close buttons in panels */
 body.light .op-hdr-close{background:rgba(0,0,0,.07);color:var(--text2);}
 body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
@@ -2131,6 +2136,7 @@ document.getElementById("run-btn").addEventListener("click",async()=>{
     // Track survey count per user
     if(_currentUser){_currentUser.surveyCount=(_currentUser.surveyCount||0)+1;saveUserSetting('surveyCount',_currentUser.surveyCount);}
     saveHistory(data,selectedLat,selectedLon);
+    _hazardCardHTML = ''; // clear stale hazard card from previous survey
     fetchSubsurfaceHazards(selectedLat,selectedLon);
     clearSurveyOverlays();
     if(surveyBbox) map.fitBounds([[surveyBbox.minLat,surveyBbox.minLon],[surveyBbox.maxLat,surveyBbox.maxLon]],{padding:[20,20]});
@@ -2196,8 +2202,15 @@ function showResults(d){
 }
 
 function renderSourceBar(d){
+  // FIX 4: use unit-aware helpers so accuracy and cell size display in the correct unit
+  const errStr = _units==='imperial'
+    ? `±${(d.vertical_error_m*3.28084).toFixed(1)} ft`
+    : `±${d.vertical_error_m} m`;
+  const cellStr = _units==='imperial'
+    ? `${(d.cell_size_m*3.28084).toFixed(1)} ft/cell`
+    : `${d.cell_size_m} m/cell`;
   document.getElementById("src-bar").innerHTML=
-    `<span class="src-tag">${d.source||"Unknown"}</span><span class="src-tag">±${d.vertical_error_m}m</span><span class="src-tag">${d.grid_shape?.[0]}×${d.grid_shape?.[1]}</span><span class="src-tag">${d.cell_size_m}m/cell</span>`;
+    `<span class="src-tag">${d.source||"Unknown"}</span><span class="src-tag">${errStr}</span><span class="src-tag">${d.grid_shape?.[0]}×${d.grid_shape?.[1]}</span><span class="src-tag">${cellStr}</span>`;
 }
 
 /* ── SURVEY CELEBRATION ── */
@@ -2318,13 +2331,20 @@ function renderProfile(d){
   const distLabel = _units === 'imperial' ? 'Distance (ft)' : 'Distance (m)';
   const convDist = _units === 'imperial' ? 3.28084 : 1;
   const convElev = _units === 'imperial' ? 3.28084 : 1;
+  // FIX 5: read theme at render time so tick/grid colors match light or dark mode
+  const tickColor = document.body.classList.contains('light')
+    ? 'rgba(29,29,31,.5)'
+    : 'rgba(235,235,245,.4)';
+  const gridColor = document.body.classList.contains('light')
+    ? 'rgba(0,0,0,.1)'
+    : 'rgba(84,84,88,.35)';
   profileChart=new Chart(document.getElementById("profile-canvas"),{
     type:"line",
     data:{labels:d.elevation_profile.map(p=>(p[0]*convDist).toFixed(0)),datasets:[{label:elevLabel,data:d.elevation_profile.map(p=>+(p[1]*convElev).toFixed(1)),fill:true,backgroundColor:grad,borderColor:"#2563eb",borderWidth:1.5,pointRadius:0,tension:.3}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
       scales:{
-        x:{ticks:{color:"rgba(235,235,245,.3)",maxTicksLimit:6,font:{size:9,family:"monospace"}},grid:{color:"rgba(84,84,88,.35)"},title:{display:true,text:distLabel,color:"rgba(235,235,245,.3)",font:{size:9,family:"monospace"}}},
-        y:{ticks:{color:"rgba(235,235,245,.3)",font:{size:9,family:"monospace"}},grid:{color:"rgba(84,84,88,.35)"},title:{display:true,text:elevLabel,color:"rgba(235,235,245,.3)",font:{size:9,family:"monospace"}}}
+        x:{ticks:{color:tickColor,maxTicksLimit:6,font:{size:9,family:"monospace"}},grid:{color:gridColor},title:{display:true,text:distLabel,color:tickColor,font:{size:9,family:"monospace"}}},
+        y:{ticks:{color:tickColor,font:{size:9,family:"monospace"}},grid:{color:gridColor},title:{display:true,text:elevLabel,color:tickColor,font:{size:9,family:"monospace"}}}
       }
     }
   });
@@ -2440,7 +2460,7 @@ function restoreSave(id){
   selectedLat=s.lat; selectedLon=s.lon; surveyBbox=s.bbox;
   placeMarker(); enableRun('Survey Area');
   toast(`"${s.name}" restored — press Survey to re-run`,'info');
-  switchRTab('metrics',document.querySelector('.bp-tab'));
+  switchRTab('metrics',document.querySelector(".bp-tab[onclick*=\"'metrics'\"]"));
 }
 
 /* ── SURVEY HISTORY (localStorage) ── */
@@ -2502,7 +2522,7 @@ function restoreHistory(i){
   selectedLat=e.lat; selectedLon=e.lon;
   placeMarker(); enableRun('Survey Area');
   toast('Location restored — press Survey to re-run','info');
-  switchRTab('metrics',document.querySelector('.bp-tab'));
+  switchRTab('metrics',document.querySelector(".bp-tab[onclick*=\"'metrics'\"]"));
 }
 // Load history on page init
 renderHistory();
@@ -2959,7 +2979,7 @@ async function renderEnvironment(data) {
     <div style="padding:12px 0 4px;">
       <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:14px;">ENVIRONMENTAL RISK FACTORS</div>
 
-      ${envCard('🌊', 'Flood Factor',  floodScore, 'var(--accent)',  `Elevation exposure · ${elevRange.toFixed(0)}m terrain range`, 'USGS DEM analysis')}
+      ${envCard('🌊', 'Flood Factor',  floodScore, 'var(--accent)',  `Elevation exposure · ${uElev(elevRange)} terrain range`, 'USGS DEM analysis')}
       ${envCard('🔥', 'Fire Factor',   fireScore,  '#f97316',       fireSource, 'NASA FIRMS VIIRS')}
       ${envCard('🌡️', 'Heat Factor',   heatScore,  'var(--red)',    `~${heatDays} days >35°C/yr`, heatSource)}
       ${envCard('💨', 'Wind Factor',   windScore,  '#94a3b8',       windMax !== '—' ? `95th-pct: ${windMax} km/h` : 'P95 wind speed', windSource)}
@@ -3388,7 +3408,7 @@ function saveAllSettings() {
   if(selectedLat && !drawnLayer) drawSurveyRect();
 
   // Persist to user profile
-  const settingsObj = { theme: pendingTheme, units: pendingUnits, defaultRes: pendingRes, defaultArea: pendingArea, accentColor: pendingAccent || '#2563eb', showErrors, showCoords };
+  const settingsObj = { theme: pendingTheme, units: pendingUnits, defaultRes: pendingRes, defaultArea: pendingArea, accentColor: pendingAccent || _currentUser?.settings?.accentColor || '#2563eb', showErrors, showCoords };
   if(_currentUser) {
     _currentUser.settings = settingsObj;
     try { localStorage.setItem('terrameasure_current_user', JSON.stringify(_currentUser)); } catch(e) {}
@@ -3636,7 +3656,7 @@ function renderTutStep(){
 // Launch tutorial for first-time users (after 1.2s so map loads first)
 (()=>{
   if(!localStorage.getItem('terrascan_tutorial_done') && _currentUser){
-    setTimeout(startTutorial, 1200);
+    setTimeout(()=>{ if(!document.getElementById('settings-overlay')?.classList.contains('open')) startTutorial(); }, 1200);
   }
 })();
 </script>
