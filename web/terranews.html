@@ -34,8 +34,26 @@
       --blur: blur(20px) saturate(180%);
     }
 
+    /* Light mode — toggled by adding .light to <body> */
+    body.light {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface2: #f1f5f9;
+      --surface3: #e2e8f0;
+      --border: rgba(0,0,0,.1);
+      --text: #0f172a;
+      --text2: rgba(15,23,42,.6);
+      --text3: rgba(15,23,42,.35);
+    }
+    body.light nav { background: rgba(248,250,252,0.88); }
+    body.light .news-card { background: rgba(255,255,255,0.9); }
+
     html { scroll-behavior: smooth; }
-    body { font-family: var(--font-ui); background: var(--bg); color: var(--text); line-height: 1.6; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    body {
+      font-family: var(--font-ui); background: var(--bg); color: var(--text);
+      line-height: 1.6; -webkit-font-smoothing: antialiased; min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
+    }
     a { text-decoration: none; color: inherit; }
 
     /* ── NAV ── */
@@ -50,18 +68,33 @@
     .nav-logo { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.3px; }
     .nav-logo .sym { color: var(--accent); margin: 0 1px; }
     .nav-links { display: flex; align-items: center; gap: 8px; }
-    .nav-links a { font-size: 0.9rem; font-weight: 500; color: var(--text2); padding: 6px 16px; border-radius: var(--radius-pill); transition: color 0.2s; }
+    .nav-links a {
+      font-size: 0.9rem; font-weight: 500; color: var(--text2);
+      padding: 6px 16px; border-radius: var(--radius-pill); transition: color 0.2s;
+    }
     .nav-links a:hover { color: var(--text); }
     .nav-links .cta { background: var(--accent); color: #fff; font-weight: 600; padding: 8px 22px; }
     .nav-links .cta:hover { background: #0a70dd; }
     .nav-links .active-link { color: var(--text); }
 
+    /* Theme toggle button in nav */
+    .theme-toggle {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text2); border-radius: var(--radius-pill);
+      width: 36px; height: 36px; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s; flex-shrink: 0;
+    }
+    .theme-toggle:hover { background: var(--surface3); color: var(--text); }
+
     /* ── PAGE HEADER ── */
     .page-header {
-      padding: 60px clamp(20px,4vw,48px) 40px;
+      padding: 60px clamp(20px,4vw,48px) 0;
       border-bottom: 1px solid var(--border);
       background: linear-gradient(180deg, rgba(37,99,235,0.04) 0%, transparent 100%);
     }
+    .page-header-inner { padding-bottom: 24px; }
+
     .live-badge {
       display: inline-flex; align-items: center; gap: 8px;
       background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25);
@@ -80,22 +113,32 @@
     .page-header h1 span { color: var(--accent); }
     .page-header p { font-size: 1rem; color: var(--text2); max-width: 680px; line-height: 1.7; margin-bottom: 20px; }
 
+    /* Source pills — only real feeds are listed (USGS, USDA, NASA, NOAA, ReliefWeb) */
     .source-strip {
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
       font-size: 0.75rem; color: var(--text3); margin-bottom: 16px;
     }
-    .source-strip span { font-weight: 600; color: var(--text2); }
+    .source-strip > span { font-weight: 600; color: var(--text2); }
     .source-pill {
+      display: inline-flex; align-items: center; gap: 4px;
       padding: 3px 10px; border-radius: var(--radius-pill);
       font-size: 0.72rem; font-weight: 600; border: 1px solid;
     }
-    .src-usgs { color: #38bdf8; border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.08); }
-    .src-usda { color: #4ade80; border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.08); }
-    .src-nasa { color: #fb923c; border-color: rgba(251,146,60,0.3); background: rgba(251,146,60,0.08); }
-    .src-noaa { color: #818cf8; border-color: rgba(129,140,248,0.3); background: rgba(129,140,248,0.08); }
-    .src-ap   { color: #e2e8f0; border-color: rgba(226,232,240,0.3); background: rgba(226,232,240,0.08); }
-    .src-reuters { color: #fbbf24; border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.08); }
-    .src-reliefweb { color: #34d399; border-color: rgba(52,211,153,0.3); background: rgba(52,211,153,0.08); }
+    .src-usgs      { color: #38bdf8; border-color: rgba(56,189,248,0.3);  background: rgba(56,189,248,0.08); }
+    .src-usda      { color: #4ade80; border-color: rgba(74,222,128,0.3);  background: rgba(74,222,128,0.08); }
+    .src-nasa      { color: #fb923c; border-color: rgba(251,146,60,0.3);  background: rgba(251,146,60,0.08); }
+    .src-noaa      { color: #818cf8; border-color: rgba(129,140,248,0.3); background: rgba(129,140,248,0.08); }
+    .src-reliefweb { color: #34d399; border-color: rgba(52,211,153,0.3);  background: rgba(52,211,153,0.08); }
+
+    /* Small colored dot shown next to source name inside cards */
+    .src-dot {
+      display: inline-block; width: 7px; height: 7px;
+      border-radius: 50%; flex-shrink: 0;
+    }
+    .dot-usgs      { background: #38bdf8; }
+    .dot-usda      { background: #4ade80; }
+    .dot-nasa      { background: #fb923c; }
+    .dot-reliefweb { background: #34d399; }
 
     .meta-row { display: flex; align-items: center; gap: 16px; font-size: 0.8rem; color: var(--text3); }
     #last-updated { color: var(--text2); }
@@ -107,6 +150,10 @@
       transition: background 0.2s; font-family: var(--font-ui);
     }
     .refresh-btn:hover { background: var(--surface2); color: var(--text); }
+
+    /* Countdown progress bar — sits flush under the header, drains over 10 min */
+    .refresh-progress-wrap { height: 3px; background: var(--surface2); margin-top: 20px; }
+    #refresh-bar { height: 100%; background: var(--accent); width: 100%; transition: width 1s linear; }
 
     /* ── FILTER BAR ── */
     .filter-bar {
@@ -147,21 +194,38 @@
       gap: 16px;
     }
 
-    /* News card */
+    /* Card stagger fade-in animation — each card gets an animation-delay set inline */
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* News card — left border is the category accent bar (color set by cat-* class) */
     .news-card {
       background: rgba(28,28,30,0.6);
       border: 1px solid var(--border);
+      border-left-width: 3px;
+      border-left-color: var(--surface3); /* default, overridden by cat-* below */
       border-radius: var(--radius);
-      padding: 20px;
+      padding: 20px 20px 20px 18px;
       display: flex; flex-direction: column; gap: 12px;
       transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
       cursor: pointer;
+      opacity: 0; /* starts hidden; animation brings it in */
+      animation: cardIn 0.4s ease forwards;
     }
     .news-card:hover {
       transform: translateY(-2px);
       box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-      border-color: rgba(63,63,70,1);
     }
+
+    /* Category accent bar colors — applied as class on the card */
+    .cat-agriculture { border-left-color: #22c55e; }
+    .cat-hazards     { border-left-color: #ef4444; }
+    .cat-land        { border-left-color: #f59e0b; }
+    .cat-policy      { border-left-color: #a855f7; }
+    .cat-satellite   { border-left-color: #2563eb; }
+    .cat-water       { border-left-color: #14b8a6; }
 
     .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .card-date { font-size: 0.75rem; color: var(--text3); white-space: nowrap; }
@@ -191,23 +255,17 @@
     .card-source-link:hover { opacity: 0.8; }
     .card-category { font-size: 0.72rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
 
-    /* Loading state */
-    .loading-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px;
-    }
+    /* Loading skeletons */
     .skeleton {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 20px; height: 180px;
       animation: shimmer 1.5s ease-in-out infinite;
     }
-    @keyframes shimmer {
-      0%,100%{opacity:0.4;} 50%{opacity:0.7;}
-    }
+    @keyframes shimmer { 0%,100%{opacity:0.4;} 50%{opacity:0.7;} }
 
-    /* Error state */
+    /* All-feeds-failed error state */
     .feed-error {
-      grid-column: 1/-1; text-align: center; padding: 60px 20px;
-      color: var(--text3);
+      grid-column: 1/-1; text-align: center; padding: 60px 20px; color: var(--text3);
     }
     .feed-error h3 { font-size: 1.1rem; color: var(--text2); margin-bottom: 8px; }
     .feed-error p { font-size: 0.88rem; }
@@ -246,31 +304,38 @@
     <a href="terraphoto.html">TerraPhoto</a>
     <a href="terranews.html" class="active-link">TerraIntel</a>
     <a href="terrascan.html" class="cta">Launch App</a>
+    <!-- Theme toggle: switches between dark and light mode -->
+    <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
   </div>
 </nav>
 
 <!-- ── PAGE HEADER ── -->
 <div class="page-header">
-  <div class="live-badge"><div class="live-dot"></div> Live Feed</div>
-  <h1>Terra<span>Intel</span></h1>
-  <p>
-    Global land intelligence — agriculture, natural hazards, policy, and satellite-detected change —
-    drawn from government agencies and wire services. Every item links directly to its source.
-    No AI-generated claims. No unverified assertions.
-  </p>
-  <div class="source-strip">
-    <span>Sources:</span>
-    <span class="source-pill src-usgs">USGS</span>
-    <span class="source-pill src-usda">USDA</span>
-    <span class="source-pill src-nasa">NASA</span>
-    <span class="source-pill src-noaa">NOAA</span>
-    <span class="source-pill src-reliefweb">ReliefWeb·UN</span>
-    <span class="source-pill src-ap">AP</span>
-    <span class="source-pill src-reuters">Reuters</span>
+  <div class="page-header-inner">
+    <div class="live-badge"><div class="live-dot"></div> Live Feed</div>
+    <h1>Terra<span>Intel</span></h1>
+    <p>
+      Global land intelligence — agriculture, natural hazards, policy, and satellite-detected change —
+      drawn from government agencies and wire services. Every item links directly to its source.
+      No AI-generated claims. No unverified assertions.
+    </p>
+    <!-- Source pills: only agencies that actually appear in the FEEDS array -->
+    <div class="source-strip">
+      <span>Sources:</span>
+      <span class="source-pill src-usgs">USGS</span>
+      <span class="source-pill src-usda">USDA</span>
+      <span class="source-pill src-nasa">NASA</span>
+      <span class="source-pill src-noaa">NOAA</span>
+      <span class="source-pill src-reliefweb">ReliefWeb·UN</span>
+    </div>
+    <div class="meta-row">
+      <span>Updated: <span id="last-updated">Loading…</span></span>
+      <button class="refresh-btn" onclick="loadAllFeeds()">&#8635; Refresh</button>
+    </div>
   </div>
-  <div class="meta-row">
-    <span>Last updated: <span id="last-updated">Loading…</span></span>
-    <button class="refresh-btn" onclick="loadAllFeeds()">&#8635; Refresh</button>
+  <!-- Progress bar drains from full to empty over the 10-minute auto-refresh window -->
+  <div class="refresh-progress-wrap">
+    <div id="refresh-bar"></div>
   </div>
 </div>
 
@@ -292,8 +357,9 @@
     <span><span id="story-count">—</span> stories loaded</span>
     <span id="feed-status" style="color:var(--text3)"></span>
   </div>
+
+  <!-- Card grid — skeletons shown here while loading -->
   <div id="news-grid" class="news-grid">
-    <!-- Skeletons while loading -->
     <div class="skeleton"></div>
     <div class="skeleton"></div>
     <div class="skeleton"></div>
@@ -301,7 +367,20 @@
     <div class="skeleton"></div>
     <div class="skeleton"></div>
   </div>
+
+  <!-- Empty state — shown when a filter returns 0 results but stories are loaded -->
+  <div id="empty-state" style="display:none; text-align:center; padding:60px 20px; color:var(--text3);">
+    <div style="font-size:48px; margin-bottom:16px;">📡</div>
+    <div style="font-size:16px; font-weight:600; margin-bottom:8px; color:var(--text2);">No stories in this category</div>
+    <div style="font-size:13px;">Try a different filter or check back after the next refresh</div>
+  </div>
 </div>
+
+<!-- Back to top — floats bottom-right, fades in after scrolling 400px -->
+<button id="back-top" onclick="window.scrollTo({top:0,behavior:'smooth'})"
+  style="position:fixed;bottom:24px;right:24px;background:var(--accent);color:#fff;border:none;
+  width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:18px;z-index:999;
+  opacity:0;transition:opacity .3s;box-shadow:0 4px 12px rgba(37,99,235,.4);">↑</button>
 
 <!-- ── DISCLAIMER ── -->
 <div class="disclaimer">
@@ -309,9 +388,8 @@
   TerraMeasure does not generate, alter, or editorialize news content. Summaries are extracted verbatim from source RSS feeds.
   No claim ships without a citation. If a source link is missing, the story is not displayed.
   Sources: <strong>USGS</strong> (U.S. Geological Survey) · <strong>USDA</strong> (U.S. Dept. of Agriculture) ·
-  <strong>NASA Earth Observatory</strong> · <strong>NOAA</strong> · <strong>ReliefWeb</strong> (UN OCHA) ·
-  <strong>AP</strong> · <strong>Reuters</strong>.
-  Earthquake data via USGS GeoJSON feed (public domain). All other content © respective organizations.
+  <strong>NASA Earth Observatory</strong> · <strong>NOAA</strong> · <strong>ReliefWeb</strong> (UN OCHA).
+  Earthquake data via USGS GeoJSON feed (public domain). All other content &copy; respective organizations.
 </div>
 
 <!-- ── FOOTER ── -->
@@ -343,7 +421,8 @@
 // Rule enforced: no card is rendered without a real source URL.
 // ============================================================
 
-// Category keywords — used to auto-tag stories from RSS descriptions
+// ── CATEGORY KEYWORDS ───────────────────────────────────────
+// Used to auto-tag stories from their title/description text.
 const CATEGORY_KEYWORDS = {
   agriculture: ['farm','crop','soil','grain','wheat','corn','soy','livestock','drought','harvest','agriculture','usda','food','irrigation','ranching','cattle','rural'],
   hazards:     ['earthquake','flood','fire','wildfire','landslide','volcano','tsunami','hurricane','tornado','hazard','disaster','magnitude','seismic'],
@@ -410,16 +489,68 @@ const FEEDS = [
 // CORS proxy — wraps any URL so the browser can fetch it from a different domain
 const PROXY = 'https://api.allorigins.win/raw?url=';
 
+// Auto-refresh interval: 10 minutes (in milliseconds)
+const REFRESH_INTERVAL = 10 * 60 * 1000;
+
 // ── STATE ───────────────────────────────────────────────────
-let allStories = [];   // flat array of all loaded story objects
+let allStories = [];        // flat array of all loaded story objects
 let activeFilter = 'all';
+let lastRefreshTime = null; // timestamp (ms) of when the last load completed
+
+// Maps a source CSS class to the dot color class for that source.
+// These dots appear inside each card's source pill for quick visual scanning.
+const SOURCE_DOTS = {
+  'src-usgs':      'dot-usgs',
+  'src-usda':      'dot-usda',
+  'src-nasa':      'dot-nasa',
+  'src-reliefweb': 'dot-reliefweb',
+};
+
+// ── THEME TOGGLE ─────────────────────────────────────────────
+// Switches between dark (default) and light mode.
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  const btn = document.getElementById('theme-btn');
+  // Show sun when in dark mode (to hint "click for light"), moon when in light mode
+  btn.textContent = document.body.classList.contains('light') ? '🌙' : '☀️';
+}
+
+// ── RELATIVE TIME HELPER ─────────────────────────────────────
+// Converts a date (string or Date object) into a human-friendly string like
+// "5m ago", "2h ago", "3d ago". Falls back to a locale date string for old dates.
+function relativeTime(dateInput) {
+  const d = new Date(dateInput);
+  if (isNaN(d)) return String(dateInput);
+  const diff = (Date.now() - d) / 1000; // seconds since that date
+  if (diff < 60)     return 'just now';
+  if (diff < 3600)   return `${Math.round(diff / 60)}m ago`;
+  if (diff < 86400)  return `${Math.round(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.round(diff / 86400)}d ago`;
+  return d.toLocaleDateString();
+}
+
+// ── ERROR STATE (all feeds failed) ───────────────────────────
+// Replaces the grid contents with a visible error message and a Retry button.
+function showError(msg) {
+  const grid = document.getElementById('news-grid');
+  grid.innerHTML = `
+    <div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text3);">
+      <div style="font-size:36px;margin-bottom:12px;">📡</div>
+      <div style="font-size:14px;color:var(--text2);margin-bottom:8px;">${msg}</div>
+      <button onclick="loadAllFeeds()"
+        style="background:var(--accent);color:#fff;border:none;padding:8px 20px;
+        border-radius:20px;cursor:pointer;font-size:13px;margin-top:8px;">Retry</button>
+    </div>`;
+}
 
 // ── MAIN LOADER ─────────────────────────────────────────────
 async function loadAllFeeds() {
-  const grid = document.getElementById('news-grid');
-  const statusEl = document.getElementById('feed-status');
+  const grid      = document.getElementById('news-grid');
+  const statusEl  = document.getElementById('feed-status');
+  const emptyState = document.getElementById('empty-state');
 
-  // Show loading skeletons
+  // Hide empty state and show loading skeletons while fetching
+  emptyState.style.display = 'none';
   grid.innerHTML = Array(6).fill('<div class="skeleton"></div>').join('');
   allStories = [];
   document.getElementById('story-count').textContent = '—';
@@ -427,6 +558,17 @@ async function loadAllFeeds() {
 
   // Fetch all feeds in parallel — errors per feed are caught individually
   const results = await Promise.allSettled(FEEDS.map(f => fetchFeed(f)));
+
+  // If every single feed failed, show the error state and stop
+  const allFailed = results.every(
+    r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value.length === 0)
+  );
+  if (allFailed) {
+    showError('Could not reach any feeds. Check your connection and try again.');
+    document.getElementById('story-count').textContent = '0';
+    statusEl.textContent = 'All feeds unavailable';
+    return;
+  }
 
   // Collect stories from whichever feeds succeeded
   const succeeded = [];
@@ -443,58 +585,73 @@ async function loadAllFeeds() {
   // Sort by date, newest first
   allStories.sort((a, b) => b.date - a.date);
 
-  // Update last-updated timestamp
-  document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+  // Record when this refresh completed, then update the header display
+  lastRefreshTime = Date.now();
+  updateRefreshDisplay();
 
-  // Status summary
-  if (failed.length > 0) {
-    statusEl.textContent = `${succeeded.length} feeds loaded · ${failed.length} unavailable`;
-  } else {
-    statusEl.textContent = `${succeeded.length} feeds loaded`;
-  }
+  // Status summary line under story count
+  statusEl.textContent = failed.length > 0
+    ? `${succeeded.length} feeds loaded · ${failed.length} unavailable`
+    : `${succeeded.length} feeds loaded`;
 
   renderStories();
 }
 
+// ── UPDATE HEADER DISPLAY (time + progress bar) ──────────────
+// Called right after a load completes, and then every 30 seconds.
+// Updates the "Updated X ago" text and the countdown progress bar.
+function updateRefreshDisplay() {
+  if (!lastRefreshTime) return;
+
+  const elapsed = Date.now() - lastRefreshTime;
+
+  // Relative time label ("Updated 3 minutes ago")
+  document.getElementById('last-updated').textContent = relativeTime(new Date(lastRefreshTime));
+
+  // Progress bar: starts at 100% (just refreshed) and drains to 0% at next auto-refresh
+  const pct = Math.max(0, 100 - (elapsed / REFRESH_INTERVAL) * 100);
+  document.getElementById('refresh-bar').style.width = pct + '%';
+}
+
 // ── FETCH ONE FEED ───────────────────────────────────────────
 async function fetchFeed(feed) {
-  if (feed.type === 'usgs-eq')    return fetchUSGSEarthquakes(feed);
-  if (feed.type === 'reliefweb')  return fetchReliefWeb(feed);
+  if (feed.type === 'usgs-eq')   return fetchUSGSEarthquakes(feed);
+  if (feed.type === 'reliefweb') return fetchReliefWeb(feed);
   return fetchRSS(feed);
 }
 
-// Fetch an RSS feed via CORS proxy and parse it
+// Fetch an RSS feed via CORS proxy and parse it into story objects
 async function fetchRSS(feed) {
   const resp = await fetch(PROXY + encodeURIComponent(feed.url), { signal: AbortSignal.timeout(8000) });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const text = await resp.text();
 
-  // Parse XML with the browser's built-in parser
+  // Parse the XML with the browser's built-in DOMParser
   const parser = new DOMParser();
   const doc = parser.parseFromString(text, 'text/xml');
 
   const items = [...doc.querySelectorAll('item')];
   return items.slice(0, 15).map(item => {
-    const title = item.querySelector('title')?.textContent?.trim() || '';
-    const link  = item.querySelector('link')?.textContent?.trim()
-               || item.querySelector('link')?.getAttribute('href') || '';
-    const desc  = item.querySelector('description')?.textContent?.trim() || '';
+    const title   = item.querySelector('title')?.textContent?.trim() || '';
+    const link    = item.querySelector('link')?.textContent?.trim()
+                 || item.querySelector('link')?.getAttribute('href') || '';
+    const desc    = item.querySelector('description')?.textContent?.trim() || '';
     const rawDate = item.querySelector('pubDate')?.textContent
                  || item.querySelector('dc\\:date')?.textContent
                  || item.querySelector('date')?.textContent || '';
 
-    // Skip if no real link (enforces "no claim without citation" rule)
+    // Skip stories with no real link — enforces "no claim without citation" rule
     if (!link || link === '') return null;
 
     return {
       title,
       link,
-      desc: stripHtml(desc).slice(0, 300),
-      date: rawDate ? new Date(rawDate) : new Date(0),
-      source: feed.name,
-      sourceCls: feed.cls,
-      defaultCat: feed.category,
-      category: autoTag(title + ' ' + desc),
+      desc:        stripHtml(desc).slice(0, 300),
+      date:        rawDate ? new Date(rawDate) : new Date(0),
+      source:      feed.name,
+      sourceCls:   feed.cls,
+      defaultCat:  feed.category,
+      category:    autoTag(title + ' ' + desc),
     };
   }).filter(Boolean);
 }
@@ -507,17 +664,17 @@ async function fetchUSGSEarthquakes(feed) {
 
   return json.features.slice(0, 15).map(f => {
     const p = f.properties;
-    if (!p.url) return null;  // enforce citation rule
+    if (!p.url) return null; // enforce citation rule
     const mag = p.mag ? `M${p.mag.toFixed(1)} ` : '';
     return {
-      title: `${mag}${p.title}`,
-      link: p.url,
-      desc: `${p.place}. Depth: ${f.geometry?.coordinates?.[2] ?? '?'} km. Status: ${p.status}. Tsunami alert: ${p.tsunami ? 'YES' : 'none'}.`,
-      date: new Date(p.time),
-      source: 'USGS Earthquakes',
-      sourceCls: 'src-usgs',
+      title:      `${mag}${p.title}`,
+      link:       p.url,
+      desc:       `${p.place}. Depth: ${f.geometry?.coordinates?.[2] ?? '?'} km. Status: ${p.status}. Tsunami alert: ${p.tsunami ? 'YES' : 'none'}.`,
+      date:       new Date(p.time),
+      source:     'USGS Earthquakes',
+      sourceCls:  'src-usgs',
       defaultCat: 'hazards',
-      category: 'hazards',
+      category:   'hazards',
     };
   }).filter(Boolean);
 }
@@ -529,26 +686,27 @@ async function fetchReliefWeb(feed) {
   const json = await resp.json();
 
   return (json.data || []).slice(0, 12).map(item => {
-    const f = item.fields;
+    const f    = item.fields;
     const link = f.url || f['url-alias'] || '';
-    if (!link) return null;  // enforce citation rule
+    if (!link) return null; // enforce citation rule
     return {
-      title: f.title || 'Untitled',
+      title:      f.title || 'Untitled',
       link,
-      desc: stripHtml(f.body || '').slice(0, 300),
-      date: f.date?.created ? new Date(f.date.created) : new Date(0),
-      source: 'ReliefWeb·UN',
-      sourceCls: 'src-reliefweb',
+      desc:       stripHtml(f.body || '').slice(0, 300),
+      date:       f.date?.created ? new Date(f.date.created) : new Date(0),
+      source:     'ReliefWeb·UN',
+      sourceCls:  'src-reliefweb',
       defaultCat: 'hazards',
-      category: 'hazards',
+      category:   'hazards',
     };
   }).filter(Boolean);
 }
 
 // ── RENDER ───────────────────────────────────────────────────
 function renderStories() {
-  const grid = document.getElementById('news-grid');
-  const countEl = document.getElementById('story-count');
+  const grid       = document.getElementById('news-grid');
+  const countEl    = document.getElementById('story-count');
+  const emptyState = document.getElementById('empty-state');
 
   // Filter by active category
   const visible = activeFilter === 'all'
@@ -557,30 +715,48 @@ function renderStories() {
 
   countEl.textContent = visible.length;
 
+  // If filter returned zero results but there ARE stories, show the empty state
+  if (visible.length === 0 && allStories.length > 0) {
+    grid.innerHTML = '';
+    emptyState.style.display = 'block';
+    return;
+  }
+
+  emptyState.style.display = 'none';
+
+  // Fallback: no stories at all (edge case not caught by showError)
   if (visible.length === 0) {
     grid.innerHTML = `
       <div class="feed-error">
-        <h3>${allStories.length === 0 ? 'Could not load feeds' : 'No stories in this category'}</h3>
-        <p>${allStories.length === 0
-          ? 'Check your connection and try refreshing. Government RSS servers can be intermittently slow.'
-          : 'Try selecting a different filter above.'}</p>
+        <h3>Could not load feeds</h3>
+        <p>Check your connection and try refreshing. Government RSS servers can be intermittently slow.</p>
       </div>`;
     return;
   }
 
-  grid.innerHTML = visible.map(s => cardHTML(s)).join('');
+  // Render cards; pass index so each card gets a staggered animation delay
+  grid.innerHTML = visible.map((s, i) => cardHTML(s, i)).join('');
 }
 
-function cardHTML(s) {
-  const dateStr = s.date && s.date.getTime() > 0
-    ? s.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : 'Date unknown';
+// Build HTML for a single news card.
+// idx is used to stagger the fade-in animation (60ms per card).
+function cardHTML(s, idx) {
+  // Use relative time instead of a bare date string
+  const dateStr  = s.date && s.date.getTime() > 0 ? relativeTime(s.date) : 'Date unknown';
   const catLabel = s.category ? s.category.charAt(0).toUpperCase() + s.category.slice(1) : '';
+  // cat-* class controls the 3px left border accent color
+  const catClass = s.category ? `cat-${s.category}` : 'cat-land';
+  // colored dot class for quick visual scanning of source
+  const dotClass = SOURCE_DOTS[s.sourceCls] || '';
+  const delay    = idx * 60; // stagger: card 0 animates immediately, card 1 after 60ms, etc.
 
   return `
-    <a class="news-card" href="${escHtml(s.link)}" target="_blank" rel="noopener noreferrer">
+    <a class="news-card ${catClass}" href="${escHtml(s.link)}" target="_blank" rel="noopener noreferrer"
+       style="animation-delay:${delay}ms;">
       <div class="card-top">
-        <span class="source-pill ${s.sourceCls}">${escHtml(s.source)}</span>
+        <span class="source-pill ${s.sourceCls}">
+          ${dotClass ? `<span class="src-dot ${dotClass}"></span>` : ''}${escHtml(s.source)}
+        </span>
         <span class="card-date">${dateStr}</span>
       </div>
       <p class="card-title">${escHtml(s.title)}</p>
@@ -607,7 +783,7 @@ function autoTag(text) {
   for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
     if (keywords.some(kw => lower.includes(kw))) return cat;
   }
-  return 'land';  // default
+  return 'land'; // default category
 }
 
 // Strip HTML tags from RSS description text
@@ -620,17 +796,27 @@ function stripHtml(html) {
 // Escape text so it's safe to put inside HTML attributes and text nodes
 function escHtml(str) {
   return String(str)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
+
+// ── BACK TO TOP ──────────────────────────────────────────────
+// Show the floating back-to-top button after the user scrolls 400px
+window.addEventListener('scroll', () => {
+  document.getElementById('back-top').style.opacity = window.scrollY > 400 ? '1' : '0';
+});
 
 // ── AUTO-REFRESH ─────────────────────────────────────────────
 // Reload the feed every 10 minutes automatically
-setInterval(loadAllFeeds, 10 * 60 * 1000);
+setInterval(loadAllFeeds, REFRESH_INTERVAL);
 
-// Initial load
+// Update the relative time label and progress bar every 30 seconds
+// (so "Updated 3 minutes ago" ticks forward without a full reload)
+setInterval(updateRefreshDisplay, 30 * 1000);
+
+// Initial load on page open
 loadAllFeeds();
 </script>
 

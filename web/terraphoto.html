@@ -344,6 +344,54 @@ html, body {
   line-height: 1.7; font-family: var(--font-ui);
 }
 
+/* ── TOPBAR NAV LINKS ── */
+.t-link {
+  color: var(--text2); text-decoration: none; font-size: 12px;
+  font-family: var(--font-ui); transition: color .15s; padding: 0 6px;
+}
+.t-link:hover { color: var(--text); }
+
+/* ── UPLOAD ZONE ANIMATED BORDER ON HOVER ── */
+@keyframes borderPulse {
+  0%, 100% { border-color: var(--accent); }
+  50%       { border-color: rgba(37,99,235,.35); }
+}
+.upload-zone:hover {
+  animation: borderPulse 2s infinite;
+}
+.upload-zone.drag-over {
+  animation: borderPulse 2s infinite;
+}
+.upload-zone .upload-subtitle {
+  font-size: 12px; color: var(--text3); margin-bottom: 4px;
+}
+
+/* ── SITE SCORE BADGE ── */
+.score-badge {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 18px;
+  font-family: var(--font-ui);
+}
+.score-badge .score-num {
+  font-size: 26px; font-weight: 700; font-family: var(--font-mono);
+  letter-spacing: -.5px;
+}
+.score-badge .score-label {
+  font-size: 11px; color: var(--text2); text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.score-badge .score-word {
+  font-size: 13px; font-weight: 600;
+}
+
+/* ── LIGHT THEME OVERRIDES ── */
+body.light {
+  --bg: #f4f4f5; --bg2: #e4e4e7; --surface: #ffffff; --surface2: #f1f5f9;
+  --surface3: #e2e8f0; --border: rgba(0,0,0,.12); --border2: rgba(0,0,0,.2);
+  --text: #09090b; --text2: rgba(9,9,11,.6); --text3: rgba(9,9,11,.35);
+}
+
 /* ── ELEVATION PROFILE BOX ── */
 #profile-chart-box {
   margin-top: 10px;
@@ -367,6 +415,10 @@ html, body {
   <span class="sep">|</span>
   <span class="title">📸 TerraPhoto</span>
   <span class="badge">Premium</span>
+  <span style="flex:1"></span>
+  <a href="terrascan.html" class="t-link">TerraScan</a>
+  <a href="terranews.html" class="t-link">TerraIntel</a>
+  <button onclick="document.body.classList.toggle('light')" style="background:none;border:none;cursor:pointer;font-size:14px;" title="Toggle theme">☀️</button>
 </div>
 
 <!-- WIZARD -->
@@ -395,9 +447,11 @@ html, body {
     <div class="upload-zone" id="upload-zone">
       <input type="file" id="file-input" accept="image/*" multiple />
       <div class="icon">📷</div>
-      <h3>Drag &amp; drop site photos here</h3>
+      <h3 class="upload-instructions">Drag &amp; drop site photos here</h3>
+      <p class="upload-subtitle">Supports JPEG, HEIC, PNG · GPS metadata required for location</p>
       <p>Or click to browse files. JPEG from a smartphone works best.</p>
       <p>Upload 3–30 photos taken at different spots around the site.</p>
+      <p class="upload-filetypes" style="font-size:11px;color:var(--text3);margin-top:6px;">Accepted: .jpg .jpeg .heic .png</p>
       <div class="tip">
         💡 <strong>Tip:</strong> Smartphone photos automatically embed GPS coordinates.
         The more photos with GPS, the better the boundary estimate.
@@ -422,6 +476,7 @@ html, body {
       <button id="analyze-btn" disabled>▶ Run Analysis</button>
     </div>
     <div id="analyze-status"></div>
+    <button class="back-btn" onclick="goStep(1)" style="background:none;border:none;color:var(--text2);font-size:11px;cursor:pointer;padding:8px 0;text-decoration:underline;">← Re-upload photos</button>
     <div class="nav-row">
       <button class="btn-back" onclick="goStep(1)">← Back</button>
       <button class="btn-next" id="btn-to-step3" disabled>View Results →</button>
@@ -431,6 +486,7 @@ html, body {
   <!-- ============== STEP 3: RESULTS ============== -->
   <div class="step-panel" id="step-3">
     <div id="photo-meta-box" class="photo-meta" style="margin-bottom:16px;"></div>
+    <div id="site-score-box" style="margin-bottom:16px;"></div>
 
     <div class="results-grid" id="meas-grid"></div>
 
@@ -482,12 +538,9 @@ html, body {
 <!-- ========================= SCRIPTS ========================= -->
 <script>
 // ── BACKEND URL ──────────────────────────────────────────────────────────────
-// Auto-detects local vs deployed:
-// - localhost → FastAPI server on port 8000 (same origin as HTML)
-// - anything else → Railway deployment URL (update after deploying backend)
-const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? window.location.origin
-  : "REPLACE_WITH_RAILWAY_URL";
+// Uses same-origin for both local dev (http://localhost:8000) and deployed
+// (e.g. Render). The frontend and API always live at the same origin.
+const API = window.location.origin;
 let uploadedFiles = [];         // File objects from the input
 let extractedLocation = null;   // {lat, lon, width_m, height_m, gps_points, note}
 let surveyData = null;          // full API response
@@ -514,6 +567,10 @@ async function handleFiles(files) {
   const imgs = files.filter(f => f.type.startsWith("image/"));
   if (!imgs.length) return;
   uploadedFiles = imgs;
+  // Show a "processing" state before the loop starts so the user knows something is happening
+  const uploadZone = document.getElementById("upload-zone");
+  uploadZone.classList.add('rendering');
+  uploadZone.querySelector('.upload-instructions').textContent = `Processing ${imgs.length} photo${imgs.length > 1 ? 's' : ''}…`;
   renderThumbnails(imgs);
   document.getElementById("btn-to-step2").disabled = false;
 }
@@ -540,6 +597,11 @@ function renderThumbnails(files) {
       badge.textContent = file.name.split(".")[0].slice(0, 10);
     };
   });
+  // Remove the "processing" visual state after the loop finishes
+  setTimeout(() => {
+    const uploadZone = document.getElementById("upload-zone");
+    uploadZone.classList.remove('rendering');
+  }, 100);
 }
 
 // ================================================================
@@ -647,7 +709,10 @@ async function analyzePhotosForGPS() {
 }
 
 function initLocationMap() {
-  if (locMap) return;
+  if (locMap) {
+    setTimeout(() => locMap.invalidateSize(), 100);
+    return;
+  }
   locMap = L.map("location-map").setView([39.5, -98.35], 5);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© OpenStreetMap contributors", maxZoom: 18,
@@ -725,6 +790,20 @@ function renderStep3(d) {
     📡 Data source: <strong>${d.source}</strong> &nbsp;|&nbsp;
     Vertical accuracy: <strong>±${d.vertical_error_m}m</strong><br>
     ${d.location_note || ""}
+  `;
+
+  // Compute and display site score
+  const score = calcPhotoScore(d);
+  const scoreColor = score >= 75 ? 'var(--green)' : score >= 50 ? 'var(--yellow)' : 'var(--red)';
+  const scoreWord  = score >= 75 ? 'GOOD' : score >= 50 ? 'FAIR' : 'POOR';
+  document.getElementById("site-score-box").innerHTML = `
+    <div class="score-badge">
+      <div>
+        <div class="score-label">Site Score</div>
+        <div class="score-num" style="color:${scoreColor}">${score}/100</div>
+      </div>
+      <div class="score-word" style="color:${scoreColor}">— ${scoreWord}</div>
+    </div>
   `;
 
   const fmt = n => n.toLocaleString("en-US", { maximumFractionDigits: 1 });
@@ -805,6 +884,20 @@ function renderStep3(d) {
       }
     }, 800);
   }
+}
+
+// ================================================================
+// SITE SCORE
+// ================================================================
+// Computes a rough 1–99 "site score" from slope and buildable area.
+// Higher = flatter, more buildable land. Same color scale as TerraScan.
+function calcPhotoScore(data) {
+  let s = 60;
+  const sl = data.avg_slope?.value || 0;
+  if (sl > 25) s -= 22; else if (sl > 15) s -= 12;
+  const build = data.buildable_area_pct || 0;
+  s += Math.min(20, build * 0.22);
+  return Math.max(10, Math.min(99, Math.round(s)));
 }
 
 // Downloads
