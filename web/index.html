@@ -196,25 +196,28 @@
       pointer-events: none;
     }
 
-    /* Animated topographic contour rings */
-    /* Each ring is a circle border that rotates slowly */
+    /* Animated topographic contour rings.
+       Each ring is a circle border that rotates slowly.
+       Inner rings are more visible; outer rings are faint to reduce GPU overdraw. */
     .contour-ring {
       position: absolute;
       border-radius: 50%;
-      border: 1px solid rgba(0,212,255,0.04);
       pointer-events: none;
-      /* They shrink/grow using scale via JS on scroll, but mainly just rotate */
+      animation-timing-function: ease-in-out;
     }
-    .contour-ring:nth-child(1)  { width: 200px;  height: 200px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 60s linear infinite; }
-    .contour-ring:nth-child(2)  { width: 380px;  height: 320px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 80s linear infinite reverse; }
-    .contour-ring:nth-child(3)  { width: 560px;  height: 440px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 100s linear infinite; }
-    .contour-ring:nth-child(4)  { width: 740px;  height: 560px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 120s linear infinite reverse; }
-    .contour-ring:nth-child(5)  { width: 920px;  height: 680px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 140s linear infinite; }
-    .contour-ring:nth-child(6)  { width: 1100px; height: 800px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 160s linear infinite reverse; }
-    .contour-ring:nth-child(7)  { width: 1280px; height: 920px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 180s linear infinite; }
-    .contour-ring:nth-child(8)  { width: 1460px; height: 1040px; top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 200s linear infinite reverse; }
-    .contour-ring:nth-child(9)  { width: 1640px; height: 1160px; top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 220s linear infinite; }
-    .contour-ring:nth-child(10) { width: 1820px; height: 1280px; top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 240s linear infinite reverse; }
+    /* Innermost 3 — brightest */
+    .contour-ring:nth-child(1)  { width: 200px;  height: 200px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 60s ease-in-out infinite;  border: 1px solid rgba(0,212,255,0.12); }
+    .contour-ring:nth-child(2)  { width: 380px;  height: 320px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 80s ease-in-out infinite reverse; border: 1px solid rgba(0,212,255,0.12); }
+    .contour-ring:nth-child(3)  { width: 560px;  height: 440px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 100s ease-in-out infinite; border: 1px solid rgba(0,212,255,0.12); }
+    /* Middle 4 — moderate brightness */
+    .contour-ring:nth-child(4)  { width: 740px;  height: 560px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 120s ease-in-out infinite reverse; border: 1px solid rgba(0,212,255,0.08); }
+    .contour-ring:nth-child(5)  { width: 920px;  height: 680px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 140s ease-in-out infinite; border: 1px solid rgba(0,212,255,0.08); }
+    .contour-ring:nth-child(6)  { width: 1100px; height: 800px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 160s ease-in-out infinite reverse; border: 1px solid rgba(0,212,255,0.08); }
+    .contour-ring:nth-child(7)  { width: 1280px; height: 920px;  top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 180s ease-in-out infinite; border: 1px solid rgba(0,212,255,0.04); }
+    /* Outermost 3 — faintest, hidden on narrow viewports */
+    .contour-ring:nth-child(8)  { width: 1460px; height: 1040px; top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 200s ease-in-out infinite reverse; border: 1px solid rgba(0,212,255,0.04); }
+    .contour-ring:nth-child(9)  { width: 1640px; height: 1160px; top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin1 220s ease-in-out infinite; border: 1px solid rgba(0,212,255,0.04); }
+    .contour-ring:nth-child(10) { width: 1820px; height: 1280px; top: 50%; left: 50%; transform: translate(-50%,-50%); animation: spin2 240s ease-in-out infinite reverse; border: 1px solid rgba(0,212,255,0.04); }
 
     @keyframes spin1 {
       from { transform: translate(-50%,-50%) rotate(0deg); }
@@ -300,7 +303,8 @@
       color: #fff;
       font-size: 1rem;
       font-weight: 600;
-      padding: 14px 32px;
+      /* slightly enlarged from original for desktop presence */
+      padding: 16px 36px;
       border-radius: var(--pill);
       transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
     }
@@ -318,7 +322,7 @@
       color: var(--accent2);
       font-size: 1rem;
       font-weight: 600;
-      padding: 14px 32px;
+      padding: 16px 36px;
       border-radius: var(--pill);
       border: 1.5px solid rgba(0,212,255,0.35);
       transition: background 0.2s, border-color 0.2s;
@@ -385,153 +389,136 @@
       margin-left: -60px; /* optical centering past the dots */
     }
 
-    /* Fake app body inside the browser frame — now just a height container;
-       the demo-canvas fills 100% of it */
+    /* Fake app body inside the browser frame */
     .mockup-body {
       height: 340px;
       position: relative;
     }
 
-    /* Left sidebar stub */
-    .mock-sidebar {
-      background: #0d1826;
-      border-right: 1px solid rgba(0,212,255,0.1);
-      padding: 16px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      grid-row: 1 / 3;
-    }
-    .mock-sidebar-item {
-      height: 28px;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.04);
-    }
-    .mock-sidebar-item:first-child { background: rgba(37,99,235,0.18); width: 70%; }
-    .mock-sidebar-item:nth-child(2) { width: 85%; }
-    .mock-sidebar-item:nth-child(3) { width: 60%; }
-    .mock-sidebar-item:nth-child(4) { width: 75%; }
-    .mock-sidebar-item:nth-child(5) { width: 50%; margin-top: auto; }
 
-    /* Map area — middle */
-    .mock-map {
-      background:
-        /* subtle grid lines like a map */
-        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px),
-        /* base color */
-        #071220;
-      background-size: 32px 32px, 32px 32px, 100%;
-      position: relative;
-      overflow: hidden;
+    /* ════════════════════════════════════════════════════════
+       DEMO CANVAS — the animated hero preview
+    ════════════════════════════════════════════════════════ */
+
+    /* ── DEMO CANVAS ── */
+    .demo-canvas {
+      position: relative; width: 100%; height: 100%;
+      background: #2d4a1e; overflow: hidden;
+      border-radius: 0 0 10px 10px;
     }
 
-    /* Terrain color blobs inside the map */
-    .mock-map::before {
-      content: "";
-      position: absolute;
-      top: 30%;
-      left: 35%;
-      width: 200px;
-      height: 140px;
-      border-radius: 50%;
-      background: radial-gradient(ellipse, rgba(34,197,94,0.18) 0%, transparent 70%);
-    }
-    .mock-map::after {
-      content: "";
-      position: absolute;
-      top: 20%;
-      left: 50%;
-      width: 140px;
-      height: 100px;
-      border-radius: 50%;
-      background: radial-gradient(ellipse, rgba(37,99,235,0.2) 0%, transparent 70%);
+    /* The terrain SVG fills the entire canvas as the background layer.
+       Both the base terrain AND the heatmap overlay live inside this SVG
+       so they share a coordinate system and the clip path works correctly. */
+    .demo-terrain-svg {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
     }
 
-    /* Glowing dot on map — selected location */
-    .mock-pin {
-      position: absolute;
-      top: 45%;
-      left: 48%;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: var(--accent2);
-      box-shadow: 0 0 0 4px rgba(0,212,255,0.2), 0 0 20px rgba(0,212,255,0.5);
-      animation: pulse 2s ease-in-out infinite;
-    }
-    .mock-pin::before {
-      content: "";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%,-50%);
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border: 1px solid rgba(0,212,255,0.3);
-      animation: ring-pulse 2s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 0 4px rgba(0,212,255,0.2), 0 0 20px rgba(0,212,255,0.5); }
-      50%       { box-shadow: 0 0 0 8px rgba(0,212,255,0.1), 0 0 30px rgba(0,212,255,0.7); }
-    }
-    @keyframes ring-pulse {
-      0%    { opacity: 1; transform: translate(-50%,-50%) scale(1); }
-      100%  { opacity: 0; transform: translate(-50%,-50%) scale(2.5); }
+    /* Scan sweep line — a glowing horizontal bar that sweeps top→bottom
+       during phase 3 to simulate LiDAR scanning */
+    .demo-sweep-line {
+      position: absolute; left: 0; right: 0; top: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, #38bdf8, #fff, #38bdf8, transparent);
+      box-shadow: 0 0 12px rgba(56,189,248,0.8), 0 0 24px rgba(56,189,248,0.4);
+      z-index: 30; opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
     }
 
-    /* Right panel stub */
-    .mock-panel {
-      background: #0d1826;
-      border-left: 1px solid rgba(0,212,255,0.1);
-      padding: 16px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      grid-row: 1 / 2;
-    }
-    .mock-panel-label {
-      height: 14px;
-      border-radius: 4px;
-      background: rgba(0,212,255,0.1);
-      width: 60%;
-    }
-    .mock-panel-val {
-      height: 22px;
-      border-radius: 6px;
-      background: rgba(255,255,255,0.06);
-    }
-    .mock-panel-val:nth-child(2) { background: rgba(34,197,94,0.15); }
-    .mock-panel-val:nth-child(4) { width: 80%; }
-    .mock-panel-val:nth-child(6) { width: 65%; }
-
-    /* Bottom bar stub spanning map + panel */
-    .mock-bottom {
-      grid-column: 2 / 4;
-      background: #0a1628;
-      border-top: 1px solid rgba(0,212,255,0.08);
-      display: flex;
-      align-items: center;
-      padding: 0 16px;
-      gap: 12px;
-    }
-    .mock-bottom-chip {
-      height: 28px;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.04);
-      padding: 0 12px;
-      font-size: 0.72rem;
-      color: var(--text3);
-      display: flex;
-      align-items: center;
+    /* Floating data labels that pop up as the sweep passes each area */
+    .demo-data-label {
+      position: absolute; z-index: 35;
+      background: rgba(9,9,11,0.85);
+      border: 1px solid rgba(56,189,248,0.5);
+      color: #e2e8f0; font-size: 9px; font-family: monospace;
+      padding: 3px 7px; border-radius: 4px;
+      opacity: 0; transform: translateY(4px);
+      transition: opacity 0.4s, transform 0.4s;
       white-space: nowrap;
     }
-    .mock-bottom-chip.active {
-      background: rgba(37,99,235,0.2);
-      color: var(--accent2);
-      border: 1px solid rgba(0,212,255,0.2);
+
+    /* Cursor */
+    .demo-cursor {
+      position: absolute; width: 20px; height: 20px;
+      transform: translate(-50%,-50%);
+      transition: left .8s cubic-bezier(.4,0,.2,1), top .8s cubic-bezier(.4,0,.2,1), opacity .3s ease;
+      z-index: 10; pointer-events: none; opacity: 0;
     }
+
+    /* Pin */
+    .demo-pin { position: absolute; transform: translate(-50%,-100%); z-index: 8; opacity: 0; pointer-events: none; }
+    .demo-pin-dot {
+      width: 10px; height: 10px; background: #2563eb; border-radius: 50%; margin: 0 auto;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.3);
+    }
+    .demo-pin-ring {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      width: 10px; height: 10px; border: 2px solid #2563eb; border-radius: 50%;
+      animation: pingRing 1.5s ease-out infinite;
+    }
+    @keyframes pingRing { 0% { width:10px; height:10px; opacity:1 } 100% { width:40px; height:40px; opacity:0; margin:-15px } }
+
+    /* City label that appears above the pin */
+    .demo-pin-label {
+      position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+      background: rgba(9,9,20,.9); border: 1px solid rgba(37,99,235,.4); border-radius: 6px;
+      padding: 3px 8px; font-size: 10px; font-weight: 600; color: #fff;
+      white-space: nowrap; font-family: monospace;
+    }
+
+    /* Survey rectangle */
+    .demo-rect {
+      position: absolute; border: 2px dashed #2563eb; border-radius: 4px;
+      background: rgba(37,99,235,.06);
+      transform: translate(-50%,-50%); z-index: 6;
+      width: 0; height: 0; opacity: 0;
+      transition: width .5s ease, height .5s ease, opacity .3s ease;
+    }
+
+    /* Scan overlay — used briefly at the start of phase 3 as a loading indicator */
+    .demo-scan {
+      position: absolute; inset: 0; background: rgba(6,12,23,.88);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 10px; opacity: 0; pointer-events: none; z-index: 12;
+      transition: opacity .3s ease;
+    }
+    .demo-diamond-svg { width: 48px; height: 48px; filter: drop-shadow(0 0 8px rgba(37,99,235,.5)); }
+    .demo-scan-progress { width: 140px; height: 2px; background: rgba(255,255,255,.08); border-radius: 1px; overflow: hidden; }
+    .demo-scan-fill { height: 100%; width: 0%; background: #2563eb; transition: width .1s linear; }
+    .demo-scan-status { font-size: 10px; color: rgba(255,255,255,.4); font-family: monospace; letter-spacing: .3px; }
+
+    /* Toast chip */
+    .demo-toast {
+      position: absolute; top: 10px; left: 50%; transform: translateX(-50%) translateY(-40px);
+      background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.4);
+      color: #22c55e; font-size: 10px; font-weight: 600; padding: 4px 12px;
+      border-radius: 99px; font-family: monospace; white-space: nowrap;
+      transition: transform .4s cubic-bezier(.34,1.56,.64,1), opacity .3s ease;
+      opacity: 0; z-index: 15;
+    }
+
+    /* Results panel */
+    .demo-results {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 80px;
+      background: rgba(13,24,38,.95); border-top: 1px solid rgba(37,99,235,.2);
+      padding: 8px 12px; display: flex; align-items: center; gap: 12px;
+      transform: translateY(100%); transition: transform .5s cubic-bezier(.34,1.3,.64,1); z-index: 9;
+    }
+    .demo-score { flex-shrink: 0; text-align: center; }
+    .demo-score-num { font-size: 24px; font-weight: 800; color: #2563eb; font-family: monospace; line-height: 1; }
+    .demo-score-lbl { font-size: 8px; color: rgba(255,255,255,.4); font-family: monospace; margin-top: 2px; white-space: nowrap; }
+    .demo-bars { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .demo-bar-row { display: flex; align-items: center; gap: 5px; }
+    .db-label { font-size: 9px; color: rgba(255,255,255,.4); font-family: monospace; width: 46px; flex-shrink: 0; }
+    .db-track { flex: 1; height: 4px; background: rgba(255,255,255,.07); border-radius: 2px; overflow: hidden; }
+    .db-fill { height: 100%; width: 0%; background: var(--color); border-radius: 2px; transition: width .8s ease; }
+    .db-val { font-size: 9px; color: rgba(255,255,255,.6); font-family: monospace; width: 24px; text-align: right; flex-shrink: 0; }
+    .demo-profile { width: 120px; height: 40px; flex-shrink: 0; }
+
+    /* Glow pulse on rect when complete */
+    @keyframes rectGlow { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,.4) } 50% { box-shadow: 0 0 0 8px rgba(34,197,94,.2) } 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0) } }
+    .demo-rect.complete { border-color: #22c55e; animation: rectGlow 1s ease; }
 
 
     /* ════════════════════════════════════════════════════════
@@ -900,100 +887,6 @@
     .reveal-stagger .reveal:nth-child(6) { transition-delay: .40s; }
 
 
-    /* ── DEMO CANVAS ── */
-    .demo-canvas{
-      position:relative;width:100%;height:100%;
-      background:#060c17;overflow:hidden;
-      border-radius:0 0 10px 10px;
-    }
-    .demo-map-grid{
-      position:absolute;inset:0;
-      background-image:
-        linear-gradient(rgba(37,99,235,.06) 1px,transparent 1px),
-        linear-gradient(90deg,rgba(37,99,235,.06) 1px,transparent 1px);
-      background-size:40px 40px;
-    }
-
-    /* Cursor */
-    .demo-cursor{
-      position:absolute;width:20px;height:20px;
-      transform:translate(-50%,-50%);
-      transition:left .8s cubic-bezier(.4,0,.2,1), top .8s cubic-bezier(.4,0,.2,1), opacity .3s ease;
-      z-index:10;pointer-events:none;opacity:0;
-    }
-
-    /* Pin */
-    .demo-pin{position:absolute;transform:translate(-50%,-100%);z-index:8;opacity:0;pointer-events:none;}
-    .demo-pin-dot{width:10px;height:10px;background:#2563eb;border-radius:50%;margin:0 auto;
-      box-shadow:0 0 0 3px rgba(37,99,235,.3);}
-    .demo-pin-ring{
-      position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-      width:10px;height:10px;border:2px solid #2563eb;border-radius:50%;
-      animation:pingRing 1.5s ease-out infinite;
-    }
-    @keyframes pingRing{0%{width:10px;height:10px;opacity:1}100%{width:40px;height:40px;opacity:0;margin:-15px}}
-    .demo-pin-label{
-      position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
-      background:rgba(9,9,20,.9);border:1px solid rgba(37,99,235,.4);border-radius:6px;
-      padding:3px 8px;font-size:10px;font-weight:600;color:#fff;white-space:nowrap;font-family:monospace;
-    }
-
-    /* Survey rectangle */
-    .demo-rect{
-      position:absolute;border:2px dashed #2563eb;border-radius:4px;
-      background:rgba(37,99,235,.06);
-      transform:translate(-50%,-50%);z-index:6;
-      width:0;height:0;opacity:0;
-      transition:width .5s ease,height .5s ease,opacity .3s ease;
-    }
-
-    /* Scan overlay */
-    .demo-scan{
-      position:absolute;inset:0;background:rgba(6,12,23,.88);
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      gap:10px;opacity:0;pointer-events:none;z-index:12;
-      transition:opacity .3s ease;
-    }
-    .demo-diamond-svg{width:48px;height:48px;filter:drop-shadow(0 0 8px rgba(37,99,235,.5));}
-    .demo-scan-progress{width:140px;height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden;}
-    .demo-scan-fill{height:100%;width:0%;background:#2563eb;transition:width .1s linear;}
-    .demo-scan-status{font-size:10px;color:rgba(255,255,255,.4);font-family:monospace;letter-spacing:.3px;}
-
-    /* Toast chip */
-    .demo-toast{
-      position:absolute;top:10px;left:50%;transform:translateX(-50%) translateY(-40px);
-      background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);
-      color:#22c55e;font-size:10px;font-weight:600;padding:4px 12px;
-      border-radius:99px;font-family:monospace;white-space:nowrap;
-      transition:transform .4s cubic-bezier(.34,1.56,.64,1), opacity .3s ease;
-      opacity:0;z-index:15;
-    }
-
-    /* Results panel */
-    .demo-results{
-      position:absolute;bottom:0;left:0;right:0;height:80px;
-      background:rgba(13,24,38,.95);border-top:1px solid rgba(37,99,235,.2);
-      padding:8px 12px;display:flex;align-items:center;gap:12px;
-      transform:translateY(100%);transition:transform .5s cubic-bezier(.34,1.3,.64,1);z-index:9;
-    }
-    .demo-score{flex-shrink:0;text-align:center;}
-    .demo-score-num{font-size:24px;font-weight:800;color:#2563eb;font-family:monospace;line-height:1;}
-    .demo-score-lbl{font-size:8px;color:rgba(255,255,255,.4);font-family:monospace;margin-top:2px;white-space:nowrap;}
-    .demo-bars{flex:1;display:flex;flex-direction:column;gap:4px;}
-    .demo-bar-row{display:flex;align-items:center;gap:5px;}
-    .db-label{font-size:9px;color:rgba(255,255,255,.4);font-family:monospace;width:46px;flex-shrink:0;}
-    .db-track{flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;}
-    .db-fill{height:100%;width:0%;background:var(--color);border-radius:2px;transition:width .8s ease;}
-    .db-val{font-size:9px;color:rgba(255,255,255,.6);font-family:monospace;width:24px;text-align:right;flex-shrink:0;}
-    .demo-profile{width:120px;height:40px;flex-shrink:0;}
-
-    /* Glow pulse on rect when complete */
-    @keyframes rectGlow{0%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}50%{box-shadow:0 0 0 8px rgba(34,197,94,.2)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
-    .demo-rect.complete{border-color:#22c55e;animation:rectGlow 1s ease;}
-
-    /* Mockup body height — needed so the demo canvas fills it */
-
-
     /* ════════════════════════════════════════════════════════
        RESPONSIVE — single column on < 768px
     ════════════════════════════════════════════════════════ */
@@ -1006,6 +899,9 @@
       .hero { padding: 100px 20px 40px; }
       .hero h1 { letter-spacing: -1.2px; }
       .hero-sub { font-size: 1rem; }
+
+      /* Buttons: scale back to comfortable mobile size */
+      .btn-primary, .btn-secondary { padding: 14px 28px; }
 
       /* Mockup: reduce height on small screens */
       .mockup-body { height: 240px; }
@@ -1037,6 +933,13 @@
     @media (min-width: 769px) and (max-width: 1024px) {
       .features-grid { grid-template-columns: repeat(2, 1fr); }
       .sources-row { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* Hide outermost 3 contour rings on narrow viewports to save GPU */
+    @media (max-width: 900px) {
+      .contour-ring:nth-child(8),
+      .contour-ring:nth-child(9),
+      .contour-ring:nth-child(10) { display: none; }
     }
   </style>
 </head>
@@ -1133,28 +1036,149 @@
           <div class="mockup-title">TerraMeasure &mdash; Terrain Intelligence</div>
         </div>
 
-        <!-- Animated demo canvas — replaces the old static mockup body -->
+        <!-- Animated demo canvas — rich terrain scene replaces old gray grid -->
         <div class="mockup-body">
           <div class="demo-canvas" id="demo-canvas">
-            <!-- Map grid background -->
-            <div class="demo-map-grid"></div>
+
+            <!--
+              TERRAIN SVG — a hand-crafted bird's-eye aerial scene.
+              Layers from back to front:
+                1. Base radial gradient (elevation shading)
+                2. Topo contour lines (subtle white ellipses)
+                3. Grass/clearing patches (sage green polygons)
+                4. Forest canopy blobs (dark green ellipses)
+                5. Dirt path and stream/creek (bezier paths)
+                6. Heatmap overlay group (same shapes, heatmap colors,
+                   clipped by sweep-clip so it reveals as the scanner sweeps)
+            -->
+            <svg class="demo-terrain-svg" viewBox="0 0 380 270"
+                 preserveAspectRatio="xMidYMid slice"
+                 xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <!-- Radial gradient: lighter green at the hill's peak, darker at the edges -->
+                <radialGradient id="terrain-grad" cx="52%" cy="42%" r="60%">
+                  <stop offset="0%"   stop-color="#5a7a3a"/>
+                  <stop offset="100%" stop-color="#2d4a1e"/>
+                </radialGradient>
+
+                <!--
+                  The sweep-clip is a growing rectangle that reveals the
+                  heatmap layer below as the scanner sweeps downward.
+                  JS animates sweep-rect height from 0 to 270 (SVG units).
+                -->
+                <clipPath id="sweep-clip">
+                  <rect id="sweep-rect" x="0" y="0" width="380" height="0"/>
+                </clipPath>
+              </defs>
+
+              <!-- ── Layer 1: Base terrain (always visible) ── -->
+              <rect width="380" height="270" fill="url(#terrain-grad)"/>
+
+              <!-- ── Layer 2: Topographic contour lines ──
+                   Subtle ellipses centered on the hillcrest at ~(192, 108).
+                   Think of them as elevation rings on a topo map visible through canopy. -->
+              <ellipse cx="192" cy="108" rx="155" ry="98"  fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+              <ellipse cx="192" cy="108" rx="115" ry="70"  fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+              <ellipse cx="193" cy="107" rx="78"  ry="47"  fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+              <ellipse cx="194" cy="106" rx="48"  ry="29"  fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+              <!-- An organic lower contour following the valley floor -->
+              <path d="M 30,210 Q 90,195 150,200 Q 210,205 265,192 Q 315,180 370,188"
+                    fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+
+              <!-- ── Layer 3: Grass clearings (open meadow patches) ── -->
+              <!-- Bottom-left clearing -->
+              <polygon points="45,155 88,143 118,160 100,182 52,178"
+                       fill="#8aaa5a" opacity="0.72"/>
+              <!-- Upper-right clearing on the ridge -->
+              <polygon points="245,52 288,48 308,70 290,88 250,82"
+                       fill="#a8c472" opacity="0.65"/>
+              <!-- Lower-right clearing -->
+              <polygon points="295,185 338,178 355,200 332,215 290,208"
+                       fill="#8aaa5a" opacity="0.55"/>
+
+              <!-- ── Layer 4: Forest canopy blobs ──
+                   Ellipses in overlapping dark greens to suggest tree-top depth. -->
+              <ellipse cx="98"  cy="76"  rx="36" ry="26" fill="#1e3a14" opacity="0.88"/>
+              <ellipse cx="153" cy="62"  rx="29" ry="21" fill="#2a4d1a" opacity="0.82"/>
+              <ellipse cx="76"  cy="107" rx="26" ry="19" fill="#3a6025" opacity="0.78"/>
+              <ellipse cx="200" cy="72"  rx="33" ry="23" fill="#1e3a14" opacity="0.86"/>
+              <ellipse cx="242" cy="96"  rx="23" ry="17" fill="#2a4d1a" opacity="0.80"/>
+              <ellipse cx="166" cy="94"  rx="31" ry="21" fill="#3a6025" opacity="0.74"/>
+              <ellipse cx="292" cy="116" rx="29" ry="21" fill="#1e3a14" opacity="0.82"/>
+              <ellipse cx="323" cy="89"  rx="23" ry="17" fill="#2a4d1a" opacity="0.76"/>
+              <ellipse cx="132" cy="122" rx="26" ry="19" fill="#3a6025" opacity="0.72"/>
+              <ellipse cx="262" cy="147" rx="21" ry="16" fill="#1e3a14" opacity="0.78"/>
+              <ellipse cx="56"  cy="58"  rx="31" ry="23" fill="#2a4d1a" opacity="0.82"/>
+
+              <!-- ── Layer 5a: Dirt path (winding tan track) ──
+                   Snakes from bottom-left toward center-right. -->
+              <path d="M 18,248 Q 55,228 98,215 Q 140,202 172,198 Q 215,192 255,183"
+                    fill="none" stroke="#c4a67a" stroke-width="3"
+                    stroke-linecap="round" opacity="0.75"/>
+
+              <!-- ── Layer 5b: Stream / creek (muted blue) ──
+                   Crosses the lower third horizontally. -->
+              <path d="M 28,205 Q 75,190 128,195 Q 170,200 215,178 Q 255,160 305,162 Q 345,164 375,154"
+                    fill="none" stroke="#6ba3be" stroke-width="2.2"
+                    stroke-linecap="round" opacity="0.85"/>
+
+              <!--
+                ── Layer 6: Heatmap overlay ──
+                Clipped by sweep-clip so it only shows below the scan sweep line.
+                Colors encode slope analysis:
+                  Blue  (#38bdf8) = gentle slope (low)
+                  Green (#22c55e) = moderate slope (medium)
+                  Orange/Red      = steep slope (high), typically near the hillcrest
+              -->
+              <g clip-path="url(#sweep-clip)">
+                <!-- Broad low-slope base across the valley floor and edges -->
+                <ellipse cx="190" cy="165" rx="185" ry="105" fill="#38bdf8" opacity="0.18"/>
+                <!-- Medium slope across the mid-elevation forest -->
+                <ellipse cx="105" cy="92"  rx="85"  ry="58"  fill="#22c55e" opacity="0.42"/>
+                <ellipse cx="288" cy="122" rx="65"  ry="48"  fill="#22c55e" opacity="0.38"/>
+                <ellipse cx="190" cy="108" rx="110" ry="68"  fill="#22c55e" opacity="0.22"/>
+                <!-- High slope near the hilltop -->
+                <ellipse cx="192" cy="108" rx="58"  ry="37"  fill="#f59e0b" opacity="0.55"/>
+                <!-- Steep summit core -->
+                <ellipse cx="193" cy="106" rx="28"  ry="18"  fill="#ef4444" opacity="0.58"/>
+                <!-- Heatmap coloring over clearings -->
+                <polygon points="45,155 88,143 118,160 100,182 52,178"
+                         fill="#38bdf8" opacity="0.35"/>
+                <polygon points="245,52 288,48 308,70 290,88 250,82"
+                         fill="#22c55e" opacity="0.45"/>
+                <polygon points="295,185 338,178 355,200 332,215 290,208"
+                         fill="#38bdf8" opacity="0.30"/>
+              </g>
+            </svg>
+
+            <!-- Scan sweep line — glows as it moves downward during analysis -->
+            <div class="demo-sweep-line" id="demo-sweep-line"></div>
+
+            <!-- Floating data labels that pop up as the sweep reveals each zone.
+                 Positions are tuned to land on interesting terrain features. -->
+            <div class="demo-data-label" id="demo-label-1"
+                 style="top:18%; right:12%;">elev: 2,847m</div>
+            <div class="demo-data-label" id="demo-label-2"
+                 style="top:44%; left:10%;">slope: 12&deg;</div>
+            <div class="demo-data-label" id="demo-label-3"
+                 style="top:65%; left:38%;">canopy: 78%</div>
 
             <!-- Cursor -->
             <div class="demo-cursor" id="demo-cursor">
               <svg width="20" height="20" viewBox="0 0 20 20"><path d="M2 2 L18 9 L10 11 L7 18 Z" fill="white" stroke="#000" stroke-width="1.2"/></svg>
             </div>
 
-            <!-- Pin + label -->
+            <!-- Pin + city label above it -->
             <div class="demo-pin" id="demo-pin">
               <div class="demo-pin-dot"></div>
               <div class="demo-pin-ring"></div>
-              <div class="demo-pin-label">&#128205; Denver, CO</div>
+              <div class="demo-pin-label">&#128205; Cascade Range, OR</div>
             </div>
 
             <!-- Survey rectangle -->
             <div class="demo-rect" id="demo-rect"></div>
 
-            <!-- Scan overlay -->
+            <!-- Scan overlay — appears briefly as a loading state at start of phase 3 -->
             <div class="demo-scan" id="demo-scan">
               <svg class="demo-diamond-svg" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
                 <path id="dd-outer" d="M30 3 L57 30 L30 57 L3 30 Z" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="153" stroke-dashoffset="153"/>
@@ -1167,10 +1191,10 @@
               <div class="demo-scan-status" id="demo-scan-status">Fetching terrain&hellip;</div>
             </div>
 
-            <!-- Toast chip -->
+            <!-- Toast chip — shows success at the end -->
             <div class="demo-toast" id="demo-toast">&#10003; Survey complete &middot; 87/100</div>
 
-            <!-- Results bottom panel -->
+            <!-- Results bottom panel — slides up in phase 4 -->
             <div class="demo-results" id="demo-results">
               <div class="demo-score">
                 <div class="demo-score-num">87</div>
@@ -1194,14 +1218,16 @@
                 </div>
               </div>
               <svg class="demo-profile" viewBox="0 0 120 40">
-                <polyline id="demo-profile-line" points="0,35 15,30 25,22 40,18 55,20 65,14 80,10 95,15 110,25 120,30"
+                <polyline id="demo-profile-line"
+                          points="0,35 15,30 25,22 40,18 55,20 65,14 80,10 95,15 110,25 120,30"
                           fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round"
                           stroke-dasharray="200" stroke-dashoffset="200"/>
                 <line x1="0" y1="38" x2="120" y2="38" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
               </svg>
             </div>
-          </div>
-        </div>
+
+          </div><!-- end .demo-canvas -->
+        </div><!-- end .mockup-body -->
       </div>
     </div>
   </div>
@@ -1315,8 +1341,9 @@
 
       <div class="step reveal">
         <div class="step-num">3</div>
-        <h3>Get your report</h3>
-        <p>Instant slope, volumes, risk scores, a site score from 0&ndash;100, and downloadable maps.</p>
+        <!-- Changed from the generic "Get your report" to something punchier -->
+        <h3>Instant intel. Zero waiting.</h3>
+        <p>Slope, volumes, risk scores, a site score from 0&ndash;100, and downloadable maps &mdash; ready before your coffee cools.</p>
       </div>
 
     </div>
@@ -1506,124 +1533,252 @@
 
   // ── DEMO ANIMATION LOOP ──────────────────────────────────
   // This drives the 5-phase looping demo inside the hero mockup frame.
-  // Each phase is triggered by a setTimeout; the whole loop repeats
-  // every 13.5 seconds so the visitor always sees something happening.
+  //
+  // Phase 1 (t=0):      Map visible, cursor appears
+  // Phase 2 (t=2500):   Cursor glides, pin drops with city label, rect expands
+  // Phase 3 (t=4500):   Scan sweep line + heatmap reveal + floating data labels
+  // Phase 4 (t=8000):   Results panel slides up with animated bars
+  // Phase 5 (t=11000):  Green glow on rect + success toast
+  // Loop restarts at t=13500 ms
   (function demoLoop() {
-    const canvas   = document.getElementById('demo-canvas');
+    const canvas    = document.getElementById('demo-canvas');
     if (!canvas) return; // bail if the element doesn't exist
 
-    const cursor   = document.getElementById('demo-cursor');
-    const pin      = document.getElementById('demo-pin');
-    const rect     = document.getElementById('demo-rect');
-    const scanOv   = document.getElementById('demo-scan');
-    const scanFill = document.getElementById('demo-scan-fill');
-    const scanStat = document.getElementById('demo-scan-status');
-    const toast    = document.getElementById('demo-toast');
-    const results  = document.getElementById('demo-results');
-    const profLine = document.getElementById('demo-profile-line');
-    const ddOuter  = document.getElementById('dd-outer');
-    const ddInner  = document.getElementById('dd-inner');
-    const ddDot    = document.getElementById('dd-dot');
-    const fills    = document.querySelectorAll('.db-fill');
+    // Grab all the elements we'll animate
+    const cursor    = document.getElementById('demo-cursor');
+    const pin       = document.getElementById('demo-pin');
+    const rect      = document.getElementById('demo-rect');
+    const scanOv    = document.getElementById('demo-scan');
+    const scanFill  = document.getElementById('demo-scan-fill');
+    const scanStat  = document.getElementById('demo-scan-status');
+    const toast     = document.getElementById('demo-toast');
+    const results   = document.getElementById('demo-results');
+    const profLine  = document.getElementById('demo-profile-line');
+    const ddOuter   = document.getElementById('dd-outer');
+    const ddInner   = document.getElementById('dd-inner');
+    const ddDot     = document.getElementById('dd-dot');
+    const fills     = document.querySelectorAll('.db-fill');
 
-    // Where the pin and rect will appear (as a % of the canvas)
+    // New elements for the terrain scan effect
+    const sweepLine  = document.getElementById('demo-sweep-line');
+    const sweepRect  = document.getElementById('sweep-rect');   // SVG <rect> inside clipPath
+    const label1     = document.getElementById('demo-label-1');
+    const label2     = document.getElementById('demo-label-2');
+    const label3     = document.getElementById('demo-label-3');
+
+    // Where the pin and survey rect appear (as % of canvas)
     const TARGET = { left: '55%', top: '40%' };
+
+    // Track the active rAF handle so we can cancel it on reset
+    let sweepRafId = null;
 
     // ── reset() puts everything back to its starting (hidden) state ──
     function reset() {
+      // Cancel any ongoing sweep animation
+      if (sweepRafId) { cancelAnimationFrame(sweepRafId); sweepRafId = null; }
+
+      // Hide / reset cursor, pin, rect
       cursor.style.opacity = '0';
-      pin.style.opacity = '0';
-      rect.style.width = '0'; rect.style.height = '0'; rect.style.opacity = '0';
+      pin.style.opacity    = '0';
+      rect.style.width     = '0';
+      rect.style.height    = '0';
+      rect.style.opacity   = '0';
       rect.classList.remove('complete');
-      scanOv.style.opacity = '0'; scanOv.style.pointerEvents = 'none';
-      toast.style.opacity = '0'; toast.style.transform = 'translateX(-50%) translateY(-40px)';
-      results.style.transform = 'translateY(100%)';
+
+      // Hide scan overlay
+      scanOv.style.opacity        = '0';
+      scanOv.style.pointerEvents  = 'none';
+
+      // Reset progress bar and status text inside scan overlay
       if (scanFill) scanFill.style.width = '0%';
-      if (profLine) { profLine.style.transition = 'none'; profLine.style.strokeDashoffset = '200'; }
-      fills.forEach(f => { f.style.transition = 'none'; f.style.width = '0%'; });
+      if (scanStat) scanStat.textContent = 'Fetching terrain…';
+
+      // Reset diamond draw animation
       if (ddOuter) { ddOuter.style.transition = 'none'; ddOuter.style.strokeDashoffset = '153'; }
       if (ddInner) { ddInner.style.transition = 'none'; ddInner.style.strokeDashoffset = '50'; }
-      if (ddDot)   { ddDot.style.transition = 'none'; ddDot.style.opacity = '0'; }
+      if (ddDot)   { ddDot.style.transition   = 'none'; ddDot.style.opacity = '0'; }
+
+      // Reset sweep line — move it back to top, hide it
+      sweepLine.style.opacity = '0';
+      sweepLine.style.top     = '0%';
+
+      // Reset the SVG clip rect so heatmap is fully hidden
+      if (sweepRect) sweepRect.setAttribute('height', '0');
+
+      // Reset floating data labels
+      [label1, label2, label3].forEach(lbl => {
+        if (!lbl) return;
+        lbl.style.opacity   = '0';
+        lbl.style.transform = 'translateY(4px)';
+      });
+
+      // Hide toast and results panel
+      toast.style.opacity   = '0';
+      toast.style.transform = 'translateX(-50%) translateY(-40px)';
+      results.style.transform = 'translateY(100%)';
+
+      // Reset result bar fills and profile line
+      fills.forEach(f => { f.style.transition = 'none'; f.style.width = '0%'; });
+      if (profLine) { profLine.style.transition = 'none'; profLine.style.strokeDashoffset = '200'; }
     }
 
-    // ── Phase 1: Map ready — cursor appears, blinking at corner ──
+    // ── Phase 1: Map visible — cursor appears at upper-left ──
     function phase1() {
       reset();
-      cursor.style.left = '20%'; cursor.style.top = '25%';
+      // Position cursor, then show it (no transition so it snaps in)
+      cursor.style.left       = '20%';
+      cursor.style.top        = '25%';
       cursor.style.transition = 'none';
-      cursor.style.opacity = '1';
+      cursor.style.opacity    = '1';
     }
 
-    // ── Phase 2: Site selected — cursor moves, pin drops, rectangle expands ──
+    // ── Phase 2: Site selected — cursor glides, pin drops, rectangle grows ──
+    // The pin already shows "Cascade Range, OR" via the .demo-pin-label element.
     function phase2() {
-      // Animate cursor gliding to the target spot
+      // Animate cursor gliding smoothly to the target point
       cursor.style.transition = 'left .8s cubic-bezier(.4,0,.2,1), top .8s cubic-bezier(.4,0,.2,1)';
-      cursor.style.left = TARGET.left; cursor.style.top = TARGET.top;
-      // After cursor arrives, drop the pin
+      cursor.style.left       = TARGET.left;
+      cursor.style.top        = TARGET.top;
+
+      // After cursor arrives (~700 ms), drop the pin
       setTimeout(() => {
-        pin.style.left = TARGET.left; pin.style.top = TARGET.top;
-        pin.style.opacity = '1';
+        pin.style.left      = TARGET.left;
+        pin.style.top       = TARGET.top;
+        pin.style.opacity   = '1';
+        // Force animation restart so pinDrop plays fresh even on loop
         pin.style.animation = 'none';
-        void pin.offsetWidth; // force reflow so animation restarts cleanly
+        void pin.offsetWidth;
         pin.style.animation = 'pinDrop .5s cubic-bezier(.34,1.56,.64,1) both';
       }, 700);
-      // Then expand the dashed survey rectangle out from the pin
+
+      // Expand the dashed survey rectangle outward from the pin
       setTimeout(() => {
-        rect.style.left = TARGET.left; rect.style.top = TARGET.top;
-        rect.style.opacity = '1'; rect.style.width = '90px'; rect.style.height = '70px';
+        rect.style.left    = TARGET.left;
+        rect.style.top     = TARGET.top;
+        rect.style.opacity = '1';
+        rect.style.width   = '90px';
+        rect.style.height  = '70px';
       }, 900);
     }
 
-    // ── Phase 3: Scanning — overlay fades in, diamond draws, progress bar fills ──
+    // ── Phase 3: Terrain scan ──
+    // The scan overlay shows briefly (loading state), then fades out.
+    // A glowing sweep line then travels top→bottom while the heatmap
+    // is revealed below it via the SVG clipPath.
+    // Floating data labels pop up as the sweep passes each region.
     function phase3() {
-      scanOv.style.opacity = '1'; scanOv.style.pointerEvents = 'all';
+      // Hide the cursor — it's "parked" while the machine works
       cursor.style.opacity = '0';
 
-      // Draw the TerraMeasure diamond (stroke animation)
+      // Show the dark loading overlay briefly with the diamond animation
+      scanOv.style.opacity       = '1';
+      scanOv.style.pointerEvents = 'all';
+
+      // Animate the TerraMeasure diamond (stroke draw)
       setTimeout(() => {
-        if (ddOuter) { ddOuter.style.transition = 'stroke-dashoffset .7s cubic-bezier(.4,0,.2,1)'; ddOuter.style.strokeDashoffset = '0'; }
-        setTimeout(() => { if (ddInner) { ddInner.style.transition = 'stroke-dashoffset .4s ease'; ddInner.style.strokeDashoffset = '0'; } }, 600);
-        setTimeout(() => { if (ddDot)   { ddDot.style.transition = 'opacity .3s ease'; ddDot.style.opacity = '1'; } }, 950);
+        if (ddOuter) {
+          ddOuter.style.transition      = 'stroke-dashoffset .7s cubic-bezier(.4,0,.2,1)';
+          ddOuter.style.strokeDashoffset = '0';
+        }
+        setTimeout(() => {
+          if (ddInner) {
+            ddInner.style.transition      = 'stroke-dashoffset .4s ease';
+            ddInner.style.strokeDashoffset = '0';
+          }
+        }, 600);
+        setTimeout(() => {
+          if (ddDot) {
+            ddDot.style.transition = 'opacity .3s ease';
+            ddDot.style.opacity    = '1';
+          }
+        }, 950);
       }, 50);
 
-      // Fill the progress bar from 0→100% and cycle the status text
-      let pct = 0;
-      const statuses = ['Fetching terrain…', 'Computing slope…', 'Generating 3D mesh…'];
-      let sIdx = 0;
-      if (scanStat) scanStat.textContent = statuses[0];
+      // Run a short progress fill to ~55% during the loading overlay phase
+      let pct  = 0;
       const iv = setInterval(() => {
-        pct += 2.2;
-        if (scanFill) scanFill.style.width = Math.min(pct, 100) + '%';
-        // Switch status label at 40% and 75%
-        const newSIdx = pct < 40 ? 0 : pct < 75 ? 1 : 2;
-        if (newSIdx !== sIdx) { sIdx = newSIdx; if (scanStat) scanStat.textContent = statuses[sIdx]; }
-        if (pct >= 100) clearInterval(iv);
-      }, 70);
+        pct += 3;
+        if (scanFill) scanFill.style.width = Math.min(pct, 55) + '%';
+        if (pct >= 55) clearInterval(iv);
+      }, 60);
+
+      // After 1.1 s, fade out the loading overlay and start the sweep
+      setTimeout(() => {
+        scanOv.style.opacity       = '0';
+        scanOv.style.pointerEvents = 'none';
+
+        // Show sweep line at the top of the canvas
+        sweepLine.style.opacity = '1';
+        sweepLine.style.top     = '0%';
+
+        // Animate sweep line + SVG clip rect together over 2800 ms
+        // SVG viewBox height = 270 units; we animate from 0 → 270
+        const sweepStart = performance.now();
+        const sweepDur   = 2800;
+
+        function animateSweep(now) {
+          const t   = Math.min((now - sweepStart) / sweepDur, 1);
+          const pct = t * 100;
+
+          // Move the CSS sweep line (percentage of canvas height)
+          sweepLine.style.top = pct + '%';
+
+          // Grow the SVG clip rect (in SVG coordinate units)
+          if (sweepRect) sweepRect.setAttribute('height', (t * 270).toFixed(1));
+
+          if (t < 1) {
+            sweepRafId = requestAnimationFrame(animateSweep);
+          } else {
+            sweepRafId = null;
+            // Ensure the sweep line is fully off the bottom
+            sweepLine.style.opacity = '0';
+          }
+        }
+        sweepRafId = requestAnimationFrame(animateSweep);
+
+        // Floating data labels appear at staggered intervals as the sweep passes:
+        // label 1 at ~700 ms after sweep start (top-right: elevation)
+        // label 2 at ~1500 ms (center-left: slope)
+        // label 3 at ~2300 ms (lower-center: canopy cover)
+        setTimeout(() => {
+          if (label1) { label1.style.opacity = '1'; label1.style.transform = 'translateY(0)'; }
+        }, 700);
+        setTimeout(() => {
+          if (label2) { label2.style.opacity = '1'; label2.style.transform = 'translateY(0)'; }
+        }, 1500);
+        setTimeout(() => {
+          if (label3) { label3.style.opacity = '1'; label3.style.transform = 'translateY(0)'; }
+        }, 2300);
+
+      }, 1100);
     }
 
-    // ── Phase 4: Results — scan overlay fades, results panel slides up ──
+    // ── Phase 4: Results — scan complete, panel slides up ──
     function phase4() {
-      scanOv.style.opacity = '0'; scanOv.style.pointerEvents = 'none';
       results.style.transform = 'translateY(0)';
-      // After panel is in, animate the mini progress bars and terrain profile
+
+      // After panel arrives, animate the mini progress bars and terrain profile
       setTimeout(() => {
         fills.forEach(f => {
           f.style.transition = 'width .8s ease';
-          // --pct is set inline on each .db-fill element; read it back
+          // --pct is set inline on each .db-fill; read it back and apply
           f.style.width = f.style.getPropertyValue('--pct');
         });
-        if (profLine) { profLine.style.transition = 'stroke-dashoffset 1.2s ease'; profLine.style.strokeDashoffset = '0'; }
+        if (profLine) {
+          profLine.style.transition      = 'stroke-dashoffset 1.2s ease';
+          profLine.style.strokeDashoffset = '0';
+        }
       }, 200);
     }
 
-    // ── Phase 5: Complete — green border glow + success toast ──
+    // ── Phase 5: Complete — green glow on the survey rect + success toast ──
     function phase5() {
       rect.classList.add('complete');
-      toast.style.opacity = '1';
+      toast.style.opacity   = '1';
       toast.style.transform = 'translateX(-50%) translateY(0)';
     }
 
-    // Timeline: [delay in ms, function to call]
+    // Timeline: each entry is [delay_ms, function_to_call]
     const timeline = [
       [0,     phase1],
       [2500,  phase2],
@@ -1635,23 +1790,26 @@
     function runLoop() {
       reset();
       const handles = [];
-      timeline.forEach(([delay, fn]) => { handles.push(setTimeout(fn, delay)); });
-      // After the full 13.5 s cycle, clear any pending timers and restart
+      timeline.forEach(([delay, fn]) => {
+        handles.push(setTimeout(fn, delay));
+      });
+      // After the full 13.5 s cycle, clear pending timers and restart cleanly
       setTimeout(() => {
         handles.forEach(clearTimeout);
         runLoop();
       }, 13500);
     }
 
-    // Inject the pinDrop keyframe dynamically (only once per page)
+    // Inject the pinDrop keyframe once per page (we do it in JS so the
+    // HTML stays clean — it's only needed by this animation)
     if (!document.getElementById('demo-style')) {
-      const s = document.createElement('style');
-      s.id = 'demo-style';
+      const s    = document.createElement('style');
+      s.id       = 'demo-style';
       s.textContent = `@keyframes pinDrop{from{opacity:0;transform:translate(-50%,-80%) scale(.5)}to{opacity:1;transform:translate(-50%,-100%) scale(1)}}`;
       document.head.appendChild(s);
     }
 
-    // Small delay so the page has fully rendered before starting
+    // Small delay so the page has fully rendered before the loop starts
     setTimeout(runLoop, 800);
   })();
 </script>
