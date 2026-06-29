@@ -8,3 +8,9 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: SUPABASE_URL
+        value: https://onmrarnvanpufmlsshvj.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubXJhcm52YW5wdWZtbHNzaHZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NDIxOTUsImV4cCI6MjA5ODMxODE5NX0.Z1IEDaDrR4DwaVG3JZkFC8roNl8ZU0qsUhJWepuNLDc
+      - key: SUPABASE_SERVICE_ROLE
+        sync: false

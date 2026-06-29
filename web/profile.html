@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* ===================================================================
    TERRAMEASURE DESIGN SYSTEM — same tokens as terrascan.html
@@ -618,59 +619,27 @@ html,body{min-height:100%;background:var(--bg);color:var(--text);}
      ================================================================ -->
 <script>
 /* ===================================================================
-   STORAGE HELPERS — exact same pattern as auth.html so we read/write
-   the same keys in the same format.
+   SUPABASE SETUP
+   These two constants connect us to our Supabase project.
+   The anon key is safe to expose in the browser — it only allows
+   what the database Row Level Security (RLS) rules permit.
    =================================================================== */
+const SUPABASE_URL  = 'https://onmrarnvanpufmlsshvj.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubXJhcm52YW5wdWZtbHNzaHZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NDIxOTUsImV4cCI6MjA5ODMxODE5NX0.Z1IEDaDrR4DwaVG3JZkFC8roNl8ZU0qsUhJWepuNLDc';
 
-// Safe localStorage read — returns null instead of throwing
-function lsGet(key) {
-  try { return localStorage.getItem(key); } catch(e) { return null; }
-}
-// Safe localStorage write
-function lsSet(key, val) {
-  try { localStorage.setItem(key, val); } catch(e) {}
-}
-// Safe localStorage remove
-function lsRemove(key) {
-  try { localStorage.removeItem(key); } catch(e) {}
-}
-// Safe sessionStorage read
-function ssGet(key) {
-  try { return sessionStorage.getItem(key); } catch(e) { return null; }
-}
-// Safe sessionStorage remove
-function ssRemove(key) {
-  try { sessionStorage.removeItem(key); } catch(e) {}
-}
+// These three variables hold the live Supabase client and the
+// currently-signed-in user once initProfile() has run.
+let _sbClient, _currentUser, _sbProfile;
 
-// Get ALL registered users from localStorage
-function getUsers() {
-  try { return JSON.parse(lsGet('terrameasure_users') || '[]'); }
-  catch(e) { return []; }
-}
-// Write ALL users back to localStorage
-function saveUsers(users) {
-  lsSet('terrameasure_users', JSON.stringify(users));
-}
-
-// Get the currently logged-in user (checks localStorage first, then sessionStorage)
-function getCurrentUser() {
-  try {
-    const raw = lsGet('terrameasure_current_user') || ssGet('terrameasure_current_user');
-    return raw ? JSON.parse(raw) : null;
-  } catch(e) { return null; }
-}
-
-// Write the current user back. We need to know WHICH storage we used,
-// so we check: if it's in localStorage, update localStorage; otherwise sessionStorage.
-function persistCurrentUser(user) {
-  const inLs = !!lsGet('terrameasure_current_user');
-  const serialized = JSON.stringify(user);
-  if (inLs) lsSet('terrameasure_current_user', serialized);
-  else {
-    try { sessionStorage.setItem('terrameasure_current_user', serialized); } catch(e) {}
-  }
-}
+/* ===================================================================
+   STORAGE HELPERS — small wrappers so we never crash on private
+   browsing mode where storage access might throw.
+   =================================================================== */
+function lsGet(key)      { try { return localStorage.getItem(key);    } catch(e) { return null; } }
+function lsSet(key, val) { try { localStorage.setItem(key, val);      } catch(e) {} }
+function lsRemove(key)   { try { localStorage.removeItem(key);        } catch(e) {} }
+function ssGet(key)      { try { return sessionStorage.getItem(key);  } catch(e) { return null; } }
+function ssRemove(key)   { try { sessionStorage.removeItem(key);      } catch(e) {} }
 
 /* ===================================================================
    AVATAR COLOR — deterministic color from a string so the same name
@@ -691,7 +660,7 @@ function avatarColor(str) {
    DATE HELPERS
    =================================================================== */
 function fmtDate(ts) {
-  // Format a Unix timestamp (ms) into a readable date like "Jun 2025"
+  // Format a Unix timestamp (ms) or ISO string into "Jun 2025"
   if (!ts) return 'unknown date';
   return new Date(ts).toLocaleDateString('en-US', { month:'short', year:'numeric' });
 }
@@ -701,72 +670,122 @@ function fmtDateFull(ts) {
 }
 
 /* ===================================================================
-   PAGE INIT — runs when the page loads
+   PAGE INIT — async because we need to talk to Supabase before we
+   can show any user data. Replaces the old synchronous init().
    =================================================================== */
-function init() {
-  // Step 1: Get the current user. If nobody is logged in, redirect to auth.
-  const user = getCurrentUser();
-  if (!user) {
-    window.location.href = 'auth.html';
-    return;
+async function initProfile() {
+  // Step 1: Create the Supabase client. We do this once and store
+  // it in _sbClient so every other function can reuse it.
+  const { createClient } = supabase;
+  _sbClient = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  // Step 2: Try to pull the user from sessionStorage first.
+  // auth.html writes 'terrameasure_sb_user' there after sign-in,
+  // so this avoids a round-trip to Supabase on every page load.
+  try {
+    const cached = sessionStorage.getItem('terrameasure_sb_user');
+    if (cached) _currentUser = JSON.parse(cached);
+  } catch(e) {}
+
+  // Step 3: If nothing was cached, ask Supabase for the live session.
+  // If there is no session at all, send them to the login page.
+  if (!_currentUser) {
+    const { data: { session } } = await _sbClient.auth.getSession();
+    if (!session) { window.location.href = 'auth.html'; return; }
+    // Build a minimal user object from the session
+    _currentUser = {
+      id:    session.user.id,
+      email: session.user.email,
+      name:  session.user.user_metadata?.name || session.user.email
+    };
   }
 
-  // Step 2: Populate the topbar chip
-  const initial = (user.name || user.username || '?')[0].toUpperCase();
-  const color   = avatarColor(user.name || user.username || 'x');
-  document.getElementById('topbar-avatar').textContent = initial;
-  document.getElementById('topbar-avatar').style.background = color;
-  document.getElementById('topbar-name').textContent = user.name ? user.name.split(' ')[0] : user.username;
+  // Step 4: Load the full profile row from the 'profiles' table.
+  // This contains bio, location, username, etc. that we saved previously.
+  const { data: profile } = await _sbClient
+    .from('profiles').select('*').eq('id', _currentUser.id).single();
+  _sbProfile = profile || {};
 
-  // Step 3: Populate the big profile header
+  // Merge the DB profile into _currentUser so we have one source of truth
+  _currentUser = { ..._currentUser, ...(_sbProfile || {}) };
+
+  // Step 5: Now we have everything — draw the page and load history
+  renderProfile();
+  loadSurveyHistory();
+}
+
+// Kick off as soon as the DOM is ready
+document.addEventListener('DOMContentLoaded', initProfile);
+
+/* ===================================================================
+   RENDER PROFILE — fills every DOM element from _currentUser.
+   Separated from initProfile() so we can call it again after a save
+   without re-fetching from the server.
+   =================================================================== */
+function renderProfile() {
+  const user = _currentUser;
+
+  // Choose the best available display name
+  const displayName = user.name || user.email || 'User';
+  const initial     = displayName[0].toUpperCase();
+  const color       = avatarColor(displayName);
+
+  // Topbar chip (top-right corner)
+  document.getElementById('topbar-avatar').textContent       = initial;
+  document.getElementById('topbar-avatar').style.background  = color;
+  document.getElementById('topbar-name').textContent         = displayName.split(' ')[0];
+
+  // Big avatar circle in the profile header
   document.getElementById('big-avatar').style.background = color;
-  document.getElementById('big-initial').textContent = initial;
-  document.getElementById('hdr-name').textContent = user.name || user.username;
-  document.getElementById('hdr-handle').textContent = '@' + (user.username || '');
-  document.getElementById('hdr-email').textContent = user.email || '';
+  document.getElementById('big-initial').textContent     = initial;
 
-  // Persona badge — only show if they chose one during onboarding
+  // Profile header text
+  document.getElementById('hdr-name').textContent   = displayName;
+  document.getElementById('hdr-handle').textContent = '@' + (user.username || user.email || '');
+  document.getElementById('hdr-email').textContent  = user.email || '';
+
+  // Persona badge — only visible if one was chosen during onboarding
   if (user.persona) {
     const badge = document.getElementById('hdr-persona');
-    badge.textContent = user.persona;
+    badge.textContent   = user.persona;
     badge.style.display = 'inline-block';
   }
 
-  // "Member since" date
-  document.getElementById('hdr-since').textContent = 'Member since ' + fmtDate(user.created);
+  // "Member since" — Supabase uses 'created_at' (ISO string); old format used 'created' (ms)
+  const createdRaw = user.created_at || user.created || null;
+  document.getElementById('hdr-since').textContent =
+    'Member since ' + fmtDate(createdRaw ? new Date(createdRaw).getTime() : null);
 
-  // Survey count badge
-  const sc = user.surveyCount || 0;
+  // Survey count badge — Supabase column is 'survey_count'; old was 'surveyCount'
+  const sc = user.survey_count || user.surveyCount || 0;
   document.getElementById('hdr-surveys').innerHTML =
     '<span style="font-size:15px;line-height:1">📍</span> ' +
     sc + ' survey' + (sc !== 1 ? 's' : '');
 
-  // Step 4: Pre-fill the edit profile form
-  document.getElementById('field-name').value     = user.name || '';
+  // Pre-fill the edit profile form
+  document.getElementById('field-name').value     = user.name     || '';
   document.getElementById('field-username').value = user.username || '';
 
-  // Location lives in user.settings.location (new field we add on save)
-  const loc = (user.settings && user.settings.location) || '';
+  // Location: Supabase column 'location'; old was settings.location
+  const loc = user.location || (user.settings && user.settings.location) || '';
   document.getElementById('field-location').value = loc;
   document.getElementById('pref-location').value  = loc;
 
-  // Bio also lives in user.bio (new field we add on save)
-  const bio = user.bio || '';
-  document.getElementById('field-bio').value = bio;
+  // Bio
+  document.getElementById('field-bio').value = user.bio || '';
   updateBioCount();
 
-  // Step 5: Pre-fill preferences
-  const units    = (user.settings && user.settings.units)          || 'imperial';
-  const mapStyle = (user.settings && user.settings.defaultMapStyle) || 'satellite';
-  const unitsEl = document.querySelector(`input[name="units"][value="${units}"]`);
+  // Pre-select the saved preference radio buttons.
+  // Supabase columns: 'units', 'map_style'. Old: settings.units, settings.defaultMapStyle.
+  const units    = user.units     || (user.settings && user.settings.units)           || 'imperial';
+  const mapStyle = user.map_style || (user.settings && user.settings.defaultMapStyle) || 'satellite';
+  const unitsEl  = document.querySelector(`input[name="units"][value="${units}"]`);
   if (unitsEl) unitsEl.checked = true;
-  const mapEl = document.querySelector(`input[name="mapStyle"][value="${mapStyle}"]`);
+  const mapEl    = document.querySelector(`input[name="mapStyle"][value="${mapStyle}"]`);
   if (mapEl) mapEl.checked = true;
 
-  // Step 6: Load survey history
-  loadHistory();
-
-  // Step 7: Keep the two location fields in sync as the user types
+  // Keep the two location fields in sync as the user types so they
+  // never fall out of step with each other.
   document.getElementById('field-location').addEventListener('input', function() {
     document.getElementById('pref-location').value = this.value;
   });
@@ -776,100 +795,105 @@ function init() {
 }
 
 /* ===================================================================
-   BIO CHARACTER COUNTER
+   SHOW SAVE SUCCESS — flashes the green "✓ Saved" indicator.
+   Accepts an optional custom message (e.g. "Password updated").
+   =================================================================== */
+function showSaveSuccess(msg) {
+  const el = document.getElementById('profile-saved');
+  el.textContent = '✓ ' + (msg || 'Saved');
+  el.classList.add('show');
+  setTimeout(() => {
+    el.classList.remove('show');
+    el.textContent = '✓ Saved'; // reset for next use
+  }, 2000);
+}
+
+/* ===================================================================
+   FLASH "SAVED" — keeps the prefs panel's own indicator working too.
+   =================================================================== */
+function flashSaved(elemId) {
+  const el = document.getElementById(elemId);
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+/* ===================================================================
+   BIO CHARACTER COUNTER — updates live as the user types.
    =================================================================== */
 function updateBioCount() {
   const ta  = document.getElementById('field-bio');
   const cnt = document.getElementById('bio-count');
   const len = ta.value.length;
   cnt.textContent = len + ' / 160';
-  cnt.className = 'char-count' + (len > 140 ? (len >= 160 ? ' over' : ' near') : '');
+  cnt.className   = 'char-count' + (len > 140 ? (len >= 160 ? ' over' : ' near') : '');
 }
 document.getElementById('field-bio').addEventListener('input', updateBioCount);
 
 /* ===================================================================
-   SAVE PROFILE
-   Reads the form, updates the user object in both the users array
-   and the current-user slot, then shows a quick confirmation.
+   SAVE PROFILE — upserts name, bio, and location to Supabase.
+   "Upsert" means: insert if the row doesn't exist yet, update if it does.
    =================================================================== */
-function saveProfile() {
-  const user = getCurrentUser();
-  if (!user) return;
+async function saveProfile() {
+  if (!_sbClient || !_currentUser) return;
 
-  // Read the form values
-  const newName     = document.getElementById('field-name').value.trim();
-  const newUsername = document.getElementById('field-username').value.trim();
-  const newLocation = document.getElementById('field-location').value.trim();
-  const newBio      = document.getElementById('field-bio').value.trim();
+  const name = document.getElementById('field-name').value.trim();
+  const bio  = document.getElementById('field-bio').value.trim();
+  const loc  = document.getElementById('field-location').value.trim();
 
-  // Basic validation — name and username must not be empty
-  if (!newName || !newUsername) {
-    alert('Name and username cannot be empty.');
-    return;
-  }
+  if (!name) { alert('Name cannot be empty.'); return; }
 
-  // Apply changes to the user object
-  user.name     = newName;
-  user.username = newUsername;
-  user.bio      = newBio;
+  // Write to Supabase profiles table
+  await _sbClient.from('profiles').upsert({ id: _currentUser.id, name, bio, location: loc });
 
-  // settings might not exist on old user objects, so create it safely
-  if (!user.settings) user.settings = { theme:'dark', units:'imperial', defaultRes:10, defaultArea:300 };
-  user.settings.location = newLocation;
+  // Update the in-memory user and refresh the sessionStorage cache
+  _currentUser.name     = name;
+  _currentUser.bio      = bio;
+  _currentUser.location = loc;
+  sessionStorage.setItem('terrameasure_sb_user', JSON.stringify(_currentUser));
 
-  // Also update the synced pref-location field
-  document.getElementById('pref-location').value = newLocation;
+  // Keep the TerraIntel location filter in sync
+  try { localStorage.setItem('terrameasure_news_location', JSON.stringify({ country: loc })); } catch(e) {}
 
-  // Write the updated user to both the users array and current user slot
-  commitUser(user);
-
-  // Sync location to the TerraIntel news-filter key so the location filter
-  // is pre-populated the next time the user visits the TerraIntel page.
-  // We only set the 'country' field here (free-text from profile = country-level).
-  if (newLocation) {
-    try {
-      const existing = JSON.parse(localStorage.getItem('terrameasure_news_location') || '{}');
-      existing.country = newLocation;
-      localStorage.setItem('terrameasure_news_location', JSON.stringify(existing));
-    } catch(_e) {}
-  }
-
-  // Update the header live so they see the change immediately
-  document.getElementById('hdr-name').textContent   = user.name;
-  document.getElementById('hdr-handle').textContent = '@' + user.username;
-  const initial = user.name[0].toUpperCase();
-  const color   = avatarColor(user.name);
-  document.getElementById('big-avatar').style.background  = color;
-  document.getElementById('big-initial').textContent      = initial;
+  // Update the page header live so the change is visible immediately
+  document.getElementById('pref-location').value         = loc;
+  document.getElementById('hdr-name').textContent        = name;
+  document.getElementById('hdr-handle').textContent      = '@' + (_currentUser.username || _currentUser.email || '');
+  const initial = name[0].toUpperCase();
+  const color   = avatarColor(name);
+  document.getElementById('big-avatar').style.background    = color;
+  document.getElementById('big-initial').textContent        = initial;
   document.getElementById('topbar-avatar').style.background = color;
-  document.getElementById('topbar-avatar').textContent    = initial;
-  document.getElementById('topbar-name').textContent      = user.name.split(' ')[0];
+  document.getElementById('topbar-avatar').textContent      = initial;
+  document.getElementById('topbar-name').textContent        = name.split(' ')[0];
 
-  flashSaved('profile-saved');
+  showSaveSuccess('Profile saved');
 }
 
 /* ===================================================================
-   SAVE PREFERENCES
+   SAVE PREFERENCES — upserts units, map style, and location to Supabase.
    =================================================================== */
-function savePrefs() {
-  const user = getCurrentUser();
-  if (!user) return;
+async function savePrefs() {
+  if (!_sbClient || !_currentUser) return;
 
-  if (!user.settings) user.settings = { theme:'dark', units:'imperial', defaultRes:10, defaultArea:300 };
-
-  // Read selected radio values
   const unitsRadio    = document.querySelector('input[name="units"]:checked');
   const mapStyleRadio = document.querySelector('input[name="mapStyle"]:checked');
+  const units    = unitsRadio    ? unitsRadio.value    : 'imperial';
+  const mapStyle = mapStyleRadio ? mapStyleRadio.value : 'satellite';
+  const loc      = document.getElementById('pref-location').value.trim();
 
-  user.settings.units          = unitsRadio    ? unitsRadio.value    : 'imperial';
-  user.settings.defaultMapStyle = mapStyleRadio ? mapStyleRadio.value : 'satellite';
-
-  // Location synced with profile field
-  const loc = document.getElementById('pref-location').value.trim();
-  user.settings.location = loc;
+  // Keep the profile location field in sync
   document.getElementById('field-location').value = loc;
 
-  commitUser(user);
+  // Write to Supabase — 'map_style' is the snake_case column name
+  await _sbClient.from('profiles').upsert({
+    id: _currentUser.id, units, map_style: mapStyle, location: loc
+  });
+
+  // Update in-memory cache
+  _currentUser.units     = units;
+  _currentUser.map_style = mapStyle;
+  _currentUser.location  = loc;
+  sessionStorage.setItem('terrameasure_sb_user', JSON.stringify(_currentUser));
 
   // Sync location to the TerraIntel news-filter key
   if (loc) {
@@ -884,41 +908,35 @@ function savePrefs() {
 }
 
 /* ===================================================================
-   COMMIT USER — write updated user to both users array + current slot
+   LOAD SURVEY HISTORY from Supabase.
+   For demo/guest users we fall back to localStorage (old format).
    =================================================================== */
-function commitUser(user) {
-  // Update the users array so changes survive a re-login
-  const users = getUsers();
-  const idx   = users.findIndex(u => u.id === user.id);
-  if (idx !== -1) users[idx] = user;
-  saveUsers(users);
-  // Also update the current-user slot
-  persistCurrentUser(user);
+async function loadSurveyHistory() {
+  if (!_sbClient || !_currentUser || _currentUser.isDemo) {
+    // Demo or offline fallback — read the old localStorage array
+    try { renderHistoryFromArray(JSON.parse(localStorage.getItem('terrascan_history') || '[]')); }
+    catch(e) { renderHistoryFromArray([]); }
+    return;
+  }
+
+  // Pull the user's surveys from the database, newest first, max 50 rows
+  const { data: surveys } = await _sbClient
+    .from('surveys').select('*')
+    .eq('user_id', _currentUser.id)
+    .order('surveyed_at', { ascending: false })
+    .limit(50);
+
+  renderHistoryFromArray(surveys || []);
 }
 
 /* ===================================================================
-   FLASH "SAVED" CONFIRMATION
-   Shows the little green tick for 2 seconds then fades it out.
+   RENDER HISTORY TABLE — handles both data shapes:
+     Supabase format: { surveyed_at, area_acres, lat, lon, score }
+     Old localStorage: { date, area, lat, lon, score }
    =================================================================== */
-function flashSaved(elemId) {
-  const el = document.getElementById(elemId);
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2000);
-}
-
-/* ===================================================================
-   SURVEY HISTORY
-   Reads from localStorage key "terrascan_history" — an array of
-   { date, lat, lon, score, area } objects written by terrascan.html.
-   =================================================================== */
-function loadHistory() {
-  let history = [];
-  try {
-    history = JSON.parse(lsGet('terrascan_history') || '[]');
-  } catch(e) { history = []; }
-
-  const body      = document.getElementById('history-body');
-  const countLbl  = document.getElementById('history-count-label');
+function renderHistoryFromArray(history) {
+  const body     = document.getElementById('history-body');
+  const countLbl = document.getElementById('history-count-label');
 
   if (!Array.isArray(history) || history.length === 0) {
     // Empty state — friendly message + CTA button to TerraScan
@@ -933,30 +951,36 @@ function loadHistory() {
     return;
   }
 
-  // We have history — build a table
   countLbl.textContent = history.length + ' survey' + (history.length !== 1 ? 's' : '');
 
-  // Newest first
-  const sorted = [...history].reverse();
+  const rows = history.map(entry => {
+    // Field name differences between Supabase and old localStorage format:
+    // date field: 'surveyed_at' (Supabase ISO string) vs 'date' (ms timestamp)
+    // area field: 'area_acres'  (Supabase)            vs 'area' (old)
+    const rawDate = entry.surveyed_at || entry.date;
+    const rawArea = entry.area_acres != null ? entry.area_acres : entry.area;
 
-  const rows = sorted.map(entry => {
-    const score    = entry.score != null ? Number(entry.score).toFixed(1) : '—';
-    const scoreNum = parseFloat(score);
+    const score     = entry.score != null ? Number(entry.score).toFixed(1) : '—';
+    const scoreNum  = parseFloat(score);
     const scoreClass = isNaN(scoreNum) ? '' :
-                       scoreNum >= 70   ? 'score-high' :
-                       scoreNum >= 40   ? 'score-mid'  : 'score-low';
-    const lat  = entry.lat  != null ? Number(entry.lat).toFixed(5)  : '—';
-    const lon  = entry.lon  != null ? Number(entry.lon).toFixed(5)  : '—';
-    const area = entry.area != null ? Number(entry.area).toFixed(1) + ' ac' : '—';
-    const date = entry.date ? fmtDateFull(entry.date) : '—';
+                       scoreNum >= 70  ? 'score-high' :
+                       scoreNum >= 40  ? 'score-mid'  : 'score-low';
+    const lat  = entry.lat != null ? Number(entry.lat).toFixed(5) : '—';
+    const lon  = entry.lon != null ? Number(entry.lon).toFixed(5) : '—';
+    const area = rawArea != null ? Number(rawArea).toFixed(1) + ' ac' : '—';
+
+    // new Date() handles both ISO strings and ms timestamps
+    let dateStr = '—';
+    if (rawDate) {
+      const d = new Date(rawDate);
+      if (!isNaN(d.getTime())) dateStr = fmtDateFull(d.getTime());
+    }
 
     return `
       <tr>
-        <td>${date}</td>
+        <td>${dateStr}</td>
         <td class="coord-cell">${lat}, ${lon}</td>
-        <td>
-          <span class="score-pill ${scoreClass}">${score}</span>
-        </td>
+        <td><span class="score-pill ${scoreClass}">${score}</span></td>
         <td>${area}</td>
       </tr>
     `;
@@ -980,19 +1004,20 @@ function loadHistory() {
 }
 
 /* ===================================================================
-   MODAL HELPERS — open and close the overlay modals
+   MODAL HELPERS — open and close the overlay modals.
    =================================================================== */
 function openModal(id) {
   document.getElementById(id).classList.add('open');
 }
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
-  // Reset inputs and error messages when closing
+  // Reset inputs and error messages when closing so the modal
+  // starts fresh the next time it's opened.
   document.querySelectorAll('#' + id + ' input').forEach(el => el.value = '');
   document.querySelectorAll('#' + id + ' .modal-err').forEach(el => el.classList.remove('show'));
 }
 
-// Close modal when clicking the backdrop (outside the box)
+// Close a modal when the user clicks the dark backdrop behind it
 document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
   backdrop.addEventListener('click', function(e) {
     if (e.target === this) closeModal(this.id);
@@ -1000,68 +1025,54 @@ document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
 });
 
 /* ===================================================================
-   CHANGE PASSWORD
-   Checks the current password against what's stored, then updates.
-   (Passwords are stored in plaintext in this localStorage setup.)
+   CHANGE PASSWORD — calls Supabase Auth to update the password.
+   Supabase handles all the security; we just pass the new value.
    =================================================================== */
-function changePassword() {
-  const user    = getCurrentUser();
-  if (!user) return;
-
-  const current = document.getElementById('mpwd-current').value;
+async function changePassword() {
   const next    = document.getElementById('mpwd-new').value;
   const confirm = document.getElementById('mpwd-confirm').value;
   const errEl   = document.getElementById('mpwd-err');
 
-  // Validate current password
-  if (current !== user.password) {
-    errEl.textContent = 'Current password is incorrect.';
+  // Validate before sending to Supabase
+  if (next.length < 6) {
+    errEl.textContent = 'New password must be at least 6 characters.';
     errEl.classList.add('show');
     return;
   }
-  // Validate new password length — same minimum as signup (8 chars)
-  if (next.length < 8) {
-    errEl.textContent = 'New password must be at least 8 characters.';
-    errEl.classList.add('show');
-    return;
-  }
-  // Confirm must match
   if (next !== confirm) {
     errEl.textContent = 'Passwords do not match.';
     errEl.classList.add('show');
     return;
   }
 
-  // All good — apply the new password and save
-  user.password = next;
-  commitUser(user);
-  closeModal('modal-password');
-  alert('Password updated successfully.');
+  // Ask Supabase Auth to update the password for the current session user
+  const { error } = await _sbClient.auth.updateUser({ password: next });
+  if (error) {
+    errEl.textContent = 'Error: ' + error.message;
+    errEl.classList.add('show');
+  } else {
+    closeModal('modal-password');
+    showSaveSuccess('Password updated');
+  }
 }
 
 /* ===================================================================
-   SIGN OUT
-   Clears only the current-user slot, leaves the users array intact
-   (so they can log back in), then redirects to auth.html.
+   SIGN OUT — ends the Supabase session and clears local cache.
    =================================================================== */
-function signOut() {
-  lsRemove('terrameasure_current_user');
-  ssRemove('terrameasure_current_user');
+async function signOut() {
+  await _sbClient.auth.signOut();
+  sessionStorage.removeItem('terrameasure_sb_user');
   window.location.href = 'auth.html';
 }
 
 /* ===================================================================
-   DELETE ACCOUNT
-   Requires typing "DELETE" to confirm. Removes the user from the
-   users array, clears the current-user slot, clears survey history,
-   then redirects to auth.html.
+   DELETE ACCOUNT — requires the user to type DELETE to confirm.
+   Actual user-row deletion needs the service_role key (server-side),
+   so here we sign them out and clear all their local data.
    =================================================================== */
-function deleteAccount() {
-  const user      = getCurrentUser();
-  if (!user) return;
-
-  const typed  = document.getElementById('mdel-confirm-text').value;
-  const errEl  = document.getElementById('mdel-err');
+async function deleteAccount() {
+  const typed = document.getElementById('mdel-confirm-text').value;
+  const errEl = document.getElementById('mdel-err');
 
   if (typed !== 'DELETE') {
     errEl.textContent = 'Please type DELETE (all caps) to confirm.';
@@ -1069,29 +1080,17 @@ function deleteAccount() {
     return;
   }
 
-  // Remove user from the users array
-  const users  = getUsers();
-  const filtered = users.filter(u => u.id !== user.id);
-  saveUsers(filtered);
+  // Sign out of Supabase so the auth token is invalidated
+  await _sbClient.auth.signOut();
 
-  // Clear current-user slot, shared history, and user-scoped orphan data
-  lsRemove('terrameasure_current_user');
-  ssRemove('terrameasure_current_user');
-  lsRemove('terrascan_history');
-  // These keys are namespaced by user ID in terrascan.html — clear both
-  lsRemove('terrascan_history_v1_' + user.id);
-  lsRemove('terrascan_saves_v1_' + user.id);
-  // Remove the TerraIntel location filter so it doesn't leak to the next account
-  lsRemove('terrameasure_news_location');
+  // Clear all session and local data so nothing lingers
+  sessionStorage.clear();
+  localStorage.removeItem('terrascan_history');
+  localStorage.removeItem('terrameasure_news_location');
+  localStorage.removeItem('terrameasure_hint_dismissed');
 
-  // Send them back to auth
   window.location.href = 'auth.html';
 }
-
-/* ===================================================================
-   KICK EVERYTHING OFF
-   =================================================================== */
-init();
 </script>
 </body>
 </html>

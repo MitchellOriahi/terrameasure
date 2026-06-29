@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.155.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.155.0/examples/jsm/"}}</script>
 <style>
 /* ===================================================================
@@ -1835,15 +1836,25 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
      MAIN SCRIPT
      ================================================================ -->
 <script>
+// ── SUPABASE CONFIG ───────────────────────────────────────────────────────────
+const SUPABASE_URL  = 'https://onmrarnvanpufmlsshvj.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubXJhcm52YW5wdWZtbHNzaHZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NDIxOTUsImV4cCI6MjA5ODMxODE5NX0.Z1IEDaDrR4DwaVG3JZkFC8roNl8ZU0qsUhJWepuNLDc';
+
 // ── AUTH GATE ─────────────────────────────────────────────────────────────────
-// If no logged-in user is found in storage, redirect to auth.html immediately.
+// Load user from Supabase session (stored in sessionStorage by auth.html).
 // This runs before anything else so the page never renders for unauthenticated users.
-const _currentUser = (()=>{
-  try { return JSON.parse(localStorage.getItem('terrameasure_current_user') || sessionStorage.getItem('terrameasure_current_user') || 'null'); } catch(e){ return null; }
-})();
-if (!_currentUser) { window.location.replace('auth.html'); throw new Error('unauthenticated'); }
-// Update last-login timestamp silently
-try { _currentUser.lastLogin = Date.now(); localStorage.setItem('terrameasure_current_user', JSON.stringify(_currentUser)); } catch(e){}
+let _currentUser = null;
+try {
+  const _sbUser = sessionStorage.getItem('terrameasure_sb_user');
+  if (_sbUser) {
+    _currentUser = JSON.parse(_sbUser);
+  }
+} catch(e) {}
+
+// If no user at all, redirect to auth
+if (!_currentUser) {
+  window.location.href = 'auth.html';
+}
 
 // User-scoped storage keys — keeps each account's data separate
 const _HIST_KEY = 'terrascan_history_v1_' + (_currentUser?.id || 'guest');
@@ -2729,6 +2740,25 @@ document.getElementById("run-btn").addEventListener("click",async()=>{
       // Keep last 50 surveys only
       localStorage.setItem('terrascan_history', JSON.stringify(hist.slice(0,50)));
     } catch(e) {}
+    // Save to Supabase if real user (not demo) — fire-and-forget, never blocks the UI
+    if (_currentUser && !_currentUser.isDemo) {
+      (async () => {
+        try {
+          const { createClient } = supabase;
+          const _sbClient = createClient(SUPABASE_URL, SUPABASE_ANON);
+          const { data: { session } } = await _sbClient.auth.getSession();
+          if (session) {
+            await _sbClient.from('surveys').insert({
+              user_id: session.user.id,
+              lat: selectedLat, lon: selectedLon,
+              score: calcSiteScore(data),
+              area_acres: ((data.dem_width_m || 0) * (data.dem_height_m || 0)) / 4046.856,
+              source: data.source,
+            });
+          }
+        } catch(e) { /* non-fatal — local history already saved */ }
+      })();
+    }
     // Track survey count per user
     if(_currentUser){_currentUser.surveyCount=(_currentUser.surveyCount||0)+1;saveUserSetting('surveyCount',_currentUser.surveyCount);}
     saveHistory(data,selectedLat,selectedLon);
@@ -4147,11 +4177,32 @@ function saveDisplayName() {
   const avLg=document.getElementById('acct-avatar-lg'); if(avLg) avLg.textContent=init;
   const nm=document.getElementById('acct-name'); if(nm) nm.textContent=n;
   try{localStorage.setItem('terrameasure_current_user', JSON.stringify(_currentUser));}catch(e){}
+  // Also update sessionStorage cache so the new name persists across pages
+  try{sessionStorage.setItem('terrameasure_sb_user', JSON.stringify(_currentUser));}catch(e){}
+  // Persist to Supabase profiles table so the name survives sessionStorage being cleared.
+  // Fire-and-forget — the UI already updated above, so a network failure is non-fatal.
+  if(_currentUser && !_currentUser.isDemo) {
+    (async () => {
+      try {
+        const { createClient } = supabase;
+        const _sbClient = createClient(SUPABASE_URL, SUPABASE_ANON);
+        await _sbClient.from('profiles').upsert({ id: _currentUser.id, name: n });
+      } catch(e) { /* non-fatal */ }
+    })();
+  }
   toast('Name updated','success',2000);
 }
 function logOut() {
-  try{localStorage.removeItem('terrameasure_current_user');sessionStorage.removeItem('terrameasure_current_user');}catch(e){}
-  window.location.replace('auth.html');
+  try{localStorage.removeItem('terrameasure_current_user');sessionStorage.removeItem('terrameasure_current_user');sessionStorage.removeItem('terrameasure_sb_user');}catch(e){}
+  // Sign out of Supabase, then redirect (async, but we redirect regardless)
+  (async () => {
+    try {
+      const { createClient } = supabase;
+      const _sbClient = createClient(SUPABASE_URL, SUPABASE_ANON);
+      await _sbClient.auth.signOut();
+    } catch(e) { /* non-fatal */ }
+    window.location.replace('auth.html');
+  })();
 }
 function clearAllHistory() {
   if(!confirm('Delete all survey history?')) return;

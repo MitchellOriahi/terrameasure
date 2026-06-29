@@ -6,6 +6,8 @@
   <title>TerraMeasure — Sign In</title>
   <!-- Inter font — same as the main app -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Supabase JS SDK — gives us _sb.auth.signInWithPassword(), signUp(), etc. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     /* ─── CSS variables — exact same palette as terrascan.html ─── */
     :root {
@@ -377,6 +379,39 @@
       background: var(--accent-dim);
     }
 
+    /* ─── Confirm screen — email icon and info box ─── */
+    .confirm-icon {
+      font-size: 3rem;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .confirm-info {
+      background: var(--accent-dim);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      text-align: center;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .confirm-info strong { color: var(--accent); font-weight: 600; }
+    .btn-secondary {
+      width: 100%;
+      padding: 12px 20px;
+      background: transparent;
+      color: var(--text-dim);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color var(--transition), color var(--transition);
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--text); }
+
     /* ─── Welcome screen — full-viewport, no card ─── */
     #state-welcome {
       flex-direction: column;
@@ -472,6 +507,41 @@
     }
     #start-btn.visible { opacity: 1; transform: translateY(0); }
 
+    /* ─── Loading overlay — covers the whole page while we check for an
+       existing session. Prevents the login form from flashing for users
+       who are already logged in. ─── */
+    #loading-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50; /* above the app shell */
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      transition: opacity 300ms ease;
+    }
+    #loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    /* Simple CSS spinner */
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 700ms linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-label {
+      font-size: 0.83rem;
+      color: var(--text-dim);
+      letter-spacing: 0.5px;
+    }
+
     /* ─── Responsive — on small phones, reduce padding and tighten grid ─── */
     @media (max-width: 480px) {
       /* Persona tiles: 2-column, readable labels */
@@ -527,6 +597,14 @@
     <div class="contour-ring"></div>
   </div>
 
+  <!-- Loading overlay — shown while we check for an existing Supabase session.
+       Hides before the login form is revealed so authenticated users never
+       see a flash of the sign-in UI. -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-label">Checking session…</div>
+  </div>
+
   <!-- App — all states live here, only one is .active at a time -->
   <div id="app">
 
@@ -545,11 +623,23 @@
           <span>Free Forever</span>
         </div>
 
+        <!-- Google sign-in button — OAuth redirect handled on page load -->
+        <button onclick="signInWithGoogle()" style="
+          width:100%; padding:12px; border-radius:10px;
+          background:#fff; color:#1a1a1a; font-size:14px; font-weight:600;
+          border:none; cursor:pointer; display:flex; align-items:center;
+          justify-content:center; gap:10px; margin-bottom:16px;
+        ">
+          <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 002.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 01-7.18-2.54H1.83v2.07A8 8 0 008.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 010-3.04V5.41H1.83a8 8 0 000 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 001.83 5.4L4.5 7.49a4.77 4.77 0 014.48-3.3z"/></svg>
+          Continue with Google
+        </button>
+        <div style="text-align:center;color:var(--text-dim);font-size:12px;margin:8px 0;">— or —</div>
+
         <form id="login-form" novalidate>
           <div class="field">
-            <label for="login-user">Username or Email</label>
-            <input type="text" id="login-user" placeholder="username or email"
-                   autocomplete="username" spellcheck="false" />
+            <label for="login-email">Email</label>
+            <input type="email" id="login-email" placeholder="you@example.com"
+                   autocomplete="email" spellcheck="false" />
           </div>
           <div class="field">
             <label for="login-pass">Password</label>
@@ -581,6 +671,18 @@
         <div class="card-title">Create Account</div>
         <div class="card-subtitle">Step 1 of 2 — Account Details</div>
 
+        <!-- Google sign-in button — also works for sign-up (creates account if new) -->
+        <button onclick="signInWithGoogle()" style="
+          width:100%; padding:12px; border-radius:10px;
+          background:#fff; color:#1a1a1a; font-size:14px; font-weight:600;
+          border:none; cursor:pointer; display:flex; align-items:center;
+          justify-content:center; gap:10px; margin-bottom:16px;
+        ">
+          <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 002.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 01-7.18-2.54H1.83v2.07A8 8 0 008.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 010-3.04V5.41H1.83a8 8 0 000 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 001.83 5.4L4.5 7.49a4.77 4.77 0 014.48-3.3z"/></svg>
+          Continue with Google
+        </button>
+        <div style="text-align:center;color:var(--text-dim);font-size:12px;margin:8px 0;">— or —</div>
+
         <form id="signup-form" novalidate>
           <div class="field">
             <label for="signup-name">Full Name</label>
@@ -591,11 +693,6 @@
             <label for="signup-email">Email</label>
             <input type="email" id="signup-email" placeholder="you@example.com"
                    autocomplete="email" spellcheck="false" />
-          </div>
-          <div class="field">
-            <label for="signup-username">Username</label>
-            <input type="text" id="signup-username" placeholder="alex_j"
-                   autocomplete="username" spellcheck="false" />
           </div>
           <div class="field">
             <label for="signup-pass">Password</label>
@@ -650,7 +747,43 @@
       </div>
     </div>
 
-    <!-- ═══════════════ STATE 4: WELCOME ANIMATION ═══════════════ -->
+    <!-- ═══════════════ STATE 4: CONFIRM EMAIL ═══════════════ -->
+    <!-- Shown after signup — user needs to click the confirmation link in their email -->
+    <div id="state-confirm" class="state">
+      <div class="card" id="confirm-card">
+
+        <div class="logo">Terra<span class="logo-diamond">◈</span>Measure</div>
+
+        <!-- Big envelope icon to make the call-to-action obvious -->
+        <div class="confirm-icon">📬</div>
+
+        <div class="card-title">Check your email!</div>
+        <div class="card-subtitle">One more step to activate your account.</div>
+
+        <!-- Info box showing which email we sent to -->
+        <div class="confirm-info">
+          We sent a confirmation link to<br>
+          <strong id="confirm-email-display">your email address</strong>.<br><br>
+          Click the link in that email to activate your account.
+          Check your spam folder if you don't see it.
+        </div>
+
+        <!-- Resend button — calls Supabase to re-send the confirmation email -->
+        <button class="btn-secondary ripple-btn" id="resend-btn" onclick="resendConfirmation()" style="margin-bottom:12px;">
+          Resend confirmation email
+        </button>
+        <div class="error-msg" id="confirm-error" role="alert"></div>
+        <div id="resend-success" style="font-size:0.82rem;color:var(--green);text-align:center;min-height:18px;margin-bottom:14px;display:none;">
+          Email resent! Check your inbox.
+        </div>
+
+        <div class="form-footer">
+          Already confirmed? <a href="#" id="confirm-go-login">Sign in</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ STATE 5: WELCOME ANIMATION ═══════════════ -->
     <div id="state-welcome" class="state">
       <div class="welcome-content">
         <div class="welcome-logo" id="welcome-logo">
@@ -687,12 +820,21 @@
 
   <script>
     // ─────────────────────────────────────────────────────────────
+    // SUPABASE SETUP
+    // The anon key is safe to expose in frontend code — it only allows
+    // what your Row Level Security (RLS) policies permit.
+    // ─────────────────────────────────────────────────────────────
+    const SUPABASE_URL  = 'https://onmrarnvanpufmlsshvj.supabase.co';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubXJhcm52YW5wdWZtbHNzaHZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NDIxOTUsImV4cCI6MjA5ODMxODE5NX0.Z1IEDaDrR4DwaVG3JZkFC8roNl8ZU0qsUhJWepuNLDc';
+    // createClient comes from the Supabase SDK loaded in <head>
+    const { createClient } = supabase;
+    const _sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    // ─────────────────────────────────────────────────────────────
     // UTILITY HELPERS
     // ─────────────────────────────────────────────────────────────
 
-    // escHtml — always use this before injecting any user-supplied string
-    // into innerHTML.  It converts < > & " ' into harmless entities so no
-    // one can inject a <script> tag through a username field.
+    // escHtml — always use this before injecting user-supplied strings into innerHTML.
     function escHtml(s) {
       return String(s)
         .replace(/&/g,'&amp;')
@@ -702,58 +844,16 @@
         .replace(/'/g,'&#39;');
     }
 
-    // Safe localStorage wrappers — if the browser blocks localStorage
-    // (private mode in some browsers) these just return safe defaults.
-    function lsGet(key) {
-      try { return localStorage.getItem(key); } catch(e) { return null; }
-    }
-    function lsSet(key, val) {
-      try { localStorage.setItem(key, val); } catch(e) {}
-    }
+    // Safe sessionStorage wrappers — private mode in some browsers can block storage.
     function ssGet(key) {
       try { return sessionStorage.getItem(key); } catch(e) { return null; }
     }
     function ssSet(key, val) {
       try { sessionStorage.setItem(key, val); } catch(e) {}
     }
-
-    // Get the array of all registered users from localStorage
-    function getUsers() {
-      try { return JSON.parse(lsGet('terrameasure_users') || '[]'); }
-      catch(e) { return []; }
+    function ssRemove(key) {
+      try { sessionStorage.removeItem(key); } catch(e) {}
     }
-
-    // Persist the user array back to localStorage
-    function saveUsers(users) {
-      lsSet('terrameasure_users', JSON.stringify(users));
-    }
-
-    // Save the "current logged-in user" — localStorage if rememberMe,
-    // sessionStorage if not (sessionStorage clears when the tab closes).
-    function setCurrentUser(user, rememberMe) {
-      const serialized = JSON.stringify(user);
-      if (rememberMe) lsSet('terrameasure_current_user', serialized);
-      else            ssSet('terrameasure_current_user', serialized);
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // DEMO ACCOUNT
-    // This is always available, regardless of what's in localStorage.
-    // It's the quickest way for someone to explore the app.
-    // ─────────────────────────────────────────────────────────────
-    const DEMO_ACCOUNT = {
-      id: 'u_demo',
-      name: 'Terra User',
-      username: 'terrameasure',
-      email: 'demo@terrameasure.app',
-      password: 'lucasrules',
-      persona: 'Just Exploring',
-      goals: ['Assess buildability', 'Plan drainage & grading'],
-      created: Date.now(),
-      lastLogin: Date.now(),
-      surveyCount: 0,
-      settings: { theme: 'dark', units: 'imperial', defaultRes: 10, defaultArea: 300 }
-    };
 
     // ─────────────────────────────────────────────────────────────
     // STATE MACHINE
@@ -761,9 +861,6 @@
     // current card left and slides in the new card from the right.
     // ─────────────────────────────────────────────────────────────
     let currentStateName = 'login';
-
-    // pendingUser holds the new user being built across signup → onboarding
-    let pendingUser = null;
 
     function transitionTo(newName) {
       if (newName === currentStateName) return;
@@ -821,7 +918,7 @@
       el.classList.remove('visible');
     }
 
-    // Shake the login card to signal a bad login attempt
+    // Shake the card to signal a bad login attempt
     function shakeCard(cardId) {
       const card = document.getElementById(cardId);
       card.classList.remove('shake');
@@ -832,71 +929,100 @@
     }
 
     // ─────────────────────────────────────────────────────────────
-    // LOGIN LOGIC
+    // GOOGLE SIGN IN (also works for sign-up — creates account if new)
+    // Supabase handles the OAuth redirect automatically.
     // ─────────────────────────────────────────────────────────────
-    document.getElementById('login-form').addEventListener('submit', function(e) {
+    async function signInWithGoogle() {
+      await _sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          // After Google auth, redirect back to this page so we can
+          // pick up the session and send the user to the app.
+          redirectTo: 'https://terrameasurev2.onrender.com/web/auth.html'
+        }
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // BUILD _currentUser FROM A SUPABASE SESSION
+    // This object is stored in sessionStorage so any app page can
+    // quickly read who is logged in without hitting Supabase each time.
+    // ─────────────────────────────────────────────────────────────
+    async function buildAndStoreCurrentUser(supabaseUser) {
+      // Fetch their profile row from the 'profiles' table
+      const { data: profile } = await _sb
+        .from('profiles')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .single();
+
+      const cu = {
+        id:        supabaseUser.id,
+        name:      profile?.name
+                   || supabaseUser.user_metadata?.name
+                   || supabaseUser.email.split('@')[0],
+        email:     supabaseUser.email,
+        persona:   profile?.persona  || '',
+        goals:     profile?.goals    || [],
+        settings:  profile?.settings || {},
+        createdAt: supabaseUser.created_at,
+      };
+
+      ssSet('terrameasure_sb_user', JSON.stringify(cu));
+      return cu;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // LOGIN LOGIC — email + password via Supabase
+    // ─────────────────────────────────────────────────────────────
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
       e.preventDefault();
       clearError('login-error');
 
-      const identifier = document.getElementById('login-user').value.trim().toLowerCase();
-      const password   = document.getElementById('login-pass').value;
-      const rememberMe = document.getElementById('remember-me').checked;
+      const email    = document.getElementById('login-email').value.trim().toLowerCase();
+      const password = document.getElementById('login-pass').value;
 
-      if (!identifier || !password) {
-        showError('login-error', 'Please enter your username/email and password.');
+      if (!email || !password) {
+        showError('login-error', 'Please enter your email and password.');
         shakeCard('login-card');
         return;
       }
 
-      // Check demo account first
-      const isDemoUser = identifier === 'terrameasure' || identifier === 'demo@terrameasure.app';
-      const isDemoPass = password === 'lucasrules';
+      // Disable the button while we wait for Supabase to respond
+      const submitBtn = this.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Signing in…';
 
-      if (isDemoUser && isDemoPass) {
-        const demo = { ...DEMO_ACCOUNT, lastLogin: Date.now() };
-        // Upsert the demo account into the users array so it shows up in any user lists
-        const users = getUsers().filter(u => u.id !== 'u_demo');
-        users.push(demo);
-        saveUsers(users);
-        setCurrentUser(demo, rememberMe);
-        document.getElementById('welcome-name').textContent = 'Terra User';
-        transitionTo('welcome');
-        return;
-      }
+      const { data, error } = await _sb.auth.signInWithPassword({ email, password });
 
-      // Check real registered users
-      const users = getUsers();
-      const user = users.find(u =>
-        (u.username.toLowerCase() === identifier || u.email.toLowerCase() === identifier)
-        && u.password === password
-      );
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Sign In';
 
-      if (!user) {
-        // showError uses textContent internally, so HTML tags won't render —
-        // keep this plain text with the credentials spelled out directly.
-        showError('login-error', 'Incorrect credentials. Try demo: terrameasure / lucasrules');
+      if (error) {
+        showError('login-error', error.message || 'Incorrect email or password.');
         shakeCard('login-card');
         return;
       }
 
-      // Update lastLogin timestamp and re-save
-      user.lastLogin = Date.now();
-      const idx = users.findIndex(u => u.id === user.id);
-      users[idx] = user;
-      saveUsers(users);
-      setCurrentUser(user, rememberMe);
-
-      // Show first name only for a friendlier greeting
-      document.getElementById('welcome-name').textContent = user.name.split(' ')[0];
+      // Success — build the user object and go straight to the app
+      const cu = await buildAndStoreCurrentUser(data.user);
+      document.getElementById('welcome-name').textContent = cu.name.split(' ')[0];
       transitionTo('welcome');
     });
 
-    // "Try the demo" auto-fills the form and submits
+    // "Try the demo" — skip Supabase entirely, use a guest session
     document.getElementById('demo-btn').addEventListener('click', function(e) {
       e.preventDefault();
-      document.getElementById('login-user').value = 'terrameasure';
-      document.getElementById('login-pass').value = 'lucasrules';
-      document.getElementById('login-form').dispatchEvent(new Event('submit'));
+      ssSet('terrameasure_sb_user', JSON.stringify({
+        id:        'demo',
+        name:      'Terra Demo',
+        email:     'demo@terrameasure.app',
+        persona:   'Just Exploring',
+        goals:     [],
+        settings:  {},
+        isDemo:    true
+      }));
+      window.location.href = 'terrascan.html';
     });
 
     // Switch to signup
@@ -907,7 +1033,7 @@
     });
 
     // ─────────────────────────────────────────────────────────────
-    // SIGN-UP LOGIC
+    // SIGN-UP LOGIC — create a new account via Supabase
     // ─────────────────────────────────────────────────────────────
     document.getElementById('go-login').addEventListener('click', function(e) {
       e.preventDefault();
@@ -915,23 +1041,22 @@
       transitionTo('login');
     });
 
-    document.getElementById('signup-form').addEventListener('submit', function(e) {
+    document.getElementById('signup-form').addEventListener('submit', async function(e) {
       e.preventDefault();
       clearError('signup-error');
 
-      const name     = document.getElementById('signup-name').value.trim();
-      const email    = document.getElementById('signup-email').value.trim().toLowerCase();
-      const username = document.getElementById('signup-username').value.trim();
-      const pass     = document.getElementById('signup-pass').value;
-      const confirm  = document.getElementById('signup-confirm').value;
+      const name    = document.getElementById('signup-name').value.trim();
+      const email   = document.getElementById('signup-email').value.trim().toLowerCase();
+      const pass    = document.getElementById('signup-pass').value;
+      const confirm = document.getElementById('signup-confirm').value;
 
-      // — Validate every field —
-      if (!name || !email || !username || !pass || !confirm) {
+      // — Validate fields —
+      if (!name || !email || !pass || !confirm) {
         showError('signup-error', 'All fields are required.');
         shakeCard('signup-card');
         return;
       }
-      // Minimum password length — 8 chars is the NIST-recommended floor
+      // NIST recommends 8-char minimum
       if (pass.length < 8) {
         showError('signup-error', 'Password must be at least 8 characters.');
         shakeCard('signup-card');
@@ -942,53 +1067,47 @@
         shakeCard('signup-card');
         return;
       }
-      // Username: 3+ chars, only letters / digits / underscores
-      if (!/^[a-zA-Z0-9_]{3,}$/.test(username)) {
-        showError('signup-error', 'Username must be ≥ 3 chars: letters, digits, and _ only.');
-        shakeCard('signup-card');
-        return;
-      }
-      // Basic email shape check
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         showError('signup-error', 'Please enter a valid email address.');
         shakeCard('signup-card');
         return;
       }
 
-      // Prevent duplicate username or email
-      const users = getUsers();
-      if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
-        showError('signup-error', 'That username is already taken.');
-        shakeCard('signup-card');
-        return;
-      }
-      if (users.some(u => u.email.toLowerCase() === email)) {
-        showError('signup-error', 'An account with that email already exists.');
-        shakeCard('signup-card');
-        return;
-      }
+      const submitBtn = this.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating account…';
 
-      // Build the new user object — won't be saved until after onboarding
-      pendingUser = {
-        id: 'u_' + Date.now(),
-        name,
-        username,
+      const { data, error } = await _sb.auth.signUp({
         email,
         password: pass,
-        persona: '',
-        goals: [],
-        created: Date.now(),
-        lastLogin: Date.now(),
-        surveyCount: 0,
-        settings: { theme: 'dark', units: 'imperial', defaultRes: 10, defaultArea: 300 }
-      };
+        options: {
+          // Attach the display name so it's available on data.user.user_metadata
+          data: { name },
+          // After clicking the confirmation link, the user lands back here
+          emailRedirectTo: 'https://terrameasurev2.onrender.com/web/auth.html'
+        }
+      });
 
-      // Personalize the onboarding greeting with the user's first name
-      const firstName = name.split(' ')[0];
-      // textContent already prevents XSS — escHtml() here would cause
-      // apostrophes and ampersands to appear as &#39; and &amp; literally.
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Create Account';
+
+      if (error) {
+        showError('signup-error', error.message || 'Could not create account. Please try again.');
+        shakeCard('signup-card');
+        return;
+      }
+
+      // Store temporary signup data so onboarding can use it.
+      // We do NOT upsert the profile yet — the user isn't confirmed.
+      ssSet('terrameasure_pending_signup', JSON.stringify({
+        userId: data.user.id,
+        name,
+        email
+      }));
+
+      // Personalize the onboarding greeting
       document.getElementById('onboarding-greeting').textContent =
-        'One quick question, ' + firstName + ' 👋';
+        'One quick question, ' + name.split(' ')[0] + ' 👋';
 
       transitionTo('onboarding');
     });
@@ -1059,9 +1178,9 @@
       }
     }
 
-    // Continue button — save survey answers to pendingUser, store user, go to welcome
+    // Continue button — save persona choice, then go to the confirm screen
     document.getElementById('onboarding-continue').addEventListener('click', function() {
-      if (!selectedPersona) return; // shouldn't happen since button is disabled, but be safe
+      if (!selectedPersona) return; // button should be disabled, but guard anyway
       finishOnboarding();
     });
 
@@ -1071,30 +1190,56 @@
     });
 
     function finishOnboarding() {
-      if (!pendingUser) { transitionTo('login'); return; }
+      // Store the chosen persona locally — we'll write it to Supabase
+      // after the email is confirmed and the user signs in for real.
+      ssSet('terrameasure_pending_persona', selectedPersona || '');
 
-      pendingUser.persona = selectedPersona || '';
-      pendingUser.goals   = [...selectedGoals];
-      // Record when this account was created so Profile can show "Member since"
-      if (!pendingUser.createdAt) pendingUser.createdAt = new Date().toISOString();
+      // Show the email address on the confirm screen
+      const pending = JSON.parse(ssGet('terrameasure_pending_signup') || '{}');
+      if (pending.email) {
+        document.getElementById('confirm-email-display').textContent = pending.email;
+      }
 
-      // Save to the users array
-      const users = getUsers();
-      users.push(pendingUser);
-      saveUsers(users);
-
-      // Mark them as currently logged in (remember by default for new accounts)
-      setCurrentUser(pendingUser, true);
-
-      // Welcome them by first name
-      const firstName = pendingUser.name.split(' ')[0];
-      document.getElementById('welcome-name').textContent = firstName;
-
-      transitionTo('welcome');
+      transitionTo('confirm');
     }
 
     // ─────────────────────────────────────────────────────────────
-    // WELCOME ANIMATION — runs when STATE 4 becomes active
+    // CONFIRM SCREEN — resend confirmation email
+    // ─────────────────────────────────────────────────────────────
+    document.getElementById('confirm-go-login').addEventListener('click', function(e) {
+      e.preventDefault();
+      transitionTo('login');
+    });
+
+    async function resendConfirmation() {
+      clearError('confirm-error');
+      const successEl = document.getElementById('resend-success');
+      successEl.style.display = 'none';
+
+      const pending = JSON.parse(ssGet('terrameasure_pending_signup') || '{}');
+      if (!pending.email) {
+        showError('confirm-error', 'No email address found. Please sign up again.');
+        return;
+      }
+
+      const resendBtn = document.getElementById('resend-btn');
+      resendBtn.disabled = true;
+      resendBtn.textContent = 'Sending…';
+
+      const { error } = await _sb.auth.resend({ type: 'signup', email: pending.email });
+
+      resendBtn.disabled = false;
+      resendBtn.textContent = 'Resend confirmation email';
+
+      if (error) {
+        showError('confirm-error', error.message || 'Could not resend. Please try again shortly.');
+      } else {
+        successEl.style.display = 'block';
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // WELCOME ANIMATION — runs when state-welcome becomes active
     // Each step is triggered with a setTimeout chain so things
     // appear in a satisfying sequence.
     // ─────────────────────────────────────────────────────────────
@@ -1124,7 +1269,6 @@
       setTimeout(() => { stats[2].classList.add('visible'); animateCounter(stats[2]); }, 1300);
 
       // Step 4 — Progress bar fills over 2.5 seconds
-      // (small delay so the fill transition sees the 0% starting state)
       setTimeout(() => { fill.style.width = '100%'; }, 1400);
 
       // Step 5 — "Start Surveying" button appears
@@ -1144,12 +1288,12 @@
     }
 
     // Counts a stat card number up from 0 to its data-target value
-    // using requestAnimationFrame for a smooth, buttery animation
+    // using requestAnimationFrame for a smooth animation
     function animateCounter(cardEl) {
-      const numEl  = cardEl.querySelector('.stat-number');
-      const target = parseInt(numEl.dataset.target, 10);
-      const prefix = numEl.dataset.prefix || '';
-      const suffix = numEl.dataset.suffix || '';
+      const numEl    = cardEl.querySelector('.stat-number');
+      const target   = parseInt(numEl.dataset.target, 10);
+      const prefix   = numEl.dataset.prefix || '';
+      const suffix   = numEl.dataset.suffix || '';
       const duration = 1400; // ms
       const startTime = performance.now();
 
@@ -1165,29 +1309,72 @@
       requestAnimationFrame(step);
     }
 
-    // Finally navigate to the main app
+    // Navigate to the main app
     function goToApp() {
       window.location.href = 'terrascan.html';
     }
 
     // ─────────────────────────────────────────────────────────────
-    // INIT — if a user is already logged in (localStorage), skip login
-    // and go straight to the app.
+    // PAGE LOAD — handle OAuth redirect and check for existing session
+    // This runs every time the page loads, including when Supabase
+    // redirects back after Google sign-in.
     // ─────────────────────────────────────────────────────────────
-    (function init() {
-      const stored = lsGet('terrameasure_current_user') || ssGet('terrameasure_current_user');
-      if (stored) {
-        try {
-          const user = JSON.parse(stored);
-          if (user && user.id) {
-            // Already authenticated — send them straight to the app
-            window.location.href = 'terrascan.html';
-            return;
-          }
-        } catch(e) { /* corrupt data — just show login */ }
+
+    // Helper: hides the loading overlay with a brief fade-out,
+    // then removes it from the DOM so it can't interfere with clicks.
+    function hideLoadingOverlay() {
+      const overlay = document.getElementById('loading-overlay');
+      if (!overlay) return;
+      overlay.classList.add('hidden');
+      // Remove from the DOM after the CSS transition finishes (300ms)
+      setTimeout(() => {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }, 320);
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+
+      // 1. Check if there's already an active session (user previously logged in,
+      //    OR Google OAuth just redirected back with tokens in the URL hash).
+      //    The loading overlay stays visible during this async check so the user
+      //    never sees the login form if they're already authenticated.
+      const { data: { session } } = await _sb.auth.getSession();
+      if (session) {
+        // Already authenticated — build the user object and go to the app.
+        // We don't hide the overlay here because the welcome animation takes over.
+        const cu = await buildAndStoreCurrentUser(session.user);
+        document.getElementById('welcome-name').textContent = cu.name.split(' ')[0];
+        hideLoadingOverlay();
+        transitionTo('welcome');
+        return;
       }
-      // Otherwise, the login card fades in naturally via its CSS animation
-    })();
+
+      // No active session — reveal the login form by fading out the overlay
+      hideLoadingOverlay();
+
+      // 2. Listen for auth state changes — this fires when:
+      //    - Google OAuth redirect completes (SIGNED_IN event)
+      //    - User clicks the email confirmation link (SIGNED_IN event)
+      _sb.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          // If the user went through onboarding before confirming, save their persona now
+          const pendingPersona = ssGet('terrameasure_pending_persona');
+          if (pendingPersona) {
+            await _sb.from('profiles').upsert({
+              id:      session.user.id,
+              persona: pendingPersona
+            });
+            ssRemove('terrameasure_pending_persona');
+            ssRemove('terrameasure_pending_signup');
+          }
+
+          // Build the user object and head to the app
+          const cu = await buildAndStoreCurrentUser(session.user);
+          document.getElementById('welcome-name').textContent = cu.name.split(' ')[0];
+          transitionTo('welcome');
+        }
+      });
+    });
   </script>
 </body>
 </html>
