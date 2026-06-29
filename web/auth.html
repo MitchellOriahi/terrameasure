@@ -1075,6 +1075,8 @@
 
       pendingUser.persona = selectedPersona || '';
       pendingUser.goals   = [...selectedGoals];
+      // Record when this account was created so Profile can show "Member since"
+      if (!pendingUser.createdAt) pendingUser.createdAt = new Date().toISOString();
 
       // Save to the users array
       const users = getUsers();

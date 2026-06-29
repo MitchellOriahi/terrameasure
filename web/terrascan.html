@@ -1313,7 +1313,7 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
     <!-- Logo -->
     <a href="auth.html" class="logo">Terra<span class="sym">◈</span>Measure<span class="sub">TerraScan v0.3</span></a>
     <div class="t-sep"></div>
-    <div class="user-chip" id="user-chip" onclick="openSettings('account')" title="Your profile">
+    <div class="user-chip" id="user-chip" onclick="window.location='profile.html'" style="cursor:pointer" title="View your profile">
       <div class="user-avatar" id="user-avatar">?</div>
       <span class="user-name" id="user-name">User</span>
     </div>
@@ -1412,6 +1412,7 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
     <div class="t-sep"></div>
     <a href="terraphoto.html" class="t-link">TerraPhoto</a>
     <a href="terranews.html" class="t-link">TerraIntel</a>
+    <a href="profile.html" class="t-link">Profile</a>
     <a href="index.html" class="t-link" style="margin-left:3px;">Home</a>
     <div class="t-sep"></div>
     <!-- Help / replay intro — clearly labeled so users can find it when confused -->
@@ -2709,6 +2710,22 @@ document.getElementById("run-btn").addEventListener("click",async()=>{
     }
     lastData=data; completeScan();
     showResults(data);
+    // Save to the shared 'terrascan_history' key so the Profile page can read it
+    try {
+      const hist = JSON.parse(localStorage.getItem('terrascan_history') || '[]');
+      hist.unshift({
+        date: new Date().toISOString(),
+        lat: selectedLat,
+        lon: selectedLon,
+        score: calcSiteScore(data),
+        // Compute area in acres from the DEM's actual footprint (width * height in metres)
+        // divided by 4046.86 sq-m/acre.  Falls back to 0 if the server didn't return dimensions.
+        area: ((data.dem_width_m || 0) * (data.dem_height_m || 0)) / 4046.856,
+        source: data.source
+      });
+      // Keep last 50 surveys only
+      localStorage.setItem('terrascan_history', JSON.stringify(hist.slice(0,50)));
+    } catch(e) {}
     // Track survey count per user
     if(_currentUser){_currentUser.surveyCount=(_currentUser.surveyCount||0)+1;saveUserSetting('surveyCount',_currentUser.surveyCount);}
     saveHistory(data,selectedLat,selectedLon);

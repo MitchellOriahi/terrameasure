@@ -174,6 +174,60 @@
     .filter-btn:hover { border-color: var(--text3); color: var(--text); }
     .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
+    /* ── LOCATION FILTER BAR ── */
+    .location-bar {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 10px clamp(20px,4vw,48px);
+      border-bottom: 1px solid var(--border);
+      background: rgba(37,99,235,0.03);
+      font-size: 0.8rem;
+    }
+    .location-label {
+      font-size: 0.75rem; color: var(--text3); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      white-space: nowrap; display: flex; align-items: center; gap: 4px;
+      margin-right: 4px;
+    }
+    /* The country dropdown and text inputs share these base styles */
+    .location-select, .location-input {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); border-radius: var(--radius-sm);
+      font-family: var(--font-ui); font-size: 0.8rem;
+      padding: 5px 10px; outline: none; transition: border-color 0.2s;
+    }
+    .location-select { max-width: 190px; cursor: pointer; }
+    .location-input  { width: 150px; }
+    .location-select:focus, .location-input:focus { border-color: var(--accent); }
+    /* Apply button — filled accent, matches the active filter-btn style */
+    .location-apply-btn {
+      padding: 5px 14px; border-radius: var(--radius-pill);
+      background: var(--accent); border: 1px solid var(--accent);
+      color: #fff; font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; transition: background 0.2s; font-family: var(--font-ui);
+      white-space: nowrap;
+    }
+    .location-apply-btn:hover { background: #0a70dd; }
+    /* Clear button — ghost style */
+    .location-clear-btn {
+      padding: 5px 10px; border-radius: var(--radius-pill);
+      border: 1px solid var(--border); background: transparent; color: var(--text2);
+      font-size: 0.8rem; cursor: pointer; font-family: var(--font-ui);
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .location-clear-btn:hover { color: var(--text); border-color: var(--text3); }
+    /* Active location badge pill shown when a filter is in effect */
+    .loc-active-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(37,99,235,0.15); border: 1px solid rgba(37,99,235,0.4);
+      border-radius: var(--radius-pill); padding: 4px 12px;
+      font-size: 0.78rem; font-weight: 600; color: #93c5fd; white-space: nowrap;
+    }
+    /* The × inside the active badge */
+    .loc-clear-x {
+      cursor: pointer; opacity: 0.7; font-size: 1rem; line-height: 1; padding: 0 2px;
+    }
+    .loc-clear-x:hover { opacity: 1; }
+
     /* ── MAIN CONTENT ── */
     .news-body {
       max-width: 1300px; margin: 0 auto;
@@ -404,6 +458,69 @@
   </div>
 </div>
 
+<!-- ── LOCATION FILTER BAR ── -->
+<!-- Lets the user narrow stories to a specific country / state / city. -->
+<!-- Sits below the category filter bar so both filters work together.  -->
+<div class="location-bar" id="location-bar">
+  <span class="location-label">🌍 Location</span>
+
+  <!-- Country dropdown — "All countries" = no location filter -->
+  <select class="location-select" id="loc-country">
+    <option value="">🌍 All countries</option>
+    <option>Afghanistan</option><option>Albania</option><option>Algeria</option>
+    <option>Angola</option><option>Argentina</option><option>Armenia</option>
+    <option>Australia</option><option>Austria</option><option>Azerbaijan</option>
+    <option>Bangladesh</option><option>Belarus</option><option>Belgium</option>
+    <option>Belize</option><option>Benin</option><option>Bolivia</option>
+    <option>Bosnia</option><option>Botswana</option><option>Brazil</option>
+    <option>Bulgaria</option><option>Burkina Faso</option><option>Cambodia</option>
+    <option>Cameroon</option><option>Canada</option><option>Chad</option>
+    <option>Chile</option><option>China</option><option>Colombia</option>
+    <option>Congo</option><option>Costa Rica</option><option>Croatia</option>
+    <option>Cuba</option><option>Czech Republic</option><option>Denmark</option>
+    <option>Dominican Republic</option><option>Ecuador</option><option>Egypt</option>
+    <option>El Salvador</option><option>Ethiopia</option><option>Finland</option>
+    <option>France</option><option>Germany</option><option>Ghana</option>
+    <option>Greece</option><option>Guatemala</option><option>Haiti</option>
+    <option>Honduras</option><option>Hungary</option><option>India</option>
+    <option>Indonesia</option><option>Iran</option><option>Iraq</option>
+    <option>Ireland</option><option>Israel</option><option>Italy</option>
+    <option>Jamaica</option><option>Japan</option><option>Jordan</option>
+    <option>Kazakhstan</option><option>Kenya</option><option>Kuwait</option>
+    <option>Laos</option><option>Lebanon</option><option>Liberia</option>
+    <option>Libya</option><option>Madagascar</option><option>Malawi</option>
+    <option>Malaysia</option><option>Mali</option><option>Mexico</option>
+    <option>Moldova</option><option>Morocco</option><option>Mozambique</option>
+    <option>Myanmar</option><option>Nepal</option><option>Netherlands</option>
+    <option>New Zealand</option><option>Nicaragua</option><option>Niger</option>
+    <option>Nigeria</option><option>Norway</option><option>Pakistan</option>
+    <option>Panama</option><option>Paraguay</option><option>Peru</option>
+    <option>Philippines</option><option>Poland</option><option>Portugal</option>
+    <option>Romania</option><option>Russia</option><option>Rwanda</option>
+    <option>Saudi Arabia</option><option>Senegal</option><option>Sierra Leone</option>
+    <option>Somalia</option><option>South Africa</option><option>South Sudan</option>
+    <option>Spain</option><option>Sri Lanka</option><option>Sudan</option>
+    <option>Sweden</option><option>Switzerland</option><option>Syria</option>
+    <option>Tanzania</option><option>Thailand</option><option>Tunisia</option>
+    <option>Turkey</option><option>Uganda</option><option>Ukraine</option>
+    <option>United Arab Emirates</option><option>United Kingdom</option>
+    <option>United States</option><option>Uruguay</option><option>Uzbekistan</option>
+    <option>Venezuela</option><option>Vietnam</option><option>Yemen</option>
+    <option>Zambia</option><option>Zimbabwe</option>
+  </select>
+
+  <!-- Optional state/region refinement -->
+  <input class="location-input" id="loc-state" type="text" placeholder="State or region (optional)" />
+  <!-- Optional city refinement -->
+  <input class="location-input" id="loc-city"  type="text" placeholder="City or town (optional)" />
+
+  <button class="location-apply-btn" onclick="applyLocationFilter()">Apply</button>
+  <button class="location-clear-btn" onclick="clearLocationFilter()">Clear</button>
+
+  <!-- Active location badge — shown when a filter is in effect, hidden otherwise -->
+  <span id="loc-active-badge" style="display:none;"></span>
+</div>
+
 <!-- ── MAIN CONTENT ── -->
 <div class="news-body">
   <div class="stats-bar">
@@ -550,6 +667,37 @@ let allStories = [];        // flat array of all loaded story objects
 let activeFilter = 'all';
 let lastRefreshTime = null; // timestamp (ms) of when the last load completed
 
+// ── LOCATION FILTER STATE ────────────────────────────────────
+// These three variables drive the location filter.
+// All three default to '' (empty string), which means "no location filter — global".
+let _filterCountry = '';  // e.g. "United States"
+let _filterState   = '';  // e.g. "Texas"
+let _filterCity    = '';  // e.g. "Austin"
+
+// Restore any location the user saved on a previous visit.
+// We use a try/catch because localStorage can throw in private-browsing on some browsers.
+try {
+  const _savedLoc = JSON.parse(localStorage.getItem('terrameasure_news_location') || '{}');
+  _filterCountry = _savedLoc.country || '';
+  _filterState   = _savedLoc.state   || '';
+  _filterCity    = _savedLoc.city    || '';
+} catch(_e) {}
+
+// ISO-3 country codes for countries that ReliefWeb's API can filter by.
+// Only major countries with frequent disaster coverage are listed here.
+// For any country NOT in this map, ReliefWeb falls back to global results.
+const COUNTRY_ISO3 = {
+  'United States': 'USA', 'United Kingdom': 'GBR', 'Canada': 'CAN',
+  'Australia':     'AUS', 'India':          'IND', 'Brazil':  'BRA',
+  'Germany':       'DEU', 'France':         'FRA', 'Japan':   'JPN',
+  'China':         'CHN', 'Mexico':         'MEX', 'Nigeria': 'NGA',
+  'Kenya':         'KEN', 'South Africa':   'ZAF', 'Philippines': 'PHL',
+  'Indonesia':     'IDN', 'Pakistan':       'PAK', 'Bangladesh':  'BGD',
+  'Ethiopia':      'ETH', 'Egypt':          'EGY', 'Tanzania':    'TZA',
+  'Uganda':        'UGA', 'Ghana':          'GHA', 'Mozambique':  'MOZ',
+  'Zimbabwe':      'ZWE', 'Zambia':         'ZMB',
+};
+
 // Maps a source CSS class to the dot color class for that source.
 // These dots appear inside each card's source pill for quick visual scanning.
 const SOURCE_DOTS = {
@@ -625,10 +773,9 @@ async function loadAllFeeds() {
   // Fetch all feeds in parallel — errors per feed are caught individually
   const results = await Promise.allSettled(FEEDS.map(f => fetchFeed(f)));
 
-  // If every single feed failed, show the error state and stop
-  const allFailed = results.every(
-    r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value.length === 0)
-  );
+  // A feed "truly failed" only if it threw a network/HTTP error (rejected promise).
+  // Returning 0 items (e.g. because the location filter removed everything) is NOT a failure.
+  const allFailed = results.every(r => r.status === 'rejected');
   if (allFailed) {
     showError('Could not reach any feeds. Check your connection and try again.');
     document.getElementById('story-count').textContent = '0';
@@ -636,15 +783,17 @@ async function loadAllFeeds() {
     return;
   }
 
-  // Collect stories from whichever feeds succeeded
+  // Collect stories from whichever feeds succeeded, track which had errors
   const succeeded = [];
-  const failed = [];
+  const failed    = [];
   results.forEach((r, i) => {
-    if (r.status === 'fulfilled' && r.value.length > 0) {
-      allStories.push(...r.value);
-      succeeded.push(FEEDS[i].name);
-    } else {
+    if (r.status === 'rejected') {
+      // Hard failure — network or HTTP error
       failed.push(FEEDS[i].name);
+    } else {
+      // Fulfilled — even 0 results counts as "reached" (may be empty due to location filter)
+      succeeded.push(FEEDS[i].name);
+      if (r.value.length > 0) allStories.push(...r.value);
     }
   });
 
@@ -697,7 +846,7 @@ async function fetchRSS(feed) {
   const doc = parser.parseFromString(text, 'text/xml');
 
   const items = [...doc.querySelectorAll('item')];
-  return items.slice(0, 15).map(item => {
+  const stories = items.slice(0, 15).map(item => {
     const title   = item.querySelector('title')?.textContent?.trim() || '';
     const link    = item.querySelector('link')?.textContent?.trim()
                  || item.querySelector('link')?.getAttribute('href') || '';
@@ -720,11 +869,59 @@ async function fetchRSS(feed) {
       category:    autoTag(title + ' ' + desc),
     };
   }).filter(Boolean);
+
+  // If a location filter is active, only keep stories that mention the location
+  // in their title or description.  This is client-side keyword matching —
+  // not perfect, but it removes clearly irrelevant stories fast.
+  if (_filterCountry || _filterState || _filterCity) {
+    const locKeywords = [_filterCountry, _filterState, _filterCity]
+      .filter(Boolean)
+      .map(s => s.toLowerCase());
+    return stories.filter(s => {
+      const text = (s.title + ' ' + s.desc).toLowerCase();
+      return locKeywords.some(kw => text.includes(kw));
+    });
+  }
+
+  return stories;
 }
 
-// Fetch USGS Significant Earthquakes (direct JSON, CORS-enabled — no proxy needed)
+// Fetch USGS earthquake data.
+// When a location filter is active, we geocode the location with Nominatim to get
+// a bounding box, then switch to the USGS FDSNWS event API so we only get quakes
+// in that region.  Without a location, we use the "significant_month" feed (global).
 async function fetchUSGSEarthquakes(feed) {
-  const resp = await fetch(feed.url, { signal: AbortSignal.timeout(8000) });
+  // Start with the default URL (significant earthquakes, past 30 days, worldwide)
+  let url = feed.url;
+
+  // If the user has set a location, try to build a region-specific URL
+  if (_filterCountry || _filterState || _filterCity) {
+    const locationQuery = [_filterCity, _filterState, _filterCountry]
+      .filter(Boolean).join(', ');
+    try {
+      // Nominatim (OpenStreetMap) geocoding — free, no API key needed
+      const geoResp = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(locationQuery)}&format=json&limit=1`,
+        { signal: AbortSignal.timeout(5000), headers: { 'Accept-Language': 'en' } }
+      );
+      const geoData = await geoResp.json();
+      if (geoData.length > 0) {
+        // boundingbox = [minlat, maxlat, minlon, maxlon]
+        const bb = geoData[0].boundingbox;
+        // Switch to the FDSNWS event API with a bounding-box and a lower min magnitude
+        // so we get local quakes, not just global "significant" ones
+        url = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson` +
+              `&minlatitude=${bb[0]}&maxlatitude=${bb[1]}` +
+              `&minlongitude=${bb[2]}&maxlongitude=${bb[3]}` +
+              `&minmagnitude=2.5&limit=20`;
+      }
+      // If Nominatim returned no results, we fall back to the global feed silently
+    } catch (_geoErr) {
+      // Geocoding timed out or failed — fall back to global feed silently
+    }
+  }
+
+  const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const json = await resp.json();
 
@@ -745,9 +942,33 @@ async function fetchUSGSEarthquakes(feed) {
   }).filter(Boolean);
 }
 
-// Fetch ReliefWeb (UN OCHA) disaster reports — their API has CORS headers
+// Fetch ReliefWeb (UN OCHA) disaster reports — their API has CORS headers.
+// When a country with a known ISO-3 code is selected, we rebuild the URL with
+// a nested AND filter: country=X AND (type=FL OR type=TC OR type=EQ).
+// For countries not in COUNTRY_ISO3, we fall back to global results.
 async function fetchReliefWeb(feed) {
-  const resp = await fetch(feed.url, { signal: AbortSignal.timeout(8000) });
+  let url = feed.url;
+
+  if (_filterCountry && COUNTRY_ISO3[_filterCountry]) {
+    const iso3 = COUNTRY_ISO3[_filterCountry];
+    // ReliefWeb nested filter:  AND( country=iso3, OR(FL, TC, EQ) )
+    url = 'https://api.reliefweb.int/v1/reports?appname=terrameasure' +
+          '&filter[operator]=AND' +
+          `&filter[conditions][0][field]=country.iso3` +
+          `&filter[conditions][0][value][]=${iso3}` +
+          '&filter[conditions][1][operator]=OR' +
+          '&filter[conditions][1][conditions][0][field]=disaster_type.id' +
+          '&filter[conditions][1][conditions][0][value][]=FL' +
+          '&filter[conditions][1][conditions][1][field]=disaster_type.id' +
+          '&filter[conditions][1][conditions][1][value][]=TC' +
+          '&filter[conditions][1][conditions][2][field]=disaster_type.id' +
+          '&filter[conditions][1][conditions][2][value][]=EQ' +
+          '&sort[]=date:desc&limit=20' +
+          '&fields[include][]=title&fields[include][]=date' +
+          '&fields[include][]=url&fields[include][]=source&fields[include][]=body';
+  }
+
+  const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const json = await resp.json();
 
@@ -781,24 +1002,48 @@ function renderStories() {
 
   countEl.textContent = visible.length;
 
-  // If filter returned zero results but there ARE stories, show the empty state
-  if (visible.length === 0 && allStories.length > 0) {
+  // Handle all "zero visible stories" cases in one place
+  if (visible.length === 0) {
     grid.innerHTML = '';
-    emptyState.style.display = 'block';
+    const locLabel = buildLocationLabel();
+
+    if (locLabel) {
+      // A location filter is active but returned nothing — give the user a clear message
+      // and a one-click button to clear the filter
+      emptyState.innerHTML = `
+        <div style="font-size:48px; margin-bottom:16px;">📍</div>
+        <div style="font-size:16px; font-weight:600; margin-bottom:8px; color:var(--text2);">
+          No news found for ${escHtml(locLabel)}
+        </div>
+        <div style="font-size:13px; margin-bottom:16px;">
+          Try broadening your search or clearing the location filter.
+        </div>
+        <button onclick="clearLocationFilter()"
+          style="background:var(--accent);color:#fff;border:none;padding:8px 20px;
+          border-radius:20px;cursor:pointer;font-size:13px;">Clear filter</button>`;
+      emptyState.style.display = 'block';
+    } else if (allStories.length > 0) {
+      // Category filter — stories exist globally, just none in this category
+      emptyState.innerHTML = `
+        <div style="font-size:48px; margin-bottom:16px;">📡</div>
+        <div style="font-size:16px; font-weight:600; margin-bottom:8px; color:var(--text2);">
+          No stories in this category
+        </div>
+        <div style="font-size:13px;">Try a different filter or check back after the next refresh</div>`;
+      emptyState.style.display = 'block';
+    } else {
+      // No stories at all — likely a network problem (showError would have caught hard failures)
+      emptyState.style.display = 'none';
+      grid.innerHTML = `
+        <div class="feed-error">
+          <h3>Could not load feeds</h3>
+          <p>Check your connection and try refreshing. Government RSS servers can be intermittently slow.</p>
+        </div>`;
+    }
     return;
   }
 
   emptyState.style.display = 'none';
-
-  // Fallback: no stories at all (edge case not caught by showError)
-  if (visible.length === 0) {
-    grid.innerHTML = `
-      <div class="feed-error">
-        <h3>Could not load feeds</h3>
-        <p>Check your connection and try refreshing. Government RSS servers can be intermittently slow.</p>
-      </div>`;
-    return;
-  }
 
   // Render cards; pass index so each card gets a staggered animation delay
   grid.innerHTML = visible.map((s, i) => cardHTML(s, i)).join('');
@@ -842,6 +1087,72 @@ function setFilter(cat, btn) {
   renderStories();
 }
 
+// ── LOCATION FILTER FUNCTIONS ─────────────────────────────────
+// Build a human-readable label from whichever location parts are set.
+// E.g. _filterCity="Austin", _filterState="Texas", _filterCountry="United States"
+// → "Austin, Texas, United States"
+function buildLocationLabel() {
+  return [_filterCity, _filterState, _filterCountry].filter(Boolean).join(', ');
+}
+
+// Refresh the active-location badge shown in the location bar.
+// Shows "📍 Texas, United States  ×" when a filter is in effect; hides otherwise.
+function updateLocationBadge() {
+  const badge = document.getElementById('loc-active-badge');
+  if (!badge) return;
+  const label = buildLocationLabel();
+  if (label) {
+    badge.style.display = 'inline-flex';
+    badge.innerHTML =
+      `<span class="loc-active-pill">` +
+        `📍 ${escHtml(label)} ` +
+        `<span class="loc-clear-x" onclick="clearLocationFilter()" title="Clear location">×</span>` +
+      `</span>`;
+  } else {
+    badge.style.display = 'none';
+    badge.innerHTML = '';
+  }
+}
+
+// Read the three UI inputs, persist to localStorage, then reload all feeds
+// so location-aware fetchers pick up the new values.
+function applyLocationFilter() {
+  _filterCountry = document.getElementById('loc-country').value.trim();
+  _filterState   = document.getElementById('loc-state').value.trim();
+  _filterCity    = document.getElementById('loc-city').value.trim();
+
+  // Save to localStorage — the filter will be restored on the next page load
+  try {
+    localStorage.setItem('terrameasure_news_location', JSON.stringify({
+      country: _filterCountry, state: _filterState, city: _filterCity
+    }));
+  } catch(_e) {}
+
+  updateLocationBadge();
+  loadAllFeeds(); // re-fetch everything with the new location context
+}
+
+// Reset all location filter variables, clear the UI, remove localStorage entry,
+// and reload so global results are shown again.
+function clearLocationFilter() {
+  _filterCountry = '';
+  _filterState   = '';
+  _filterCity    = '';
+
+  // Reset UI inputs
+  const cs = document.getElementById('loc-country');
+  const ss = document.getElementById('loc-state');
+  const ci = document.getElementById('loc-city');
+  if (cs) cs.value = '';
+  if (ss) ss.value = '';
+  if (ci) ci.value = '';
+
+  try { localStorage.removeItem('terrameasure_news_location'); } catch(_e) {}
+
+  updateLocationBadge();
+  loadAllFeeds(); // reload without any location filter
+}
+
 // ── HELPERS ─────────────────────────────────────────────────
 // Guess a category for a story based on its text content
 function autoTag(text) {
@@ -882,7 +1193,20 @@ setInterval(loadAllFeeds, REFRESH_INTERVAL);
 // (so "Updated 3 minutes ago" ticks forward without a full reload)
 setInterval(updateRefreshDisplay, 30 * 1000);
 
-// Initial load on page open
+// Restore location UI to match any saved filter before the first load.
+// The state variables (_filterCountry etc.) were already set from localStorage above,
+// but the <select> and <input> elements need to be updated to match them.
+(function restoreLocationUI() {
+  const cs = document.getElementById('loc-country');
+  const ss = document.getElementById('loc-state');
+  const ci = document.getElementById('loc-city');
+  if (cs) cs.value = _filterCountry;
+  if (ss) ss.value = _filterState;
+  if (ci) ci.value = _filterCity;
+  updateLocationBadge();
+})();
+
+// Initial load on page open — will use restored location filter if one was saved
 loadAllFeeds();
 </script>
 
