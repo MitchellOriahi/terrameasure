@@ -2281,10 +2281,13 @@ const DEMO_SITES = [
   { name: 'Rocky Mtn Natl Park',  lat: 40.3428, lon: -105.6836, zoom: 12 },
 ];
 let _demoSiteIdx = 0;
+let _demoTutorialPending = false; // flag: launch explainer tour after demo survey finishes
+
 function runQuickDemo() {
   const site = DEMO_SITES[_demoSiteIdx % DEMO_SITES.length];
   _demoSiteIdx++;
-  toast(`⚡ Demo: ${site.name}`, 'info', 2500);
+  _demoTutorialPending = true; // mark that this survey should trigger the tutorial
+  toast(`⚡ Demo: ${site.name} — we'll walk you through the results`, 'info', 3000);
   map.flyTo([site.lat, site.lon], site.zoom, { duration: 1.5 });
   setTimeout(() => {
     selectedLat = site.lat; selectedLon = site.lon;
@@ -2785,6 +2788,11 @@ function showResults(d){
   document.getElementById("dl-row").style.display="flex";
   // On mobile, auto-expand the strip so results are visible without tapping a tab
   expandMobileStrip();
+  // If this was a demo run, launch the guided post-survey tour after a short delay
+  if(_demoTutorialPending){
+    _demoTutorialPending = false;
+    setTimeout(()=> startDemoTour(), 1400);
+  }
   renderSourceBar(d);
   renderScoreSection(d);
   renderMetrics(d);
@@ -4231,6 +4239,271 @@ function toggleDrawRibbon(){
 }
 
 /* ── TUTORIAL OVERLAY FUNCTIONS ── */
+/* ══════════════════════════════════════════════════════════════════════════
+   POST-SURVEY DEMO TOUR
+   Launched after "See It in Action" runs a demo survey. Walks through every
+   tab and number so newcomers know exactly what they're looking at.
+   Each step can: spotlight an element, switch a tab, and explain in plain English.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function _getDemoTourSteps(){
+  // Pull live values from the last survey result so explanations use real numbers
+  const score = lastData ? calcSiteScore(lastData) : '—';
+  const slope = lastData ? lastData.avg_slope?.value?.toFixed(1) : '—';
+  const buildPct = lastData ? lastData.buildable_area_pct?.toFixed(0) : '—';
+  const minH = lastData ? lastData.min_height?.toFixed(0) : '—';
+  const maxH = lastData ? lastData.max_height?.toFixed(0) : '—';
+  const elRange = (lastData && lastData.max_height != null && lastData.min_height != null)
+    ? (lastData.max_height - lastData.min_height).toFixed(0) : '—';
+  const cut = lastData ? lastData.cut_volume?.value?.toFixed(0) : '—';
+  const fill = lastData ? lastData.fill_volume?.value?.toFixed(0) : '—';
+
+  const slopeDesc = !lastData ? 'unknown' :
+    slope < 3  ? 'essentially flat — ideal for any construction' :
+    slope < 8  ? 'gently sloping — manageable with standard grading' :
+    slope < 15 ? 'moderate slope — needs careful site planning' :
+    slope < 25 ? 'steep — significant earthwork required' :
+                 'very steep — development is difficult and costly';
+
+  const scoreDesc = !lastData ? '' :
+    score >= 80 ? 'Excellent land. High quality for development or agriculture.' :
+    score >= 65 ? 'Good land. Minor challenges but broadly suitable.' :
+    score >= 50 ? 'Moderate quality. Some limiting factors to consider.' :
+                  'Challenging land. Significant constraints present.';
+
+  return [
+    // ── 0: Welcome ──────────────────────────────────────────────────────
+    {
+      icon: '🎉',
+      title: 'Survey complete! Here\'s your breakdown.',
+      body: 'We just fetched real government satellite elevation data for this location and ran a full land analysis. Let\'s walk through every result so you know exactly what you\'re looking at.',
+      stat: 'Real data. Real measurements. No equipment needed.',
+      target: null, position: 'center', tab: null,
+    },
+    // ── 1: Site Score ────────────────────────────────────────────────────
+    {
+      icon: '🏅',
+      title: `Site Score: ${score}/100`,
+      body: `This is the overall quality rating for this land. It combines slope, buildable area, elevation stability, and environmental risk into one number. ${scoreDesc} A score above 75 is generally great for construction or farming.`,
+      stat: 'Weighted across 6 terrain factors',
+      target: '.score-badge, .site-score, #score-ring, .score-section', position: 'above', tab: 'metrics',
+    },
+    // ── 2: Slope ─────────────────────────────────────────────────────────
+    {
+      icon: '📐',
+      title: `Average Slope: ${slope}°`,
+      body: `Slope tells you how steep the land is. This site averages ${slope}° — ${slopeDesc}. For reference: a flat parking lot is ~0°, a gentle hill is ~5°, and a black diamond ski slope is around 30°+. Steeper = more expensive to build on.`,
+      stat: 'Computed from the full elevation grid',
+      target: '.mb-row, .metric-bar, #rtab-metrics', position: 'above', tab: 'metrics',
+    },
+    // ── 3: Buildable Area ────────────────────────────────────────────────
+    {
+      icon: '🏗️',
+      title: `Buildable Area: ${buildPct}%`,
+      body: `This is the percentage of the land with a slope under 8° — gentle enough to build on without major earthmoving. ${buildPct}% of this site qualifies. The rest is too steep for standard construction and would need terracing, retaining walls, or grading.`,
+      stat: 'Cells below 8° slope threshold',
+      target: '.mb-row, .metric-bar, #rtab-metrics', position: 'above', tab: 'metrics',
+    },
+    // ── 4: Elevation Range ───────────────────────────────────────────────
+    {
+      icon: '⛰️',
+      title: `Elevation: ${minH}m – ${maxH}m`,
+      body: `The survey area spans ${elRange} meters of elevation change — from a low of ${minH}m to a high of ${maxH}m above sea level. A large range means dramatic terrain. A small range means relatively flat ground. This also affects drainage and flood risk.`,
+      stat: 'Absolute elevations from USGS data',
+      target: '.mb-row, .metric-bar, #rtab-metrics', position: 'above', tab: 'metrics',
+    },
+    // ── 5: Cut / Fill ────────────────────────────────────────────────────
+    {
+      icon: '🚜',
+      title: 'Cut & Fill Volumes',
+      body: `Cut (${cut} m³) is how much soil needs to be dug away from high spots. Fill (${fill} m³) is how much needs to be brought in to raise low spots. Together they estimate the earthwork cost to level the site to its average elevation. Lower numbers = flatter land = cheaper to prepare.`,
+      stat: 'Volume to grade to mean elevation',
+      target: '.mb-row, .metric-bar, #rtab-metrics', position: 'above', tab: 'metrics',
+    },
+    // ── 6: Profile Tab ───────────────────────────────────────────────────
+    {
+      icon: '📈',
+      title: 'Elevation Profile',
+      body: 'This chart shows a cross-section of the terrain — imagine slicing through the land diagonally from one corner to the other and looking at the edge. Peaks are hills, dips are valleys. A flat line means flat land. Use this to visualize drainage patterns and where high/low points are.',
+      stat: 'Diagonal cross-section of the DEM grid',
+      target: '#rtab-profile, .profile-chart-wrap', position: 'above', tab: 'profile',
+    },
+    // ── 7: Insights Tab ──────────────────────────────────────────────────
+    {
+      icon: '⚡',
+      title: 'Insights — Risk Summary',
+      body: 'Insights gives you a quick risk report: flood susceptibility, landslide potential, soil stability, and a plain-English verdict on site suitability. Green = low risk. Yellow = moderate — worth investigating. Red = high risk that could affect permits, insurance, or construction cost.',
+      stat: 'Derived from slope, elevation, and terrain data',
+      target: '#rtab-insights, .insight-card', position: 'above', tab: 'insights',
+    },
+    // ── 8: Environment Tab ───────────────────────────────────────────────
+    {
+      icon: '🌿',
+      title: 'Environment',
+      body: 'The Environment tab shows climate and ecological context for this location — temperature ranges, precipitation patterns, and environmental risk factors. These affect decisions around drainage design, material selection, landscaping, and long-term land management.',
+      stat: 'Climate data from global models',
+      target: '#rtab-environment, .env-grid', position: 'above', tab: 'environment',
+    },
+    // ── 9: Agriculture Tab ───────────────────────────────────────────────
+    {
+      icon: '🌾',
+      title: 'Agriculture',
+      body: 'The Agriculture tab rates this land for farming by evaluating slope (flat land irrigates best), elevation (affects frost and growing season), and regional climate. It suggests suitable crop types and irrigation needs. Even if you\'re not farming, this tells you about soil drainage and land productivity.',
+      stat: 'Based on slope, elevation, and regional climate',
+      target: '#rtab-agriculture, .ag-grid', position: 'above', tab: 'agriculture',
+    },
+    // ── 10: Maps Tab ─────────────────────────────────────────────────────
+    {
+      icon: '🗺️',
+      title: 'Maps — Slope & Contour',
+      body: 'Two visual maps of the survey area. The slope heatmap colors the land by steepness — green is flat, yellow is moderate, red is steep. The contour map draws lines at equal elevations (like a topographic map). Closely spaced lines = steep. Wide spacing = gentle. These are the same tools professional surveyors use.',
+      stat: 'Generated from the full elevation grid',
+      target: '#rtab-maps, .map-img-wrap', position: 'above', tab: 'maps',
+    },
+    // ── 11: 3D Tab ───────────────────────────────────────────────────────
+    {
+      icon: '🌐',
+      title: '3D Terrain Model',
+      body: 'The 3D tab renders a three-dimensional mesh of the terrain using the elevation data, draped with a real satellite image. Drag to rotate, scroll to zoom, right-click to pan. This is the same kind of model used in professional GIS software — but generated instantly in your browser.',
+      stat: 'Three.js mesh from DEM + Esri satellite imagery',
+      target: '#tab-3d, .strip-right', position: 'above', tab: '3d',
+    },
+    // ── 12: Overlays ─────────────────────────────────────────────────────
+    {
+      icon: '🔲',
+      title: 'Overlays — Add Data Layers',
+      body: 'Click the Overlays button to add extra data on top of the map. Available layers include: flood zones, earthquake fault lines, slope heatmap, contour lines, soil types, infrastructure, climate zones, and satellite imagery. Layer these over your survey area to see what environmental factors are at play.',
+      stat: '10+ data layers available',
+      target: '#overlays-btn', position: 'below', tab: null,
+    },
+    // ── 13: Finish ───────────────────────────────────────────────────────
+    {
+      icon: '✅',
+      title: 'That\'s the full analysis!',
+      body: 'Now you know what every number means. To survey your own land: click anywhere on the map to drop a pin, adjust the survey area size in ⚙ Settings, then press Survey. You\'ll get all of this — in about 10 seconds, for any location on Earth. Free.',
+      stat: 'No equipment. No site visit. No waiting.',
+      target: null, position: 'center', tab: null,
+    },
+  ];
+}
+
+let _demoTutStep = 0;
+let _demoTutSteps = [];
+let _inDemoTut = false;
+
+function startDemoTour(){
+  _demoTutSteps = _getDemoTourSteps();
+  _demoTutStep = 0;
+  _inDemoTut = true;
+  document.getElementById('tutorial-ov').classList.add('active');
+  renderDemoTutStep();
+}
+
+function demoTutNext(){
+  _demoTutStep++;
+  if(_demoTutStep >= _demoTutSteps.length){ closeDemoTour(); return; }
+  renderDemoTutStep();
+}
+
+function demoTutPrev(){
+  if(_demoTutStep > 0){ _demoTutStep--; renderDemoTutStep(); }
+}
+
+function closeDemoTour(){
+  _inDemoTut = false;
+  document.getElementById('tutorial-ov').classList.remove('active');
+}
+
+function renderDemoTutStep(){
+  const s = _demoTutSteps[_demoTutStep];
+  const card = document.getElementById('tut-card');
+  const spotlight = document.getElementById('tut-spotlight');
+
+  // Switch tab if this step has one
+  if(s.tab) switchRTab(s.tab);
+
+  // Update card content
+  document.getElementById('tut-icon').textContent  = s.icon;
+  document.getElementById('tut-title').textContent = s.title;
+  document.getElementById('tut-body').textContent  = s.body;
+  document.getElementById('tut-stat').textContent  = s.stat;
+
+  const isLast = _demoTutStep === _demoTutSteps.length - 1;
+  const nextBtn = document.getElementById('tut-next-btn');
+  nextBtn.textContent = isLast ? 'Done ✓' : 'Next →';
+  // Wire next button to demo tour (override tutorial's tutNext)
+  nextBtn.onclick = demoTutNext;
+
+  // Step pills — show progress through all steps
+  const pills = document.getElementById('tut-step-pills');
+  pills.innerHTML = _demoTutSteps.map((_,i) =>
+    `<div class="tut-pill${i < _demoTutStep ? ' done' : i === _demoTutStep ? ' done' : ''}"></div>`
+  ).join('');
+
+  // Back button — inject it if not already present
+  let backBtn = document.getElementById('tut-back-btn');
+  if(!backBtn){
+    backBtn = document.createElement('button');
+    backBtn.id = 'tut-back-btn';
+    backBtn.style.cssText = 'background:none;border:1px solid var(--border);border-radius:8px;color:var(--text2);padding:8px 14px;font-size:13px;cursor:pointer;font-family:var(--font-ui);';
+    nextBtn.parentNode.insertBefore(backBtn, nextBtn);
+  }
+  backBtn.textContent = '← Back';
+  backBtn.style.display = _demoTutStep === 0 ? 'none' : 'inline-block';
+  backBtn.onclick = demoTutPrev;
+
+  // Skip / close button wires to closeDemoTour
+  const skipBtn = document.getElementById('tut-skip-btn');
+  if(skipBtn) skipBtn.onclick = closeDemoTour;
+
+  // Step counter label
+  let counter = document.getElementById('tut-counter');
+  if(!counter){
+    counter = document.createElement('div');
+    counter.id = 'tut-counter';
+    counter.style.cssText = 'font-size:11px;color:var(--text3);text-align:center;margin-top:6px;font-family:var(--font-ui);';
+    card.appendChild(counter);
+  }
+  counter.textContent = `Step ${_demoTutStep + 1} of ${_demoTutSteps.length}`;
+
+  // Spotlight positioning — same logic as renderTutStep()
+  const tryTargets = s.target ? s.target.split(', ') : [];
+  let target = null;
+  for(const sel of tryTargets){
+    const el = document.querySelector(sel.trim());
+    if(el){ target = el; break; }
+  }
+
+  if(target && s.position !== 'center'){
+    const r = target.getBoundingClientRect();
+    const pad = 12;
+    spotlight.style.boxShadow   = '0 0 0 9999px rgba(0,0,0,.75)';
+    spotlight.style.position    = 'fixed';
+    spotlight.style.left        = (r.left - pad) + 'px';
+    spotlight.style.top         = (r.top - pad) + 'px';
+    spotlight.style.width       = (r.width + pad*2) + 'px';
+    spotlight.style.height      = (r.height + pad*2) + 'px';
+    spotlight.style.borderRadius = '10px';
+    let cx = r.left, cy = r.bottom + 20;
+    if(s.position === 'above') cy = r.top - (card.offsetHeight || 280) - 20;
+    if(s.position === 'left')  { cx = r.left - 320; cy = r.top; }
+    cx = Math.max(12, Math.min(cx, window.innerWidth  - 320));
+    cy = Math.max(12, Math.min(cy, window.innerHeight - 320));
+    card.style.left      = cx + 'px';
+    card.style.top       = cy + 'px';
+    card.style.transform = '';
+  } else {
+    spotlight.style.boxShadow = '0 0 0 9999px rgba(0,0,0,.65)';
+    spotlight.style.left = '50%'; spotlight.style.top = '50%';
+    spotlight.style.width = '0';  spotlight.style.height = '0';
+    card.style.left      = '50%';
+    card.style.top       = '50%';
+    card.style.transform = 'translate(-50%,-50%)';
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+
 const TUT_STEPS = [
   {
     icon:'&#127758;', title:'No equipment. No site visit. Free.',
