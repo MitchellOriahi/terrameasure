@@ -902,6 +902,8 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
 /* Mobile settings tabs — hidden on desktop */
 .mob-settings-tabs { display: none; }
 .mob-stab { display: none; }
+/* Mobile collapse button — hidden on desktop */
+.mob-collapse-btn { display: none; }
 
 /* ===================================================================
    MOBILE LAYOUT  (max-width: 768px)
@@ -988,12 +990,44 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
     top: 8px;
   }
 
-  /* ── BOTTOM STRIP: taller, full-width stacked panels ── */
+  /* ── BOTTOM STRIP: collapsed by default — only tab bar visible ──
+     The map fills the screen. Tapping any tab expands the panel.
+     mob-expanded class is toggled by switchRTab on mobile. */
   .bottom-strip {
-    height: 48vh;
-    min-height: 200px;
-    max-height: 70vh;
+    height: 52px;        /* just the tab header */
+    min-height: 52px;
+    max-height: 52px;
     border-radius: 16px 16px 0 0;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+  }
+  /* Expanded state — triggered when user taps a tab */
+  .bottom-strip.mob-expanded {
+    height: 50vh;
+    min-height: 50vh;
+    max-height: 50vh;
+  }
+  /* Collapse button inside tab bar — shown only on mobile */
+  .mob-collapse-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px; height: 28px;
+    margin-left: auto;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--text3);
+    font-size: 12px;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .mob-collapse-btn:active { background: var(--surface3); color: var(--text); }
+  /* Tutorial card: adjust for collapsed strip */
+  .tut-card {
+    bottom: 68px !important;
   }
 
   /* Stack analysis (left) and 3D (right) vertically on mobile */
@@ -1607,6 +1641,8 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
             <button class="bp-tab" id="tab-history" onclick="switchRTab('history',this)">History</button>
             <button class="bp-tab" id="tab-3d" onclick="switchRTab('3d',this)">3D ▲</button>
           </div>
+          <!-- Collapse button — only visible on mobile, hidden on desktop via CSS -->
+          <button class="mob-collapse-btn" id="mob-collapse-btn" onclick="collapseMobileStrip()" title="Collapse panel">↓</button>
         </div>
 
         <!-- Placeholder before first survey -->
@@ -2574,6 +2610,8 @@ function showResults(d){
   document.getElementById("pre-survey").style.display="none";
   document.getElementById("survey-results").style.display="flex";
   document.getElementById("dl-row").style.display="flex";
+  // On mobile, auto-expand the strip so results are visible without tapping a tab
+  expandMobileStrip();
   renderSourceBar(d);
   renderScoreSection(d);
   renderMetrics(d);
@@ -4065,14 +4103,26 @@ document.addEventListener('click', (e) => {
   }
 });
 
-/* ── MOBILE: patch switchRTab to show/hide 3D panel on mobile ── */
-// We wait for DOMContentLoaded so switchRTab is fully defined before we wrap it.
+/* ── MOBILE: collapse/expand strip ── */
+function collapseMobileStrip() {
+  const strip = document.querySelector('.bottom-strip');
+  if(strip) strip.classList.remove('mob-expanded');
+}
+function expandMobileStrip() {
+  if(window.innerWidth > 768) return;
+  const strip = document.querySelector('.bottom-strip');
+  if(strip) strip.classList.add('mob-expanded');
+}
+
+/* ── MOBILE: patch switchRTab to expand strip + show/hide 3D panel ── */
 document.addEventListener('DOMContentLoaded', () => {
   const originalSwitch = window.switchRTab;
   if(originalSwitch) {
     window.switchRTab = function(tab, btn) {
       originalSwitch(tab, btn);
       if(window.innerWidth <= 768) {
+        // Expand the strip whenever any tab is tapped
+        expandMobileStrip();
         const left = document.querySelector('.strip-left');
         const right = document.querySelector('.strip-right');
         if(tab === '3d') {
