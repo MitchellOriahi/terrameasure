@@ -870,6 +870,279 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
 }
 .setting-btn-save:hover{opacity:.88;}
 .setting-btn-save:active{transform:scale(.97);}
+/* ===================================================================
+   MOBILE ELEMENTS BASE STYLES — hidden on desktop, shown on mobile
+   =================================================================== */
+/* Hamburger button — hidden on desktop */
+.mob-ham {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px; height: 36px;
+  padding: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.mob-ham span {
+  display: block; width: 100%; height: 2px;
+  background: var(--text2); border-radius: 1px;
+  transition: background 0.15s;
+}
+/* Mobile drawer — hidden on desktop */
+.mob-drawer { display: none; }
+/* Mobile drawer inner elements — hidden on desktop */
+.mob-drawer-inner { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.mob-section-label { display: none; }
+.mob-draw-row { display: none; }
+.mob-dt { display: none; }
+/* Mobile settings tabs — hidden on desktop */
+.mob-settings-tabs { display: none; }
+.mob-stab { display: none; }
+
+/* ===================================================================
+   MOBILE LAYOUT  (max-width: 768px)
+   All rules here are mobile-only. Desktop layout is unchanged.
+   =================================================================== */
+
+@media (max-width: 768px) {
+  /* ── TOPBAR: hide all non-essential elements ── */
+  .draw-ribbon,
+  .search-wrap,
+  #coord-top,
+  .live-badge,
+  #live-clock,
+  .t-link,
+  .logo .sub,
+  #demo-btn,
+  .t-sep { display: none !important; }
+
+  /* Topbar: compact layout */
+  .topbar {
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  /* Make Survey button more prominent on mobile */
+  #run-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  /* Show hamburger on mobile */
+  .mob-ham {
+    display: flex;
+  }
+  .mob-ham.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+  .mob-ham.open span:nth-child(2) { opacity: 0; }
+  .mob-ham.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+  /* Show mobile drawer on mobile */
+  .mob-drawer {
+    display: block;
+    position: absolute;
+    top: 52px; left: 0; right: 0;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border2);
+    z-index: 1900;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .mob-drawer.open { max-height: 70vh; overflow-y: auto; }
+
+  /* Show drawer inner elements */
+  .mob-section-label {
+    display: block;
+    font-size: 9px; font-weight: 700; letter-spacing: 1px;
+    color: var(--text3); padding: 4px 0 2px;
+    border-bottom: 1px solid var(--border);
+  }
+  .mob-draw-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .mob-dt {
+    display: flex; align-items: center; gap: 5px;
+    padding: 9px 14px; font-size: 13px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text2);
+    cursor: pointer; text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+    min-height: 44px;
+  }
+  .mob-dt:active { background: var(--surface3); color: var(--text); }
+
+  /* ── OVERLAYS PANEL: full width, anchored top ── */
+  .overlays-panel {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: 55vh;
+    top: 8px;
+  }
+
+  /* ── BOTTOM STRIP: taller, full-width stacked panels ── */
+  .bottom-strip {
+    height: 48vh;
+    min-height: 200px;
+    max-height: 70vh;
+    border-radius: 16px 16px 0 0;
+  }
+
+  /* Stack analysis (left) and 3D (right) vertically on mobile */
+  .strip-cols { flex-direction: column; }
+
+  /* Full width for the analysis panel */
+  .strip-left {
+    width: 100% !important;
+    min-width: 0 !important;
+    border-right: none;
+    height: 100%;
+    flex-shrink: 0;
+  }
+
+  /* Hide the horizontal resize handle and 3D panel by default on mobile */
+  .h-resize { display: none !important; }
+  .strip-right {
+    display: none;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 280px;
+    flex-shrink: 0;
+  }
+  /* Show 3D panel when the 3D tab is active (via JS class) */
+  .strip-right.mob-visible { display: flex !important; }
+  .strip-left.mob-hidden { display: none !important; }
+
+  /* ── TABS: horizontally scrollable ── */
+  .bp-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+  .bp-tabs::-webkit-scrollbar { display: none; }
+  .bp-tab {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    font-size: 11px;
+    white-space: nowrap;
+    min-height: 36px;
+  }
+
+  /* ── SETTINGS PANEL: full-screen bottom sheet on mobile ── */
+  .settings-overlay { align-items: flex-end; }
+  .settings-panel {
+    width: 100vw !important;
+    max-height: 90vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    overflow-y: auto;
+    flex-direction: column;
+  }
+  /* Settings: hide sidebar on mobile */
+  .settings-sidebar { display: none !important; }
+  .settings-content { padding: 16px !important; }
+
+  /* Show mobile settings tabs on mobile */
+  .mob-settings-tabs {
+    display: flex;
+    overflow-x: auto;
+    gap: 4px;
+    padding: 12px 16px 8px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .mob-settings-tabs::-webkit-scrollbar { display: none; }
+  .mob-stab {
+    display: flex;
+    flex-shrink: 0;
+    padding: 6px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    color: var(--text2);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    min-height: 36px;
+    align-items: center;
+  }
+  .mob-stab.active {
+    background: var(--accentDim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── SCAN / LOADING OVERLAY: full screen ── */
+  .scan-overlay {
+    position: fixed;
+    z-index: 9999;
+  }
+
+  /* ── TUTORIAL CARD: always centered on mobile ── */
+  .tut-card {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100vw - 32px) !important;
+    max-width: 340px;
+    top: auto !important;
+    bottom: calc(48vh + 16px) !important;
+  }
+
+  /* ── TOAST NOTIFICATIONS: centered on mobile ── */
+  .toast {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100vw - 32px) !important;
+    text-align: center;
+  }
+
+  /* ── REPORT MODAL: full screen ── */
+  .report-modal .report-box {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    padding: 20px 16px !important;
+    overflow-y: auto;
+  }
+  .report-box .rp-2col {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── MAP AREA: ensure map fills available space ── */
+  .map-area { flex: 1; min-height: 0; }
+
+  /* ── FONT SIZE: boost to readable minimum for interactive elements ── */
+  .ol-name { font-size: 13px; }
+  .ol-chk, .ol-radio { width: 20px; height: 20px; }
+
+  /* ── DRAW HINT: adjust for mobile ── */
+  .draw-hint {
+    width: calc(100% - 32px);
+    text-align: center;
+    font-size: 13px;
+  }
+
+  /* ── USER CHIP: compact on mobile ── */
+  .user-chip { padding: 4px 8px; }
+  .uc-name { display: none; }
+
+  /* ── OVERLAYS TOGGLE: keep as-is (button is fine on mobile) ── */
+
+  /* Increase tap targets for all interactive elements */
+  .ol-item { min-height: 44px; }
+}
 </style>
 </head>
 <body>
@@ -1053,7 +1326,50 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
     <button id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark mode"
       style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 6px;line-height:1;flex-shrink:0;">☀️</button>
 
+    <!-- MOBILE: hamburger menu button — hidden on desktop via CSS -->
+    <button class="mob-ham" id="mob-ham" onclick="toggleMobileDrawer()" title="Menu" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </button>
+
   </div><!-- /topbar -->
+
+  <!-- MOBILE DRAWER — slides down from topbar on small screens, hidden on desktop -->
+  <div class="mob-drawer" id="mob-drawer">
+    <div class="mob-drawer-inner">
+      <!-- Draw tools row -->
+      <div class="mob-section-label">DRAW TOOLS</div>
+      <div class="mob-draw-row">
+        <button class="mob-dt" onclick="setDrawMode('click');closeMobileDrawer()" title="Pin point">📍 Point</button>
+        <button class="mob-dt" onclick="setDrawMode('rectangle');closeMobileDrawer()" title="Rectangle">▭ Rect</button>
+        <button class="mob-dt" onclick="setDrawMode('polygon');closeMobileDrawer()" title="Polygon">⬡ Poly</button>
+        <button class="mob-dt" onclick="setDrawMode('measure');closeMobileDrawer()" title="Distance">📏 Distance</button>
+        <button class="mob-dt" onclick="clearDrawing();closeMobileDrawer()" title="Clear">✕ Clear</button>
+      </div>
+      <!-- Quick actions row -->
+      <div class="mob-section-label">QUICK ACTIONS</div>
+      <div class="mob-draw-row">
+        <button class="mob-dt" onclick="document.getElementById('overlays-btn').click();closeMobileDrawer()">⊞ Overlays</button>
+        <button class="mob-dt" onclick="openSettings();closeMobileDrawer()">⚙ Settings</button>
+        <button class="mob-dt" onclick="runQuickDemo();closeMobileDrawer()">⚡ Demo</button>
+      </div>
+      <!-- Search -->
+      <div class="mob-section-label">SEARCH LOCATION</div>
+      <div style="padding:0 4px;">
+        <input type="text" id="mob-search-input" placeholder="Search place or address…"
+          style="width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-pill);color:var(--text);font-size:14px;outline:none;"
+          oninput="handleSearchInput(this.value)"
+          onkeydown="if(event.key==='Enter')handleSearchInput(this.value)"/>
+        <div id="mob-search-results" style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);margin-top:4px;display:none;max-height:160px;overflow-y:auto;"></div>
+      </div>
+      <!-- Nav links -->
+      <div class="mob-section-label">NAVIGATE</div>
+      <div class="mob-draw-row">
+        <a class="mob-dt" href="index.html">🏠 Home</a>
+        <a class="mob-dt" href="terraphoto.html">📷 TerraPhoto</a>
+        <a class="mob-dt" href="terranews.html">📡 TerraIntel</a>
+      </div>
+    </div>
+  </div>
 
   <!-- ── MAP AREA ── -->
   <div class="map-area" id="map-area">
@@ -1696,6 +2012,75 @@ function calcBearing(lat1,lon1,lat2,lon2){
 // openSettings() and closeSettings() are defined later in the Settings JS block below.
 // Stub here so any early calls don't throw before the full definitions load.
 function toggleSettingsPopover(){ openSettings(); } // legacy alias
+
+/* ── MOBILE DRAWER ── */
+function toggleMobileDrawer() {
+  const drawer = document.getElementById('mob-drawer');
+  const ham = document.getElementById('mob-ham');
+  const isOpen = drawer.classList.toggle('open');
+  ham.classList.toggle('open', isOpen);
+  // Close overlays panel if open, to avoid stacking
+  if(isOpen) {
+    const op = document.getElementById('overlays-panel');
+    if(op && op.classList.contains('open')) {
+      op.classList.remove('open');
+      document.getElementById('overlays-btn')?.classList.remove('active');
+    }
+  }
+}
+function closeMobileDrawer() {
+  document.getElementById('mob-drawer')?.classList.remove('open');
+  document.getElementById('mob-ham')?.classList.remove('open');
+}
+
+/* ── MOBILE SEARCH WRAPPER ── */
+// The mobile drawer has its own search input. This wrapper calls doSearch
+// and also mirrors results into #mob-search-results for mobile users.
+let _mobSearchTmo;
+function handleSearchInput(q) {
+  clearTimeout(_mobSearchTmo);
+  const mobBox = document.getElementById('mob-search-results');
+  if(!q || q.length < 3) { if(mobBox) mobBox.style.display = 'none'; return; }
+  _mobSearchTmo = setTimeout(async () => {
+    try {
+      const coordMatch = q.trim().match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
+      if(coordMatch) {
+        const _lat = parseFloat(coordMatch[1]), _lon = parseFloat(coordMatch[2]);
+        if(_lat >= -90 && _lat <= 90 && _lon >= -180 && _lon <= 180) {
+          if(mobBox) mobBox.style.display = 'none';
+          map.setView([_lat, _lon], 14); clearDrawing();
+          selectedLat = _lat; selectedLon = _lon;
+          placeMarker(); enableRun('Survey Area');
+          closeMobileDrawer();
+          toast('Jumped to coordinates', 'success');
+          return;
+        }
+      }
+      const data = await (await fetch(`${API}/geocode?q=${encodeURIComponent(q)}`)).json();
+      if(!mobBox) return;
+      mobBox.innerHTML = '';
+      if(!data.length) {
+        mobBox.innerHTML = '<div style="padding:10px 14px;color:var(--text3);font-size:12px;">No results</div>';
+      } else {
+        data.slice(0, 6).forEach(p => {
+          const d = document.createElement('div');
+          d.style.cssText = 'padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);color:var(--text2);font-size:13px;';
+          d.textContent = p.display_name;
+          d.onclick = () => {
+            const _lat = parseFloat(p.lat), _lon = parseFloat(p.lon);
+            map.setView([_lat, _lon], 14); clearDrawing();
+            selectedLat = _lat; selectedLon = _lon;
+            placeMarker(); enableRun('Survey Area');
+            mobBox.style.display = 'none';
+            closeMobileDrawer();
+          };
+          mobBox.appendChild(d);
+        });
+      }
+      mobBox.style.display = 'block';
+    } catch(e) { if(mobBox) mobBox.style.display = 'none'; }
+  }, 350);
+}
 
 /* ── THEME TOGGLE (topbar button — instant, no save required) ── */
 function toggleTheme(){
@@ -3468,6 +3853,12 @@ function switchSettingsTab(section, btn) {
   document.querySelectorAll('.snav-item').forEach(b=>b.classList.remove('active'));
   document.getElementById('stab-'+section)?.classList.add('active');
   if(btn) btn.classList.add('active');
+  // Sync mobile settings tabs active state
+  document.querySelectorAll('.mob-stab').forEach(b=>b.classList.remove('active'));
+  // Find the mob-stab whose onclick matches this section
+  document.querySelectorAll('.mob-stab').forEach(b=>{
+    if(b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'"+section+"'")) b.classList.add('active');
+  });
 }
 function applyThemeSetting(theme, btn) {
   document.querySelectorAll('.theme-opt').forEach(b=>b.classList.remove('active'));
@@ -3660,6 +4051,39 @@ function renderTutStep(){
     setTimeout(()=>{ if(!document.getElementById('settings-overlay')?.classList.contains('open')) startTutorial(); }, 1200);
   }
 })();
+
+/* ── MOBILE: close drawer when tapping outside ── */
+document.addEventListener('click', (e) => {
+  const drawer = document.getElementById('mob-drawer');
+  const ham = document.getElementById('mob-ham');
+  if(drawer?.classList.contains('open') &&
+     !drawer.contains(e.target) &&
+     !ham?.contains(e.target)) {
+    closeMobileDrawer();
+  }
+});
+
+/* ── MOBILE: patch switchRTab to show/hide 3D panel on mobile ── */
+// We wait for DOMContentLoaded so switchRTab is fully defined before we wrap it.
+document.addEventListener('DOMContentLoaded', () => {
+  const originalSwitch = window.switchRTab;
+  if(originalSwitch) {
+    window.switchRTab = function(tab, btn) {
+      originalSwitch(tab, btn);
+      if(window.innerWidth <= 768) {
+        const left = document.querySelector('.strip-left');
+        const right = document.querySelector('.strip-right');
+        if(tab === '3d') {
+          left?.classList.add('mob-hidden');
+          right?.classList.add('mob-visible');
+        } else {
+          left?.classList.remove('mob-hidden');
+          right?.classList.remove('mob-visible');
+        }
+      }
+    };
+  }
+});
 </script>
 
 <!-- ================================================================
@@ -3773,6 +4197,15 @@ document.getElementById("exag").addEventListener("input",function(){
         </button>
       </nav>
       <button class="settings-close-btn" onclick="closeSettings()">✕ Close</button>
+    </div>
+    <!-- MOBILE SETTINGS TABS — shown only on mobile since sidebar is hidden -->
+    <div class="mob-settings-tabs" id="mob-settings-tabs">
+      <button class="mob-stab active" onclick="switchSettingsTab('appearance',this)">Appearance</button>
+      <button class="mob-stab" onclick="switchSettingsTab('survey',this)">Survey</button>
+      <button class="mob-stab" onclick="switchSettingsTab('map',this)">Map</button>
+      <button class="mob-stab" onclick="switchSettingsTab('account',this)">Account</button>
+      <button class="mob-stab" onclick="switchSettingsTab('data',this)">Data</button>
+      <button class="mob-stab" onclick="switchSettingsTab('about',this)">About</button>
     </div>
     <div class="settings-content">
       <!-- APPEARANCE -->
