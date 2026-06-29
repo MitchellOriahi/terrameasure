@@ -904,6 +904,21 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
 .mob-stab { display: none; }
 /* Mobile collapse button — hidden on desktop */
 .mob-collapse-btn { display: none; }
+/* Mobile topbar right-edge fade — hidden on desktop, shown on mobile */
+.mob-topbar-fade {
+  display: none;
+  position: sticky;   /* stays at the right edge of the scrollable topbar */
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  min-width: 40px;
+  height: 52px;
+  background: linear-gradient(to right, transparent, rgba(9,9,11,0.95));
+  pointer-events: none;  /* clicks pass through to content underneath */
+  flex-shrink: 0;
+  z-index: 1;
+}
 
 /* ===================================================================
    MOBILE LAYOUT  (max-width: 768px)
@@ -911,36 +926,58 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
    =================================================================== */
 
 @media (max-width: 768px) {
-  /* ── TOPBAR: hide all non-essential elements ── */
-  .draw-ribbon,
-  .search-wrap,
+  /* ── TOPBAR: horizontally scrollable — swipe to reveal all tools ── */
+  /* Still hide things that are pure desktop info noise */
   #coord-top,
   .live-badge,
   #live-clock,
   .t-link,
   .logo .sub,
-  #demo-btn,
-  .t-sep { display: none !important; }
+  #units-btn,
+  #res-sel,
+  #area-sel { display: none !important; }
 
-  /* Topbar: compact layout */
+  /* Topbar scrolls side to side — all tools are reachable by swiping */
   .topbar {
-    padding: 0 10px;
-    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;        /* Firefox */
+    padding: 0 8px;
+    gap: 0;
+    /* Don't let the topbar wrap */
+    flex-wrap: nowrap;
   }
+  .topbar::-webkit-scrollbar { display: none; }  /* Chrome/Safari */
 
-  /* Make Survey button more prominent on mobile */
-  #run-btn {
-    padding: 8px 16px;
-    font-size: 13px;
-  }
+  /* Every item in the topbar must not shrink — let scroll handle overflow */
+  .logo, .draw-ribbon, .overlays-toggle, .search-wrap,
+  .settings-wrap, #run-btn, #demo-btn, #theme-btn,
+  .user-chip, .t-sep, .t-spacer, .res-lbl,
+  .mob-ham { flex-shrink: 0 !important; }
 
-  /* Show hamburger on mobile */
-  .mob-ham {
-    display: flex;
-  }
+  /* Separators: keep visible for visual grouping between sections */
+  .t-sep { display: flex !important; }
+
+  /* Survey button: readable size */
+  #run-btn { padding: 8px 16px; font-size: 13px; }
+
+  /* Search: narrower on mobile so it fits better */
+  .search-wrap { width: 160px !important; }
+
+  /* Draw ribbon buttons: slightly more tappable */
+  .dt { padding: 5px 10px; min-height: 36px; }
+
+  /* Hamburger: still available for the mobile drawer (nav links, etc.) */
+  .mob-ham { display: flex; }
   .mob-ham.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
   .mob-ham.open span:nth-child(2) { opacity: 0; }
   .mob-ham.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+  /* Fade gradient on the right edge — hints there's more to scroll */
+  .mob-topbar-fade {
+    display: block !important;
+  }
 
   /* Show mobile drawer on mobile */
   .mob-drawer {
@@ -1282,8 +1319,16 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
     </div>
     <div class="t-sep"></div>
 
-    <!-- Draw tool ribbon (like MS Paint / Word toolbar) -->
-    <div class="draw-ribbon">
+    <!-- Draw tools — collapsed by default, expanded via toggle button -->
+    <!-- Toggle button shown when ribbon is collapsed -->
+    <button id="draw-toggle-btn" onclick="toggleDrawRibbon()"
+      title="Open draw tools — point, polygon, rectangle, measure"
+      style="display:flex;align-items:center;gap:5px;padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-pill);color:var(--text2);cursor:pointer;font-size:10px;font-family:var(--font-ui);white-space:nowrap;flex-shrink:0;">
+      &#9998; Draw Tools
+    </button>
+
+    <!-- The actual draw tool ribbon — hidden by default -->
+    <div class="draw-ribbon" id="draw-ribbon-wrap" style="display:none;">
       <button class="dt active" id="dt-click" title="Click to survey" onclick="setDrawMode('click')">
         <span class="dt-icon">⊕</span><span class="dt-lbl">Point</span>
       </button>
@@ -1302,11 +1347,14 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
       <button class="dt" id="dt-clear" title="Clear drawing" onclick="clearDrawing()">
         <span class="dt-icon">✕</span><span class="dt-lbl">Clear</span>
       </button>
+      <!-- Collapse arrow button -->
+      <button onclick="toggleDrawRibbon()" title="Collapse draw tools"
+        style="background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:2px 4px;margin-left:2px;">&#10094;</button>
     </div>
     <div class="t-sep"></div>
 
     <!-- Overlays floating panel toggle -->
-    <button class="overlays-toggle active" id="overlays-btn" onclick="toggleOverlaysPanel()">⊞ Overlays</button>
+    <button class="overlays-toggle" id="overlays-btn" onclick="toggleOverlaysPanel()">⊞ Overlays</button>
     <div class="t-sep"></div>
 
     <!-- Location search -->
@@ -1337,17 +1385,26 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
     <button id="units-btn" style="display:none" onclick="toggleUnits()">FT</button>
 
     <!-- Quick demo button — auto-surveys a famous location for demos -->
-    <button id="demo-btn" onclick="runQuickDemo()" title="Auto-survey Grand Canyon for demo" style="margin-left:6px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:#f59e0b;padding:5px 10px;border-radius:6px;font-size:11px;font-family:var(--font-ui);cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;">⚡ Demo</button>
+    <button id="demo-btn" onclick="runQuickDemo()"
+      title="Auto-surveys the Grand Canyon with real data — see the app in action in 10 seconds"
+      style="margin-left:6px;background:var(--accentDim);border:1px solid rgba(37,99,235,.5);color:var(--cyan);padding:5px 14px;border-radius:6px;font-size:11px;font-family:var(--font-ui);cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;font-weight:600;">&#9889; See It in Action</button>
 
-    <!-- Survey run button -->
-    <button id="run-btn" disabled style="margin-left:6px;">▶ Survey</button>
+    <!-- Survey run button — disabled until user picks a location on the map -->
+    <button id="run-btn" disabled
+      title="First, click anywhere on the map to pick your survey location"
+      style="margin-left:6px;">&#9654; Survey</button>
+    <!-- Visible "pick a spot first" nudge — shown next to the disabled button -->
+    <span id="run-nudge" style="
+      font-size:11px;color:var(--text3);white-space:nowrap;margin-left:5px;flex-shrink:0;
+      display:inline-flex;align-items:center;gap:3px;
+    ">&#8593; pick a spot first</span>
 
     <div class="t-spacer"></div>
 
     <!-- Live badge + clock + coords -->
-    <div class="live-badge">
-      <div class="live-dot"></div>
-      <span class="live-lbl">LIVE</span>
+    <div class="live-badge" id="live-badge-wrap">
+      <div class="live-dot" id="live-dot" style="animation:none;background:var(--text3);box-shadow:none;"></div>
+      <span class="live-lbl" id="live-lbl" style="color:var(--text3);">READY</span>
     </div>
     <span id="live-clock" style="margin-left:6px;">—</span>
     <div class="t-sep"></div>
@@ -1357,6 +1414,13 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
     <a href="terranews.html" class="t-link">TerraIntel</a>
     <a href="index.html" class="t-link" style="margin-left:3px;">Home</a>
     <div class="t-sep"></div>
+    <!-- Help / replay intro — clearly labeled so users can find it when confused -->
+    <button onclick="localStorage.removeItem('terrascan_tutorial_done');localStorage.removeItem('terrascan_welcome_seen');showWelcomeModal();" title="Replay the intro" style="
+      background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+      cursor:pointer;font-size:11px;padding:4px 10px;flex-shrink:0;
+      color:var(--text2);font-family:var(--font-ui);display:flex;align-items:center;gap:4px;
+    ">? Help</button>
+
     <!-- Theme toggle — instant, no save required -->
     <button id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark mode"
       style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 6px;line-height:1;flex-shrink:0;">☀️</button>
@@ -1366,7 +1430,33 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
       <span></span><span></span><span></span>
     </button>
 
+    <!-- MOBILE: right-edge fade hint — hidden on desktop, shows gradient to signal scroll -->
+    <div class="mob-topbar-fade" id="mob-topbar-fade"></div>
+
   </div><!-- /topbar -->
+
+  <!-- Persistent hint bar — shown until first survey runs, dismissable with X -->
+  <!-- Only shown if not yet dismissed (checked via JS on load) -->
+  <div id="hint-bar" style="
+    display:none;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    height:36px;
+    min-height:36px;
+    flex-shrink:0;
+    background:rgba(37,99,235,.08);
+    border-bottom:1px solid rgba(37,99,235,.25);
+    padding:0 16px;
+    font-size:12px;
+    color:rgba(250,250,250,.7);
+    position:relative;
+    z-index:1999;
+  ">
+    <span>&#128070; Click anywhere on the map to pick your survey location, then press &#9654; Survey</span>
+    <button onclick="dismissHintBar()" title="Dismiss"
+      style="background:none;border:none;color:rgba(250,250,250,.4);cursor:pointer;font-size:14px;line-height:1;padding:0 4px;flex-shrink:0;">&#10005;</button>
+  </div>
 
   <!-- MOBILE DRAWER — slides down from topbar on small screens, hidden on desktop -->
   <div class="mob-drawer" id="mob-drawer">
@@ -1409,10 +1499,34 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
   <!-- ── MAP AREA ── -->
   <div class="map-area" id="map-area">
     <div id="map"></div>
+
+    <!-- First-visit hint strip — fades out when user clicks the map or runs a survey -->
+    <div id="map-hint-strip" style="
+      position:absolute;
+      bottom:20px;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:800;
+      background:rgba(9,9,11,0.88);
+      border:1px solid rgba(37,99,235,0.45);
+      border-radius:999px;
+      padding:10px 24px;
+      font-size:13px;
+      color:rgba(250,250,250,0.92);
+      white-space:nowrap;
+      pointer-events:none;
+      backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);
+      transition:opacity 0.4s ease;
+      letter-spacing:0.1px;
+    ">
+      Click anywhere on the map to start &mdash; no equipment needed
+    </div>
+
     <div class="draw-hint" id="draw-hint">Click to add points — double-click to finish</div>
 
     <!-- Floating overlays panel — starts open, sits on top of map -->
-    <div class="overlays-panel open" id="overlays-panel">
+    <div class="overlays-panel" id="overlays-panel">
       <div class="op-hdr">
         <span class="op-hdr-title">OVERLAYS</span>
         <button class="op-hdr-close" onclick="toggleOverlaysPanel()">✕</button>
@@ -1647,9 +1761,15 @@ body.light .op-hdr-close:hover{background:rgba(0,0,0,.13);}
 
         <!-- Placeholder before first survey -->
         <div class="pre-survey" id="pre-survey">
-          <div class="ps-icon">◈</div>
-          <div class="ps-title">Ready to Survey</div>
-          <div class="ps-body">Click the map or draw a shape,<br>then press <strong>▶ Survey</strong>.</div>
+          <div class="ps-icon">&#9672;</div>
+          <div class="ps-title">Survey any land on Earth</div>
+          <div class="ps-body" style="font-size:13px;color:rgba(250,250,250,.62);line-height:1.8;">
+            No equipment needed &mdash; we read satellite data for you.
+            <br><br>
+            <span style="color:rgba(250,250,250,.88);font-weight:600;">1.</span> Click anywhere on the map<br>
+            <span style="color:rgba(250,250,250,.88);font-weight:600;">2.</span> Press <strong>&#9654; Survey</strong><br>
+            <span style="color:rgba(250,250,250,.88);font-weight:600;">3.</span> Read your results below
+          </div>
         </div>
 
         <!-- Populated after survey -->
@@ -1901,6 +2021,9 @@ map.on("click",e=>{
   if(currentDrawMode!=='click') return;
   selectedLat=e.latlng.lat; selectedLon=e.latlng.lng;
   placeMarker(); enableRun("Survey Area");
+  // Dismiss the floating hint strip on first click
+  const hint=document.getElementById('map-hint-strip');
+  if(hint){hint.style.opacity='0';setTimeout(()=>{if(hint.parentNode)hint.parentNode.removeChild(hint);},500);}
 });
 
 function placeMarker(){
@@ -1920,7 +2043,11 @@ function drawSurveyRect(){
 function enableRun(label){
   const btn=document.getElementById("run-btn");
   btn.disabled=false;
-  btn.innerHTML='▶ '+(label||"Survey");
+  btn.innerHTML='&#9654; '+(label||"Survey");
+  btn.removeAttribute('title');
+  // Hide the "pick a spot first" nudge once a location is chosen
+  const nudge=document.getElementById('run-nudge');
+  if(nudge) nudge.style.display='none';
 }
 
 /* ── DRAW TOOLS ── */
@@ -2453,7 +2580,27 @@ function buildabilityCanvas(d){
 
 /* ── LOADING ANIMATION ── */
 
+/* ── LIVE BADGE HELPER ── */
+function setLiveBadge(state){
+  const lbl=document.getElementById('live-lbl');
+  const dot=document.getElementById('live-dot');
+  if(!lbl||!dot) return;
+  if(state==='LIVE'){
+    // Restore CSS class defaults (pulse animation, green)
+    dot.style.cssText='';
+    lbl.style.color='';
+  } else {
+    // Muted appearance for READY state
+    dot.style.animation='none';
+    dot.style.background='var(--text3)';
+    dot.style.boxShadow='none';
+    lbl.style.color='var(--text3)';
+  }
+  lbl.textContent=state;
+}
+
 function startScan(){
+  setLiveBadge('LIVE');
   document.getElementById("scan-overlay").classList.add("visible");
 
   // Animate the SVG diamond drawing itself
@@ -2508,6 +2655,7 @@ function startScan(){
   }, 80);
 }
 function completeScan(){
+  setLiveBadge('READY');
   clearInterval(window._scanInterval);
   const fill = document.getElementById('scan-fill');
   if(fill) fill.style.width = '100%';
@@ -2536,6 +2684,11 @@ let _surveyAbort=null;
 document.getElementById("run-btn").addEventListener("click",async()=>{
   const btn=document.getElementById("run-btn");
   btn.disabled=true;
+  // Dismiss the hint bar permanently when first survey runs
+  dismissHintBar();
+  // Also dismiss the floating map hint strip if still visible
+  const _hs=document.getElementById('map-hint-strip');
+  if(_hs){_hs.style.opacity='0';setTimeout(()=>{if(_hs.parentNode)_hs.parentNode.removeChild(_hs);},500);}
   // Cancel any in-flight survey request before starting a new one
   if(_surveyAbort){_surveyAbort.abort();}
   _surveyAbort=new AbortController();
@@ -2566,6 +2719,9 @@ document.getElementById("run-btn").addEventListener("click",async()=>{
     const _score = calcSiteScore(data);
     toast("Survey complete — "+_score+"/100","success");
     document.title = `${_score}/100 · TerraScan`;
+    // Make sure the floating hint pill is gone once results appear
+    const _hintPill=document.getElementById('map-hint-strip');
+    if(_hintPill){_hintPill.style.opacity='0';setTimeout(()=>{if(_hintPill.parentNode)_hintPill.parentNode.removeChild(_hintPill);},400);}
     if(_score >= 75) celebrateSurvey(_score);
     pulseSurveyBoundary();
   }catch(e){
@@ -2727,12 +2883,21 @@ function renderMetrics(d){
   // Convert elevation relief max for bar scaling
   const elRMax=_units==='metric'?300:300*3.28084;
   const volMax=_units==='metric'?5e6:5e6*1.30795;
+  // Plain-English interpretations of the key metrics
+  const slopeNote = sl<5
+    ? 'Essentially flat — ideal for construction and farming'
+    : sl<15 ? 'Gently sloping — manageable for most projects'
+    : sl<25 ? 'Moderately steep — suitable for terracing'
+    : 'Steep terrain — challenging for most development';
+  const buildNote = `${build.toFixed(0)}% of this land has gentle enough slope to build on`;
   document.getElementById("rtab-metrics").innerHTML=`
-    ${mkBar("◉","Buildable Area",build,build.toFixed(0)+"%",100,build>=60?"#22c55e":build>=40?"#2563eb":"#ef4444")}
-    ${mkBar("◢","Avg Slope",Math.min(sl,45),fmt(sl)+"°",45,sl<8?"#22c55e":sl<20?"#2563eb":"#ef4444")}
-    ${mkBar("↕","Elev. Relief",Math.min(_units==='metric'?elR:elR*3.28084,elRMax),uElev(elR),elRMax,"rgba(235,235,245,.6)")}
-    ${mkBar("▲","Cut Volume",Math.min(_units==='metric'?cut:cut*1.30795,volMax),uVol(cut),volMax,"#f59e0b")}
-    ${mkBar("▼","Fill Volume",Math.min(_units==='metric'?fill:fill*1.30795,volMax),uVol(fill),volMax,"#2563eb")}
+    ${mkBar("&#9673;","Buildable Area",build,build.toFixed(0)+"%",100,build>=60?"#22c55e":build>=40?"#2563eb":"#ef4444")}
+    <div style="font-size:11px;color:rgba(250,250,250,.55);padding:2px 10px 8px;font-style:italic;">${buildNote}</div>
+    ${mkBar("&#9698;","Avg Slope",Math.min(sl,45),fmt(sl)+"&deg;",45,sl<8?"#22c55e":sl<20?"#2563eb":"#ef4444")}
+    <div style="font-size:11px;color:rgba(250,250,250,.55);padding:2px 10px 8px;font-style:italic;">${slopeNote}</div>
+    ${mkBar("&#8597;","Elev. Relief",Math.min(_units==='metric'?elR:elR*3.28084,elRMax),uElev(elR),elRMax,"rgba(235,235,245,.6)")}
+    ${mkBar("&#9650;","Cut Volume",Math.min(_units==='metric'?cut:cut*1.30795,volMax),uVol(cut),volMax,"#f59e0b")}
+    ${mkBar("&#9660;","Fill Volume",Math.min(_units==='metric'?fill:fill*1.30795,volMax),uVol(fill),volMax,"#2563eb")}
     <div class="pane-sec">Detail</div>
     <div class="metric-grid">
       <div class="mg-cell"><div class="mg-lbl">Elev Min</div><div class="mg-val">${uElev(d.min_height)}</div><div class="mg-sub">±${uElev(d.vertical_error_m)}</div></div>
@@ -3997,12 +4162,63 @@ if(_currentUser?.settings){
   if(s.defaultArea){_surveySize=parseFloat(s.defaultArea);const as=document.getElementById('area-sel');if(as)as.value=s.defaultArea;}
 }
 
+/* ── WELCOME MODAL ── */
+function showWelcomeModal(){
+  const el=document.getElementById('welcome-modal');
+  if(el) el.style.display='flex';
+}
+function dismissWelcomeModal(launchTour){
+  try{localStorage.setItem('terrascan_welcome_seen','1');}catch(e){}
+  const el=document.getElementById('welcome-modal');
+  if(el){
+    el.style.opacity='0';
+    el.style.transition='opacity 0.3s ease';
+    setTimeout(()=>{el.style.display='none';el.style.opacity='';},320);
+  }
+  // Show the hint bar now that the modal is dismissed
+  showHintBar();
+  if(launchTour){setTimeout(()=>startTutorial(),400);}
+}
+// Show welcome modal on first visit (no terrascan_welcome_seen key)
+(()=>{
+  try{
+    if(!localStorage.getItem('terrascan_welcome_seen')){
+      showWelcomeModal();
+    } else {
+      // Returning user: show hint bar if not dismissed
+      showHintBar();
+    }
+  }catch(e){ showHintBar(); }
+})();
+
+/* ── HINT BAR ── */
+function showHintBar(){
+  try{if(localStorage.getItem('terrameasure_hint_dismissed'))return;}catch(e){}
+  const bar=document.getElementById('hint-bar');
+  if(bar) bar.style.display='flex';
+}
+function dismissHintBar(){
+  try{localStorage.setItem('terrameasure_hint_dismissed','1');}catch(e){}
+  const bar=document.getElementById('hint-bar');
+  if(bar) bar.style.display='none';
+}
+
+/* ── DRAW RIBBON TOGGLE ── */
+function toggleDrawRibbon(){
+  const ribbon=document.getElementById('draw-ribbon-wrap');
+  const toggleBtn=document.getElementById('draw-toggle-btn');
+  if(!ribbon||!toggleBtn) return;
+  const open=ribbon.style.display!=='none';
+  ribbon.style.display=open?'none':'flex';
+  toggleBtn.style.display=open?'flex':'none';
+}
+
 /* ── TUTORIAL OVERLAY FUNCTIONS ── */
 const TUT_STEPS = [
   {
-    icon:'🗺️', title:'Welcome to TerraScan',
-    body:'This is your terrain intelligence dashboard. Everything you need to assess any land on Earth is right here.',
-    stat:'±1m accuracy with USGS 3DEP data',
+    icon:'&#127758;', title:'No equipment. No site visit. Free.',
+    body:'TerraMeasure reads satellite elevation data for any spot on Earth — instantly, from your browser. No drone, no GPS receiver, no physical tools of any kind.',
+    stat:'Works for every location on Earth',
     target:'#map', position:'center',
   },
   {
@@ -4086,8 +4302,9 @@ function renderTutStep(){
   }
 }
 // Launch tutorial for first-time users (after 1.2s so map loads first)
+// Skipped if user has already seen the welcome modal OR the tutorial
 (()=>{
-  if(!localStorage.getItem('terrascan_tutorial_done') && _currentUser){
+  if(!localStorage.getItem('terrascan_tutorial_done') && !localStorage.getItem('terrascan_welcome_seen') && _currentUser){
     setTimeout(()=>{ if(!document.getElementById('settings-overlay')?.classList.contains('open')) startTutorial(); }, 1200);
   }
 })();
@@ -4438,6 +4655,82 @@ document.getElementById("exag").addEventListener("input",function(){
           <button class="setting-btn-save" id="settings-save-btn" onclick="saveAllSettings()">Save Changes</button>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     WELCOME MODAL — shown once to first-time visitors, z-index 9600
+     (higher than tutorial at 9500, so it always wins if both fire)
+     ================================================================ -->
+<div id="welcome-modal" style="
+  display:none;
+  position:fixed;inset:0;z-index:9600;
+  background:rgba(9,9,11,0.94);
+  align-items:center;justify-content:center;
+  padding:20px;
+">
+  <div style="
+    background:#18181b;
+    border:1px solid rgba(63,63,70,.9);
+    border-radius:20px;
+    padding:36px;
+    max-width:480px;
+    width:100%;
+    display:flex;flex-direction:column;gap:24px;
+  ">
+    <!-- Header -->
+    <div style="text-align:center;">
+      <div style="font-size:1.6rem;font-weight:700;color:#fafafa;line-height:1.3;margin-bottom:10px;">
+        Survey land anywhere on Earth &mdash; from where you&rsquo;re sitting right now.
+      </div>
+      <div style="font-size:0.95rem;color:rgba(250,250,250,.6);">
+        No equipment. No site visit. No cost.
+      </div>
+    </div>
+
+    <!-- 3 Step cards -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <!-- Step 1 -->
+      <div style="display:flex;align-items:flex-start;gap:14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.18);border-radius:12px;padding:14px 16px;">
+        <div style="width:40px;height:40px;min-width:40px;background:#2563eb;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0;">1</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#fafafa;margin-bottom:3px;">Click any spot on the map</div>
+          <div style="font-size:12px;color:rgba(250,250,250,.55);">Drop a pin anywhere on Earth. We use satellite data &mdash; no physical tools needed.</div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div style="display:flex;align-items:flex-start;gap:14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.18);border-radius:12px;padding:14px 16px;">
+        <div style="width:40px;height:40px;min-width:40px;background:#2563eb;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0;">2</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#fafafa;margin-bottom:3px;">We fetch the terrain data</div>
+          <div style="font-size:12px;color:rgba(250,250,250,.55);">Government satellite elevation data is pulled automatically, in about 10 seconds.</div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div style="display:flex;align-items:flex-start;gap:14px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.18);border-radius:12px;padding:14px 16px;">
+        <div style="width:40px;height:40px;min-width:40px;background:#2563eb;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0;">3</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#fafafa;margin-bottom:3px;">Read your results</div>
+          <div style="font-size:12px;color:rgba(250,250,250,.55);">Slope, elevation, buildable area, flood risk &mdash; a full land assessment, instantly.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer buttons -->
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <button onclick="dismissWelcomeModal(false)"
+        style="flex:1;padding:12px 20px;background:#2563eb;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font-ui);white-space:nowrap;">
+        Got it, start surveying &rarr;
+      </button>
+      <button onclick="dismissWelcomeModal(true)"
+        style="background:none;border:none;color:rgba(250,250,250,.35);font-size:12px;cursor:pointer;font-family:var(--font-ui);white-space:nowrap;padding:4px;">
+        Take the guided tour instead
+      </button>
     </div>
   </div>
 </div>
