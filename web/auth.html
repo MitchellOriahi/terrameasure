@@ -474,11 +474,39 @@
 
     /* ─── Responsive — on small phones, reduce padding and tighten grid ─── */
     @media (max-width: 480px) {
-      .card { padding: 28px 20px; }
-      .persona-grid { grid-template-columns: repeat(2, 1fr); }
+      /* Persona tiles: 2-column, readable labels */
+      .persona-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
+      .persona-tile { padding: 16px 10px !important; }
+      .persona-icon { font-size: 24px !important; }
+      .persona-label { font-size: 12px !important; line-height: 1.4; }
+
+      /* Goal chips: larger tap targets */
+      .goal-chip { min-height: 40px; font-size: 13px !important; padding: 8px 14px !important; }
+
+      /* Welcome stat cards: single column on very small screens */
+      .welcome-stats { flex-direction: column; align-items: center; }
+      .welcome-stat-card { width: 100%; max-width: 220px; padding: 16px 20px !important; }
+
+      /* Card padding: tighter on mobile */
+      .card { padding: 28px 20px !important; }
+      .card-wide { padding: 24px 16px !important; }
+
+      /* Field labels: readable */
+      .field label { font-size: 13px !important; }
+
+      /* Buttons: full width and tall on mobile */
+      .btn-primary { width: 100%; min-height: 48px; font-size: 15px !important; }
+
+      /* Form footer: more readable */
+      .form-footer { font-size: 13px !important; }
+      .error-msg { font-size: 13px !important; }
+
+      /* Stats row on welcome: readable */
+      .stat-label { font-size: 12px !important; }
+
+      /* Welcome logo and text sizing */
       .welcome-logo { font-size: 1.5rem; }
       .welcome-text { font-size: 1.1rem; }
-      .welcome-stat-card { padding: 16px 20px; }
       .stat-number { font-size: 1.6rem; }
     }
   </style>

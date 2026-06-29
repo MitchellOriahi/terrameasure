@@ -291,6 +291,47 @@
       .news-grid { grid-template-columns: 1fr; }
       .source-strip { display: none; }
       .nav-links a:not(.cta) { display: none; }
+
+      /* Show hamburger */
+      .mob-ham-news { display: inline-flex !important; }
+
+      /* Filter bar: larger tap targets, scroll hint */
+      .filter-btn {
+        min-height: 40px;
+        font-size: 13px !important;
+        padding: 8px 16px !important;
+        white-space: nowrap;
+      }
+
+      /* Filter bar fade hint (right edge) */
+      .filter-bar-wrap {
+        position: relative;
+      }
+      .filter-bar-wrap::after {
+        content: '';
+        position: absolute;
+        right: 0; top: 0; bottom: 0;
+        width: 40px;
+        background: linear-gradient(to right, transparent, var(--bg));
+        pointer-events: none;
+      }
+
+      /* Boost page header font on mobile */
+      .page-header h1 { font-size: 1.6rem !important; }
+
+      /* Card: bigger text for readability */
+      .card-title { font-size: 1rem !important; }
+      .card-desc { font-size: 0.9rem !important; }
+      .card-date { font-size: 0.82rem !important; }
+
+      /* Filter category text: slightly larger */
+      .card-category { font-size: 0.78rem !important; }
+
+      /* Back to top button: move left on very narrow screens */
+      #back-top { bottom: 16px; right: 16px; }
+
+      /* Disclaimer: readable size */
+      .disclaimer { font-size: 0.85rem !important; }
     }
   </style>
 </head>
@@ -306,8 +347,17 @@
     <a href="terrascan.html" class="cta">Launch App</a>
     <!-- Theme toggle: switches between dark and light mode -->
     <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
+    <!-- Mobile hamburger — hidden on desktop, shown via media query -->
+    <button class="mob-ham-news" onclick="toggleNewsDrawer()" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--text2);font-size:16px;">☰</button>
   </div>
 </nav>
+
+<!-- MOBILE NAV DRAWER — shown only on small screens when hamburger is tapped -->
+<div id="mob-drawer-news" style="display:none;position:fixed;top:64px;left:0;right:0;background:var(--bg);border-bottom:1px solid var(--border);z-index:1900;padding:16px;flex-direction:column;gap:8px;box-shadow:0 8px 32px rgba(0,0,0,.4);">
+  <a href="terrascan.html" style="display:block;padding:14px 16px;background:var(--surface);border-radius:8px;color:var(--text2);font-size:15px;border:1px solid var(--border);">🗺 TerraScan</a>
+  <a href="terraphoto.html" style="display:block;padding:14px 16px;background:var(--surface);border-radius:8px;color:var(--text2);font-size:15px;border:1px solid var(--border);">📷 TerraPhoto</a>
+  <a href="index.html" style="display:block;padding:14px 16px;background:var(--surface);border-radius:8px;color:var(--text2);font-size:15px;border:1px solid var(--border);">🏠 Home</a>
+</div>
 
 <!-- ── PAGE HEADER ── -->
 <div class="page-header">
@@ -340,15 +390,18 @@
 </div>
 
 <!-- ── FILTER BAR ── -->
-<div class="filter-bar">
-  <span class="filter-label">Filter:</span>
-  <button class="filter-btn active" data-cat="all" onclick="setFilter('all',this)">All</button>
-  <button class="filter-btn" data-cat="agriculture" onclick="setFilter('agriculture',this)">Agriculture</button>
-  <button class="filter-btn" data-cat="hazards" onclick="setFilter('hazards',this)">Natural Hazards</button>
-  <button class="filter-btn" data-cat="land" onclick="setFilter('land',this)">Land Use</button>
-  <button class="filter-btn" data-cat="policy" onclick="setFilter('policy',this)">Policy</button>
-  <button class="filter-btn" data-cat="satellite" onclick="setFilter('satellite',this)">Satellite</button>
-  <button class="filter-btn" data-cat="water" onclick="setFilter('water',this)">Water</button>
+<!-- filter-bar-wrap enables the right-edge fade gradient on mobile -->
+<div class="filter-bar-wrap">
+  <div class="filter-bar">
+    <span class="filter-label">Filter:</span>
+    <button class="filter-btn active" data-cat="all" onclick="setFilter('all',this)">All</button>
+    <button class="filter-btn" data-cat="agriculture" onclick="setFilter('agriculture',this)">Agriculture</button>
+    <button class="filter-btn" data-cat="hazards" onclick="setFilter('hazards',this)">Natural Hazards</button>
+    <button class="filter-btn" data-cat="land" onclick="setFilter('land',this)">Land Use</button>
+    <button class="filter-btn" data-cat="policy" onclick="setFilter('policy',this)">Policy</button>
+    <button class="filter-btn" data-cat="satellite" onclick="setFilter('satellite',this)">Satellite</button>
+    <button class="filter-btn" data-cat="water" onclick="setFilter('water',this)">Water</button>
+  </div>
 </div>
 
 <!-- ── MAIN CONTENT ── -->
@@ -505,6 +558,19 @@ const SOURCE_DOTS = {
   'src-nasa':      'dot-nasa',
   'src-reliefweb': 'dot-reliefweb',
 };
+
+// ── MOBILE HAMBURGER DRAWER ──────────────────────────────────────────────────
+// Toggles the mobile nav drawer open/closed when the ☰ button is tapped.
+function toggleNewsDrawer() {
+  const d = document.getElementById('mob-drawer-news');
+  d.style.display = (d.style.display === 'flex') ? 'none' : 'flex';
+}
+// Close the drawer if the user taps anywhere outside it
+document.addEventListener('click', e => {
+  const d = document.getElementById('mob-drawer-news');
+  const h = document.querySelector('.mob-ham-news');
+  if (d && h && !d.contains(e.target) && !h.contains(e.target)) d.style.display = 'none';
+});
 
 // ── THEME TOGGLE ─────────────────────────────────────────────
 // Switches between dark (default) and light mode.
