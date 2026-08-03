@@ -130,11 +130,15 @@ export interface SurveyResponse {
   elevation_profile: [number, number][];
   buildable_area_pct: number;
   dominant_aspect_deg: number;
-  slope_map_png_b64: string;
-  contour_map_png_b64: string;
-  slope_map_clean_b64: string;
-  contour_map_clean_b64: string;
-  satellite_texture_b64: string;
+  // The base64 image fields are OPTIONAL because shared-report snapshots
+  // strip them server-side (only the two "clean" overlays may survive,
+  // and only when they fit the storage budget). A live survey response
+  // always includes all five; code that uses one must check it exists.
+  slope_map_png_b64?: string;
+  contour_map_png_b64?: string;
+  slope_map_clean_b64?: string;
+  contour_map_clean_b64?: string;
+  satellite_texture_b64?: string;
   // Geographic footprint of the DEM, used to pin image overlays on the map
   dem_center_lat: number;
   dem_center_lon: number;
@@ -191,9 +195,47 @@ export interface GeocodeResult {
 }
 
 // ------------------------------------------------------------------
+// Shareable reports: POST a survey snapshot, get back a short slug;
+// anyone can GET that slug later with no login. Mirrors api/reports.py.
+// ------------------------------------------------------------------
+
+// What POST /reports answers with.
+export interface ReportCreateResponse {
+  slug: string;
+  url_path: string; // "/r/{slug}", ready to append to the site origin
+  created_at: string; // ISO timestamp
+}
+
+// What GET /reports/{slug} answers with. The snapshot is exactly what
+// we posted, except the server stripped the heavy base64 images (the
+// two clean overlays may survive when they fit the storage budget).
+export interface ReportResponse {
+  slug: string;
+  title: string | null;
+  snapshot: {
+    survey: SurveyResponse;
+    parcel?: ParcelResponse | null;
+    vertices?: { lat: number; lon: number }[] | null;
+  };
+  created_at: string;
+  disclaimer: string;
+}
+
+// ------------------------------------------------------------------
 // Small fetch wrapper: throws a readable Error on any non-200 response
 // so the UI can show a human message instead of silently failing.
+// ApiError additionally carries the HTTP status, so pages that care
+// (like the report page telling 404 apart from a server hiccup) can
+// check it without parsing message text.
 // ------------------------------------------------------------------
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
@@ -213,7 +255,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       // Body was not JSON; keep the generic message.
     }
-    throw new Error(detail);
+    throw new ApiError(detail, res.status);
   }
   return (await res.json()) as T;
 }
@@ -242,4 +284,41 @@ export function geocode(q: string): Promise<GeocodeResult[]> {
 /** Look up the tax parcel under a tapped point (pilot counties only). */
 export function fetchParcel(lat: number, lon: number): Promise<ParcelResponse> {
   return request<ParcelResponse>(`/parcel?lat=${lat}&lon=${lon}`);
+}
+
+/**
+ * Turn the current survey into a public share link.
+ *
+ * Before posting we drop the three heavy base64 images (satellite photo
+ * and the two decorated maps). The server strips them anyway, so sending
+ * them would only risk tripping its 2 MB request limit. The two CLEAN
+ * overlays stay in: the server keeps those when they fit its budget,
+ * and the report page drapes them over its map.
+ */
+export function createReport(input: {
+  survey: SurveyResponse;
+  parcel?: ParcelResponse | null;
+  vertices?: { lat: number; lon: number }[] | null;
+  title?: string;
+}): Promise<ReportCreateResponse> {
+  const slimSurvey: Record<string, unknown> = { ...input.survey };
+  delete slimSurvey.slope_map_png_b64;
+  delete slimSurvey.contour_map_png_b64;
+  delete slimSurvey.satellite_texture_b64;
+
+  return request<ReportCreateResponse>("/reports", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      survey: slimSurvey,
+      parcel: input.parcel ?? null,
+      vertices: input.vertices ?? null,
+      title: input.title ?? null,
+    }),
+  });
+}
+
+/** Fetch a shared report by its slug. Public, no login. 404s throw ApiError. */
+export function fetchReport(slug: string): Promise<ReportResponse> {
+  return request<ReportResponse>(`/reports/${encodeURIComponent(slug)}`);
 }

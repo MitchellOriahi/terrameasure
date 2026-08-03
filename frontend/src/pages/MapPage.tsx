@@ -53,6 +53,9 @@ export function MapPage() {
 
   function handleShapeFinished(vertices: { lat: number; lon: number }[]) {
     lastFinishRef.current = Date.now();
+    // A hand-drawn shape has no parcel behind it; forget any earlier one
+    // so a shared report never carries the wrong parcel's facts.
+    useAppStore.getState().setSurveyParcel(null);
     runSurvey(vertices);
   }
 

@@ -81,6 +81,45 @@ export function pathLengthM(vertices: LatLon[]): number {
 }
 
 // ------------------------------------------------------------------
+// Pinning a survey image overlay onto the map
+// ------------------------------------------------------------------
+
+/** The four [lon, lat] corners a MapLibre image source wants, in order:
+    top-left, top-right, bottom-right, bottom-left. */
+export type ImageCorners = [
+  [number, number],
+  [number, number],
+  [number, number],
+  [number, number],
+];
+
+/**
+ * The backend describes its DEM footprint as a center point plus a width
+ * and height in meters. MapLibre wants four corner coordinates instead,
+ * so this converts one to the other (same flat-earth degree math as the
+ * area helpers above). Used to drape the slope/contour PNGs on the map.
+ */
+export function demImageCorners(dem: {
+  dem_center_lat: number;
+  dem_center_lon: number;
+  dem_width_m: number;
+  dem_height_m: number;
+}): ImageCorners {
+  const mPerDegLon =
+    M_PER_DEG_LAT * Math.cos((dem.dem_center_lat * Math.PI) / 180);
+  const halfW = dem.dem_width_m / 2 / mPerDegLon;
+  const halfH = dem.dem_height_m / 2 / M_PER_DEG_LAT;
+  const lat = dem.dem_center_lat;
+  const lon = dem.dem_center_lon;
+  return [
+    [lon - halfW, lat + halfH],
+    [lon + halfW, lat + halfH],
+    [lon + halfW, lat - halfH],
+    [lon - halfW, lat - halfH],
+  ];
+}
+
+// ------------------------------------------------------------------
 // Friendly number formatting for the results panel
 // ------------------------------------------------------------------
 

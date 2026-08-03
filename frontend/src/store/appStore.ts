@@ -93,6 +93,12 @@ interface AppState {
   // True while a /parcel request is in flight; extra taps are ignored.
   parcelLoading: boolean;
   setParcelLoading: (loading: boolean) => void;
+  // The parcel the CURRENT survey was started from (via "Survey this
+  // parcel"), or null when the user drew the shape by hand. The parcel
+  // card itself closes when a survey runs, so without this field the
+  // share-report flow would have no way to include the parcel facts.
+  surveyParcel: ParcelResponse | null;
+  setSurveyParcel: (p: ParcelResponse | null) => void;
 
   // ---- Tiny toast (small transient message pill) ----
   toast: string | null;
@@ -206,6 +212,9 @@ export const useAppStore = create<AppState>((set) => ({
   parcelLoading: false,
   setParcelLoading: (loading) => set({ parcelLoading: loading }),
 
+  surveyParcel: null,
+  setSurveyParcel: (p) => set({ surveyParcel: p }),
+
   toast: null,
   setToast: (msg) => set({ toast: msg }),
 
@@ -222,5 +231,6 @@ export const useAppStore = create<AppState>((set) => ({
       resultsOpen: false,
       drawMode: "none",
       parcel: null,
+      surveyParcel: null,
     }),
 }));

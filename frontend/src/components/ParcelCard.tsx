@@ -72,6 +72,7 @@ interface ParcelCardProps {
 function ParcelCardBody({ parcel, onSurvey }: ParcelCardProps) {
   const setParcel = useAppStore((s) => s.setParcel);
   const setDrawnVertices = useAppStore((s) => s.setDrawnVertices);
+  const setSurveyParcel = useAppStore((s) => s.setSurveyParcel);
 
   const vertices = boundaryToVertices(parcel);
 
@@ -110,7 +111,10 @@ function ParcelCardBody({ parcel, onSurvey }: ParcelCardProps) {
           onClick={() => {
             // Show the outline as the drawn shape, then run the normal
             // survey flow on it. From here on it is just like the user
-            // drew this polygon by hand.
+            // drew this polygon by hand. We also remember WHICH parcel
+            // this survey came from, so a shared report can include
+            // the ownership facts alongside the terrain numbers.
+            setSurveyParcel(parcel);
             setDrawnVertices(vertices);
             setParcel(null);
             onSurvey(vertices);
