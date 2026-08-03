@@ -6,8 +6,10 @@
 // No sign-in is ever required here: drawing and surveying work for
 // everyone, always.
 
+import { useRef } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { MapView } from "@/components/map/MapView";
+import { ParcelCard } from "@/components/ParcelCard";
 import { TopBar } from "@/components/TopBar";
 import {
   LayersPanelDesktop,
@@ -23,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/store/appStore";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useSurvey, loadingMessage } from "@/hooks/useSurvey";
+import { useParcel } from "@/hooks/useParcel";
 
 export function MapPage() {
   const isMobile = useIsMobile();
@@ -34,6 +37,32 @@ export function MapPage() {
   const drawMode = useAppStore((s) => s.drawMode);
 
   const { runSurvey, isLoading, error, reset, elapsed } = useSurvey();
+  const { lookupParcel } = useParcel();
+  const parcel = useAppStore((s) => s.parcel);
+  const toast = useAppStore((s) => s.toast);
+
+  // Finishing a polygon ends with a click on the map. That same click
+  // also reaches the map's onClick handler, and by then drawMode is
+  // already back to "none", so it would trigger a bogus parcel lookup.
+  // Remember when the last shape finished and ignore taps right after.
+  const lastFinishRef = useRef(0);
+
+  function handleShapeFinished(vertices: { lat: number; lon: number }[]) {
+    lastFinishRef.current = Date.now();
+    runSurvey(vertices);
+  }
+
+  function handleMapClick(lat: number, lon: number) {
+    // Tap-to-parcel only when: the Parcels layer is on, no draw tool is
+    // armed, nothing else is mid-flight, and this is not the tail end of
+    // a finished drawing gesture.
+    const s = useAppStore.getState();
+    if (!s.layers.parcels) return;
+    if (s.drawMode !== "none") return;
+    if (s.parcelLoading || isLoading) return;
+    if (Date.now() - lastFinishRef.current < 600) return;
+    lookupParcel(lat, lon);
+  }
 
   const showResults = survey !== null && resultsOpen && !isLoading;
 
@@ -42,7 +71,10 @@ export function MapPage() {
       {/* The map fills everything; panels float above it. The map-shell
           class pins it and hands all touch gestures to MapLibre. */}
       <div className="map-shell">
-        <MapView onShapeFinished={(v) => runSurvey(v)} />
+        <MapView
+          onShapeFinished={handleShapeFinished}
+          onMapClick={handleMapClick}
+        />
       </div>
 
       <TopBar />
@@ -154,6 +186,21 @@ export function MapPage() {
             </div>
           </aside>
         ))}
+
+      {/* ---- Parcel Card: appears after tapping a parcel on the map ---- */}
+      {parcel && !showResults && !isLoading && (
+        <ParcelCard parcel={parcel} onSurvey={(v) => runSurvey(v)} />
+      )}
+
+      {/* ---- Tiny toast pill (e.g. "No parcel data here yet") ---- */}
+      {toast && (
+        <div
+          className="glass pointer-events-none absolute bottom-24 left-1/2 z-40 w-max max-w-[90vw] -translate-x-1/2 px-4 py-2 text-center text-xs text-foreground"
+          role="status"
+        >
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

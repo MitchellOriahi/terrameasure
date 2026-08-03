@@ -4,9 +4,9 @@
 // homes: the desktop right-side panel and the mobile bottom sheet, so
 // it knows nothing about panels, only about content.
 
-import { useMemo } from "react";
-import { X } from "lucide-react";
-import type { SurveyResponse } from "@/lib/api";
+import { useMemo, type ReactNode } from "react";
+import { AlertTriangle, X } from "lucide-react";
+import type { SurveyContext, SurveyResponse } from "@/lib/api";
 import {
   polygonAreaM2,
   polygonPerimeterM,
@@ -50,8 +50,9 @@ interface ResultsContentProps {
 export function ResultsContent({ survey, vertices }: ResultsContentProps) {
   const clearSurvey = useAppStore((s) => s.clearSurvey);
 
-  // Score, verdict and cost range. Derived client-side for now; the
-  // backend will own these numbers soon (see lib/verdict.ts).
+  // Score, verdict and cost range. The backend computes these when it
+  // can; assessSite falls back to a client heuristic for old backends
+  // (see lib/verdict.ts for the whole story).
   const assessment = useMemo(() => assessSite(survey), [survey]);
   const meta = VERDICT_META[assessment.verdict];
 
@@ -90,6 +91,13 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
         <div className="flex items-center justify-between">
           <span className="text-2xl font-bold tracking-tight">
             {assessment.verdict}
+            {/* The backend's one-word grade ("Good", "Fair", ...), when
+                the server computed this verdict */}
+            {assessment.label && (
+              <span className="ml-2 text-sm font-medium opacity-80">
+                {assessment.label}
+              </span>
+            )}
           </span>
           <Button
             variant="ghost"
@@ -123,6 +131,49 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
         <ScoreDial score={assessment.score} verdict={assessment.verdict} />
       </div>
 
+      {/* ---- Why this verdict: the backend's score breakdown ----
+           Only server-computed scores come with receipts; the client
+           fallback has no breakdown, so this section simply disappears
+           on old backends. */}
+      {assessment.breakdown.length > 0 && (
+        <div className="rounded-xl border border-line bg-surface-2/40 px-4 py-3">
+          <div className="mb-2 text-[11px] uppercase tracking-widest text-muted">
+            Why this verdict
+          </div>
+          <ul className="flex flex-col gap-2">
+            {assessment.breakdown.map((item, i) => (
+              <li key={i} className="flex items-start gap-3">
+                {/* The score effect: green for bonus, red for penalty,
+                    muted for neutral. The +/- sign carries the meaning
+                    too, so color is never the only signal. */}
+                <span
+                  className={`num w-9 shrink-0 text-right text-xs font-semibold ${
+                    item.effect.startsWith("+")
+                      ? "text-go"
+                      : item.effect.startsWith("-")
+                        ? "text-nogo"
+                        : "text-muted"
+                  }`}
+                >
+                  {item.effect}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-medium capitalize text-foreground">
+                    {item.factor}
+                  </span>
+                  <span className="block text-[11px] leading-snug text-muted">
+                    {item.note}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* ---- Risk flags: wetlands, water, flood from federal sources ---- */}
+      {survey.context && <RiskFlags context={survey.context} />}
+
       {/* ---- The metric rows ---- */}
       <div className="rounded-xl border border-line bg-surface-2/40 px-4 py-1">
         {area && areaErr && outline && (
@@ -150,10 +201,17 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
         />
         <MetricRow
           label="Buildable area"
-          value={fmt(survey.buildable_area_pct, 0)}
+          // Prefer the backend's water-adjusted number (open water is not
+          // buildable no matter how flat it is); fall back to the plain
+          // slope-based percentage on old backends.
+          value={fmt(assessment.buildablePct, 0)}
           unit="%"
           qualifier="est. (no formal bound yet)"
-          note="ground with slope under 8 degrees"
+          note={
+            assessment.fromBackend
+              ? "gentle slope, adjusted for open water"
+              : "ground with slope under 8 degrees"
+          }
         />
         <MetricRow
           label="Elevation range"
@@ -193,9 +251,217 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
       <p className="text-[11px] leading-relaxed text-muted">
         Elevation source: {survey.source}, {survey.cell_size_m.toFixed(0)} m
         grid, vertical accuracy about ±{survey.vertical_error_m.toFixed(1)} m.
-        Tip: turn on the Contours layer to see this survey's contour lines on
-        the map.
+        {/* When the backend fell back to a coarser DEM it says so here */}
+        {survey.dem_source_note ? ` ${survey.dem_source_note}` : ""} Tip: turn
+        on the Contours layer to see this survey's contour lines on the map.
       </p>
+
+      {/* ---- The disclaimer, verbatim from the backend when present ---- */}
+      <p className="border-t border-line pt-3 text-[10px] leading-relaxed text-muted">
+        {survey.disclaimer ?? "Preliminary and uncertified"}
+      </p>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// Risk flags: what the federal context layers found on this site.
+// Three honest rules:
+//   1. An "unavailable" source is SHOWN as unavailable, never hidden.
+//      Unknown is not the same as clear.
+//   2. Lots of open water (over 30% of the site) gets the loud red row.
+//   3. Every row names its data source.
+// ------------------------------------------------------------------
+
+/** "0.42" -> "42%" for the coverage fractions (which are 0 to 1). */
+function fmtPct(fraction: number | null): string {
+  if (fraction === null || fraction === undefined) return "?";
+  return `${Math.round(fraction * 100)}%`;
+}
+
+/** One risk row: a title line, a detail line, and the source name. */
+function RiskRow({
+  title,
+  detail,
+  source,
+  tone,
+}: {
+  title: string;
+  detail: string;
+  source: string;
+  tone: "ok" | "warn" | "danger" | "unknown";
+}) {
+  const toneClass =
+    tone === "danger"
+      ? "border-nogo/40 bg-nogo/10"
+      : tone === "warn"
+        ? "border-caution/40 bg-caution/10"
+        : "border-line bg-transparent";
+  const titleClass =
+    tone === "danger"
+      ? "text-nogo"
+      : tone === "warn"
+        ? "text-caution"
+        : tone === "unknown"
+          ? "text-muted"
+          : "text-foreground";
+  return (
+    <li className={`rounded-lg border px-3 py-2 ${toneClass}`}>
+      <div
+        className={`flex items-center gap-1.5 text-xs font-medium ${titleClass}`}
+      >
+        {(tone === "danger" || tone === "warn") && (
+          <AlertTriangle size={12} className="shrink-0" />
+        )}
+        {title}
+      </div>
+      <div className="text-[11px] leading-snug text-muted">{detail}</div>
+      <div className="mt-0.5 text-[10px] text-muted/80">Source: {source}</div>
+    </li>
+  );
+}
+
+function RiskFlags({ context }: { context: SurveyContext }) {
+  const { water, wetlands, flood } = context;
+  const rows: ReactNode[] = [];
+
+  // ---- Open water ----
+  if (water.status === "unavailable") {
+    rows.push(
+      <RiskRow
+        key="water"
+        title="Open water: could not check (source unavailable)"
+        detail="The waterbody service did not answer. Unknown, not clear."
+        source={water.source}
+        tone="unknown"
+      />,
+    );
+  } else {
+    // Prefer the combined open-water estimate (it also counts wetland
+    // open water); fall back to the waterbody coverage alone.
+    const frac = context.open_water_fraction ?? water.coverage_fraction ?? 0;
+    const names = water.waterbodies
+      .map((w) => w.name || w.feature_type || "unnamed waterbody")
+      .slice(0, 3)
+      .join(", ");
+    if (frac > 0.3) {
+      // A site that is nearly a third water is a headline, not a footnote.
+      rows.push(
+        <RiskRow
+          key="water"
+          title={`Open water covers about ${fmtPct(frac)} of this site`}
+          detail={names ? `Waterbodies: ${names}.` : "Mapped open water."}
+          source={water.source}
+          tone="danger"
+        />,
+      );
+    } else if (frac > 0.02 || water.waterbodies.length > 0) {
+      rows.push(
+        <RiskRow
+          key="water"
+          title={`Open water: about ${fmtPct(frac)} of the site`}
+          detail={names ? `Waterbodies: ${names}.` : "Minor mapped water."}
+          source={water.source}
+          tone="warn"
+        />,
+      );
+    } else {
+      rows.push(
+        <RiskRow
+          key="water"
+          title="Open water: none mapped on this site"
+          detail="No significant waterbodies intersect the outline."
+          source={water.source}
+          tone="ok"
+        />,
+      );
+    }
+  }
+
+  // ---- Wetlands ----
+  if (wetlands.status === "unavailable") {
+    rows.push(
+      <RiskRow
+        key="wetlands"
+        title="Wetlands: could not check (source unavailable)"
+        detail="The wetlands inventory did not answer. Unknown, not clear."
+        source={wetlands.source}
+        tone="unknown"
+      />,
+    );
+  } else if (wetlands.wetland_types.length > 0) {
+    rows.push(
+      <RiskRow
+        key="wetlands"
+        title={`Wetlands: about ${fmtPct(wetlands.coverage_fraction)} of the site`}
+        detail={`Types: ${wetlands.wetland_types.join(", ")}. Wetlands often need permits to disturb.`}
+        source={wetlands.source}
+        tone="warn"
+      />,
+    );
+  } else {
+    rows.push(
+      <RiskRow
+        key="wetlands"
+        title="Wetlands: none mapped on this site"
+        detail="No inventoried wetlands intersect the outline."
+        source={wetlands.source}
+        tone="ok"
+      />,
+    );
+  }
+
+  // ---- Flood zones ----
+  if (flood.status === "unavailable") {
+    rows.push(
+      <RiskRow
+        key="flood"
+        title="Flood zones: could not check (source unavailable)"
+        detail="The flood hazard service did not answer. Unknown, not clear."
+        source={flood.source}
+        tone="unknown"
+      />,
+    );
+  } else if (flood.zones.length > 0) {
+    const zoneLabels = flood.zones
+      .map((z) => `${z.zone}${z.high_risk ? " (high risk)" : ""}`)
+      .join(", ");
+    const high = flood.in_high_risk_zone === true;
+    rows.push(
+      <RiskRow
+        key="flood"
+        title={
+          high
+            ? "Flood: site touches a high-risk FEMA zone"
+            : "Flood: site is in mapped FEMA zones"
+        }
+        detail={`Zones: ${zoneLabels}.${
+          high && flood.high_risk_fraction !== null
+            ? ` About ${fmtPct(flood.high_risk_fraction)} of the site is high risk.`
+            : ""
+        }`}
+        source={flood.source}
+        tone={high ? "danger" : "ok"}
+      />,
+    );
+  } else {
+    rows.push(
+      <RiskRow
+        key="flood"
+        title="Flood zones: none mapped on this site"
+        detail="No FEMA flood zones intersect the outline."
+        source={flood.source}
+        tone="ok"
+      />,
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-line bg-surface-2/40 px-4 py-3">
+      <div className="mb-2 text-[11px] uppercase tracking-widest text-muted">
+        Risk flags
+      </div>
+      <ul className="flex flex-col gap-2">{rows}</ul>
     </div>
   );
 }

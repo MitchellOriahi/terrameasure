@@ -17,6 +17,7 @@ import {
   GeolocateControl,
   ScaleControl,
 } from "@vis.gl/react-maplibre";
+import type { MapLayerMouseEvent } from "@vis.gl/react-maplibre";
 import type { Feature, Polygon } from "geojson";
 import { useAppStore } from "@/store/appStore";
 import type { LatLon } from "@/lib/geo";
@@ -31,6 +32,9 @@ import { DrawTools } from "./DrawTools";
 
 interface MapViewProps {
   onShapeFinished: (vertices: LatLon[]) => void;
+  // Called with lat/lon when the user taps the bare map (used for the
+  // tap-to-parcel lookup; the page decides whether the tap counts).
+  onMapClick?: (lat: number, lon: number) => void;
 }
 
 /** Turn stored vertices back into a GeoJSON polygon for display. */
@@ -44,12 +48,23 @@ function verticesToFeature(vertices: LatLon[]): Feature<Polygon> {
   };
 }
 
-export function MapView({ onShapeFinished }: MapViewProps) {
+export function MapView({ onShapeFinished, onMapClick }: MapViewProps) {
   const basemap = useAppStore((s) => s.basemap);
   const terrain3d = useAppStore((s) => s.terrain3d);
   const layers = useAppStore((s) => s.layers);
   const drawnVertices = useAppStore((s) => s.drawnVertices);
   const survey = useAppStore((s) => s.survey);
+  const parcel = useAppStore((s) => s.parcel);
+
+  // The looked-up parcel's outline as a GeoJSON feature for display.
+  const parcelFeature = useMemo<Feature<Polygon> | null>(() => {
+    if (!parcel?.boundary) return null;
+    return {
+      type: "Feature",
+      properties: {},
+      geometry: parcel.boundary as Polygon,
+    };
+  }, [parcel]);
 
   // The finished shape as GeoJSON (memoized so the map is not poked on
   // every unrelated re-render).
@@ -102,6 +117,9 @@ export function MapView({ onShapeFinished }: MapViewProps) {
       maxPitch={terrain3d ? 70 : 60}
       style={{ width: "100%", height: "100%" }}
       attributionControl={{ compact: true }}
+      onClick={(e: MapLayerMouseEvent) =>
+        onMapClick?.(e.lngLat.lat, e.lngLat.lng)
+      }
     >
       {/* ---- Built-in map controls (bottom right, above mobile sheet) ---- */}
       <NavigationControl position="bottom-right" showCompass visualizePitch />
@@ -195,6 +213,29 @@ export function MapView({ onShapeFinished }: MapViewProps) {
             id="survey-contours-layer"
             type="raster"
             paint={{ "raster-opacity": 0.9, "raster-fade-duration": 0 }}
+          />
+        </Source>
+      )}
+
+      {/* ---- Looked-up parcel boundary (tap-to-parcel) ----
+           Same emerald accent family as the drawn shape, but lighter
+           fill and a dashed line so the two never read as the same
+           thing when both are on screen. */}
+      {parcelFeature && (
+        <Source id="parcel-boundary" type="geojson" data={parcelFeature}>
+          <Layer
+            id="parcel-boundary-fill"
+            type="fill"
+            paint={{ "fill-color": "#34d399", "fill-opacity": 0.08 }}
+          />
+          <Layer
+            id="parcel-boundary-line"
+            type="line"
+            paint={{
+              "line-color": "#34d399",
+              "line-width": 2,
+              "line-dasharray": [2, 1.5],
+            }}
           />
         </Source>
       )}

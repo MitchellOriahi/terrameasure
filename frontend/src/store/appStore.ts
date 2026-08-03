@@ -12,7 +12,7 @@
 // is mirrored here so every panel can read it.
 
 import { create } from "zustand";
-import type { SurveyResponse } from "@/lib/api";
+import type { ParcelResponse, SurveyResponse } from "@/lib/api";
 import type { LatLon } from "@/lib/geo";
 
 export type Basemap = "map" | "satellite";
@@ -49,6 +49,19 @@ interface AppState {
   survey: SurveyResponse | null;
   setSurvey: (s: SurveyResponse | null) => void;
 
+  // ---- Parcel lookup (tap the map when not drawing) ----
+  // The parcel found under the user's tap; non-null shows the Parcel Card
+  // and draws the boundary on the map.
+  parcel: ParcelResponse | null;
+  setParcel: (p: ParcelResponse | null) => void;
+  // True while a /parcel request is in flight; extra taps are ignored.
+  parcelLoading: boolean;
+  setParcelLoading: (loading: boolean) => void;
+
+  // ---- Tiny toast (small transient message pill) ----
+  toast: string | null;
+  setToast: (msg: string | null) => void;
+
   // ---- Panels ----
   layersPanelOpen: boolean;
   setLayersPanelOpen: (open: boolean) => void;
@@ -67,7 +80,9 @@ export const useAppStore = create<AppState>((set) => ({
   toggleTerrain3d: () => set((s) => ({ terrain3d: !s.terrain3d })),
 
   layers: {
-    parcels: false,
+    // Parcels defaults ON: it controls whether tapping the map (while not
+    // drawing) looks up the parcel under your finger.
+    parcels: true,
     wetlands: false,
     flood: false,
     contours: false,
@@ -83,7 +98,19 @@ export const useAppStore = create<AppState>((set) => ({
   setDrawnVertices: (v) => set({ drawnVertices: v }),
 
   survey: null,
-  setSurvey: (s) => set({ survey: s, resultsOpen: s !== null }),
+  // A fresh survey takes center stage, so the parcel card steps aside.
+  setSurvey: (s) =>
+    set(s !== null
+      ? { survey: s, resultsOpen: true, parcel: null }
+      : { survey: s, resultsOpen: false }),
+
+  parcel: null,
+  setParcel: (p) => set({ parcel: p }),
+  parcelLoading: false,
+  setParcelLoading: (loading) => set({ parcelLoading: loading }),
+
+  toast: null,
+  setToast: (msg) => set({ toast: msg }),
 
   layersPanelOpen: false,
   setLayersPanelOpen: (open) => set({ layersPanelOpen: open }),
@@ -97,5 +124,6 @@ export const useAppStore = create<AppState>((set) => ({
       survey: null,
       resultsOpen: false,
       drawMode: "none",
+      parcel: null,
     }),
 }));

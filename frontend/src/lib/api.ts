@@ -28,6 +28,92 @@ export interface MeasurementOut {
   note: string;
 }
 
+// ------------------------------------------------------------------
+// New backend extras (score, cost, context, parcel).
+// All of these are OPTIONAL on SurveyResponse because the deployed API
+// on Render may be an older build that does not send them yet. The UI
+// checks for each one and falls back gracefully when it is missing.
+// ------------------------------------------------------------------
+
+// One line of the score breakdown: which factor moved the score, by how
+// much ("+15", "-22", "0"), and a plain-language reason.
+export interface ScoreFactor {
+  factor: string;
+  effect: string;
+  note: string;
+}
+
+// The server-computed site score. verdict is lowercase on the wire
+// ("go" | "caution" | "no-go"); the UI uppercases it for display.
+export interface ScoreOut {
+  value: number; // 0 to 100
+  verdict: "go" | "caution" | "no-go";
+  label: string; // "Excellent" | "Good" | "Fair" | "Challenging"
+  buildable_area_pct: number; // water-adjusted, 0 to 100
+  breakdown: ScoreFactor[];
+  note: string;
+}
+
+// Rough grading cost range computed server-side from cut + fill volume.
+export interface EarthworkCostOut {
+  low_usd: number;
+  high_usd: number;
+  base_usd: number;
+  cut_m3: number;
+  fill_m3: number;
+  note: string;
+}
+
+// Each context source reports "ok" or, honestly, "unavailable".
+export type ContextStatus = "ok" | "unavailable";
+
+export interface WetlandsContext {
+  status: ContextStatus;
+  wetland_types: string[];
+  coverage_fraction: number | null; // 0 to 1, share of site in wetlands
+  open_water_fraction: number | null; // subset that is open water
+  source: string;
+  note: string;
+}
+
+export interface WaterbodyOut {
+  name: string | null;
+  feature_type: string | null;
+  area_sqkm: number | null;
+}
+
+export interface WaterContext {
+  status: ContextStatus;
+  waterbodies: WaterbodyOut[];
+  coverage_fraction: number | null;
+  source: string;
+  note: string;
+}
+
+export interface FloodZoneOut {
+  zone: string; // FEMA zone code like "AE" or "X"
+  subtype: string | null;
+  high_risk: boolean;
+}
+
+export interface FloodContext {
+  status: ContextStatus;
+  zones: FloodZoneOut[];
+  in_high_risk_zone: boolean | null;
+  high_risk_fraction: number | null;
+  source: string;
+  note: string;
+}
+
+// The bundle of all three checks plus a combined open-water estimate.
+export interface SurveyContext {
+  wetlands: WetlandsContext;
+  water: WaterContext;
+  flood: FloodContext;
+  open_water_fraction: number | null;
+  note: string;
+}
+
 export interface SurveyResponse {
   source: string;
   vertical_error_m: number;
@@ -54,6 +140,44 @@ export interface SurveyResponse {
   dem_center_lon: number;
   dem_width_m: number;
   dem_height_m: number;
+
+  // ---- New optional fields (older deployed APIs omit these) ----
+  // Server-computed score and verdict; preferred over the client-side
+  // heuristic in lib/verdict.ts whenever present.
+  score?: ScoreOut;
+  // Server-computed earthwork cost range.
+  earthwork_cost?: EarthworkCostOut;
+  // Wetlands / water / flood findings for the surveyed polygon.
+  context?: SurveyContext | null;
+  // Set when the primary DEM source failed and a fallback was used.
+  dem_source_note?: string;
+  // The uncertified-survey disclaimer, verbatim from the backend.
+  disclaimer?: string;
+}
+
+// ------------------------------------------------------------------
+// Parcel lookup: GET /parcel?lat=&lon= returns "whose land is this".
+// status tells the honest story: "ok" (found one), "no_coverage" (we
+// have no data for that county yet), or "unavailable" (county server
+// did not answer).
+// ------------------------------------------------------------------
+export interface ParcelResponse {
+  status: "ok" | "no_coverage" | "unavailable";
+  parcel_id: string | null;
+  owner: string | null;
+  address: string | null;
+  acreage: number | null;
+  land_use: string | null;
+  zoning: string | null;
+  assessed_value: number | null;
+  last_sale_price: number | null;
+  last_sale_date: string | null;
+  // GeoJSON Polygon of the parcel outline ([lon, lat] rings), or null
+  boundary: { type: "Polygon"; coordinates: number[][][] } | null;
+  source: string | null;
+  county: string | null;
+  note: string;
+  disclaimer?: string;
 }
 
 // One result row from the backend's /geocode proxy (Nominatim format)
@@ -113,4 +237,9 @@ export function surveyPolygon(
 /** Address / place search (backend proxies to OpenStreetMap Nominatim). */
 export function geocode(q: string): Promise<GeocodeResult[]> {
   return request<GeocodeResult[]>(`/geocode?q=${encodeURIComponent(q)}`);
+}
+
+/** Look up the tax parcel under a tapped point (pilot counties only). */
+export function fetchParcel(lat: number, lon: number): Promise<ParcelResponse> {
+  return request<ParcelResponse>(`/parcel?lat=${lat}&lon=${lon}`);
 }

@@ -26,8 +26,8 @@ const LAYER_DEFS: {
     key: "parcels",
     name: "Parcels",
     swatch: "#8b7dd8",
-    info: "Property boundaries. Pilot counties only, coming online.",
-    live: false,
+    info: "Tap the map (when not drawing) to look up a parcel. Pilot counties only.",
+    live: true,
   },
   {
     key: "wetlands",
