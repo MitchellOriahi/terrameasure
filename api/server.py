@@ -53,10 +53,17 @@ from fetchers import context_layers
 from fetchers.parcel_fetcher import get_parcel as fetch_parcel
 from engine import measurements as M
 from engine import scoring
+# Shareable report endpoints live in their own module (api/reports.py)
+# and plug in below via an APIRouter, FastAPI's way of splitting an app
+# across files without changing how anything is served.
+from api.reports import router as reports_router
 
 
 # ---------------------------------------------------------------------------
 app = FastAPI(title="TerraMeasure API", version="0.4.0")
+
+# POST /reports and GET /reports/{slug}: turn a survey into a share link.
+app.include_router(reports_router)
 
 app.add_middleware(
     CORSMiddleware,
