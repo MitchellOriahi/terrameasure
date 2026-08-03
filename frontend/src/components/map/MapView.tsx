@@ -29,6 +29,7 @@ import {
   WETLANDS_WMS_TILES,
 } from "./basemaps";
 import { DrawTools } from "./DrawTools";
+import { ReticleLayers } from "./ReticleLayers";
 
 interface MapViewProps {
   onShapeFinished: (vertices: LatLon[]) => void;
@@ -258,6 +259,11 @@ export function MapView({ onShapeFinished, onMapClick }: MapViewProps) {
 
       {/* ---- Drawing wiring (renders nothing) ---- */}
       <DrawTools onShapeFinished={onShapeFinished} />
+
+      {/* ---- Mobile reticle drawing: in-progress vertices, dashed
+           segments, and the live rubber-band line. Renders nothing
+           unless reticle mode is active. ---- */}
+      <ReticleLayers />
     </Map>
   );
 }

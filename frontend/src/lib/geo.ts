@@ -58,6 +58,28 @@ export function polygonPerimeterM(vertices: LatLon[]): number {
   return total;
 }
 
+/** Straight-line distance between two lat/lon points, in meters. */
+export function distanceM(a: LatLon, b: LatLon): number {
+  // Same flat-earth trick as above: convert both points to local meters
+  // and measure with the Pythagorean theorem. Plenty accurate at parcel
+  // scale, which is all the live drawing readout needs.
+  const [pa, pb] = toLocalMeters([a, b]);
+  return Math.hypot(pb.x - pa.x, pb.y - pa.y);
+}
+
+/** Length of an OPEN polyline (does not loop back to the start). */
+export function pathLengthM(vertices: LatLon[]): number {
+  // Used while drawing: "how far have I walked so far", before the shape
+  // is closed. polygonPerimeterM wraps around; this one does not.
+  if (vertices.length < 2) return 0;
+  const pts = toLocalMeters(vertices);
+  let total = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    total += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+  }
+  return total;
+}
+
 // ------------------------------------------------------------------
 // Friendly number formatting for the results panel
 // ------------------------------------------------------------------

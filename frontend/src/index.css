@@ -136,6 +136,53 @@ body {
 }
 
 /* ------------------------------------------------------------------ */
+/* Reticle drawing (the mobile crosshair survey mode)                  */
+/* ------------------------------------------------------------------ */
+
+/* The 28px crosshair. Its arms are absolutely positioned spans (see
+   ReticleOverlay.tsx); this class supplies the frame and a soft shadow
+   so the emerald lines stay readable over bright satellite imagery. */
+.reticle-cross {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.55));
+}
+.reticle-arm {
+  position: absolute;
+  background: var(--accent-bright);
+  border-radius: 1px;
+}
+
+/* The placement pulse: a quick 120ms breath (scale only, so the GPU
+   animates it without touching layout). Replayed from JS by remounting
+   the element with a fresh key each time a point is placed. */
+@keyframes reticle-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.reticle-pulse {
+  animation: reticle-pulse 120ms ease-out;
+}
+
+/* Action sheets slide up from the bottom edge, transform-only. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* MapLibre control restyling so the default controls match the theme  */
 /* ------------------------------------------------------------------ */
 .maplibregl-ctrl-group {

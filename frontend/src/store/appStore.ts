@@ -45,6 +45,42 @@ interface AppState {
   drawnVertices: LatLon[] | null;
   setDrawnVertices: (v: LatLon[] | null) => void;
 
+  // ---- Reticle drawing (the mobile crosshair survey mode) ----
+  // On phones we never place points by tapping the map (fingers are too
+  // fat for corner-level precision). Instead a fixed crosshair sits over
+  // the map, the user pans the map underneath it, and "Add Point" drops a
+  // vertex at the crosshair. All of that mode's state lives here so the
+  // map layers, the crosshair overlay, and the button tray (three separate
+  // components) all stay in sync automatically.
+  reticleActive: boolean;
+  /** Enter reticle mode (also disarms desktop drawing and any parcel card). */
+  startReticle: () => void;
+  /** Leave reticle mode and forget the in-progress sketch. */
+  stopReticle: () => void;
+  // The corners placed so far, in order.
+  reticleVertices: LatLon[];
+  addReticleVertex: (v: LatLon) => void;
+  undoReticleVertex: () => void;
+  clearReticleVertices: () => void;
+  moveReticleVertex: (index: number, v: LatLon) => void;
+  deleteReticleVertex: (index: number) => void;
+  // Which vertex is selected for editing (Move Here / Delete), or null.
+  selectedVertexIndex: number | null;
+  setSelectedVertexIndex: (i: number | null) => void;
+  // Live camera readings, streamed in on every map move so the readout
+  // strip and rubber-band line can follow the crosshair in real time.
+  reticleCenter: LatLon | null;
+  setReticleCenter: (c: LatLon | null) => void;
+  reticleZoom: number;
+  setReticleZoom: (z: number) => void;
+  // True while the crosshair hovers within snapping range of vertex #1,
+  // which flips "Add Point" into "Close Shape".
+  snapToFirst: boolean;
+  setSnapToFirst: (b: boolean) => void;
+  // A counter that bumps every time a point is placed or moved; the
+  // crosshair overlay watches it to replay its little pulse animation.
+  reticlePulse: number;
+
   // ---- Survey results ----
   survey: SurveyResponse | null;
   setSurvey: (s: SurveyResponse | null) => void;
@@ -96,6 +132,67 @@ export const useAppStore = create<AppState>((set) => ({
 
   drawnVertices: null,
   setDrawnVertices: (v) => set({ drawnVertices: v }),
+
+  // ---- Reticle drawing ----
+  reticleActive: false,
+  startReticle: () =>
+    set({
+      reticleActive: true,
+      reticleVertices: [],
+      selectedVertexIndex: null,
+      snapToFirst: false,
+      // Also clear anything that would visually compete with drawing
+      drawMode: "none",
+      parcel: null,
+    }),
+  stopReticle: () =>
+    set({
+      reticleActive: false,
+      reticleVertices: [],
+      selectedVertexIndex: null,
+      snapToFirst: false,
+      reticleCenter: null,
+    }),
+
+  reticleVertices: [],
+  addReticleVertex: (v) =>
+    set((s) => ({
+      reticleVertices: [...s.reticleVertices, v],
+      reticlePulse: s.reticlePulse + 1,
+    })),
+  undoReticleVertex: () =>
+    set((s) => ({
+      reticleVertices: s.reticleVertices.slice(0, -1),
+      selectedVertexIndex: null,
+      snapToFirst: false,
+    })),
+  clearReticleVertices: () =>
+    set({ reticleVertices: [], selectedVertexIndex: null, snapToFirst: false }),
+  moveReticleVertex: (index, v) =>
+    set((s) => ({
+      reticleVertices: s.reticleVertices.map((old, i) =>
+        i === index ? v : old,
+      ),
+      reticlePulse: s.reticlePulse + 1,
+    })),
+  deleteReticleVertex: (index) =>
+    set((s) => ({
+      reticleVertices: s.reticleVertices.filter((_, i) => i !== index),
+      selectedVertexIndex: null,
+    })),
+
+  selectedVertexIndex: null,
+  setSelectedVertexIndex: (i) => set({ selectedVertexIndex: i }),
+
+  reticleCenter: null,
+  setReticleCenter: (c) => set({ reticleCenter: c }),
+  reticleZoom: 16, // seeded high so the "zoom in" chip never flashes early
+  setReticleZoom: (z) => set({ reticleZoom: z }),
+
+  snapToFirst: false,
+  setSnapToFirst: (b) => set({ snapToFirst: b }),
+
+  reticlePulse: 0,
 
   survey: null,
   // A fresh survey takes center stage, so the parcel card steps aside.

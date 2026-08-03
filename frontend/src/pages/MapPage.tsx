@@ -17,6 +17,9 @@ import {
 } from "@/components/LayersPanel";
 import { Sheet } from "@/components/ui/sheet";
 import { MobileBottomBar } from "@/components/MobileBottomBar";
+import { ReticleOverlay } from "@/components/ReticleOverlay";
+import { ReticleTray } from "@/components/ReticleTray";
+import { bumpCompletedSurveyCount } from "@/lib/hints";
 import {
   ResultsContent,
   UncertifiedLabel,
@@ -35,6 +38,7 @@ export function MapPage() {
   const setResultsOpen = useAppStore((s) => s.setResultsOpen);
   const clearSurvey = useAppStore((s) => s.clearSurvey);
   const drawMode = useAppStore((s) => s.drawMode);
+  const reticleActive = useAppStore((s) => s.reticleActive);
 
   const { runSurvey, isLoading, error, reset, elapsed } = useSurvey();
   const { lookupParcel } = useParcel();
@@ -52,6 +56,18 @@ export function MapPage() {
     runSurvey(vertices);
   }
 
+  // The mobile reticle flow ends here: grab the placed corners, leave
+  // draw mode, then feed the SAME survey path the desktop tools use.
+  function handleReticleFinished() {
+    const s = useAppStore.getState();
+    const vertices = [...s.reticleVertices];
+    if (vertices.length < 3) return;
+    bumpCompletedSurveyCount(); // feeds the "stop showing the hint" counter
+    s.stopReticle();
+    s.setDrawnVertices(vertices);
+    handleShapeFinished(vertices);
+  }
+
   function handleMapClick(lat: number, lon: number) {
     // Tap-to-parcel only when: the Parcels layer is on, no draw tool is
     // armed, nothing else is mid-flight, and this is not the tail end of
@@ -59,6 +75,7 @@ export function MapPage() {
     const s = useAppStore.getState();
     if (!s.layers.parcels) return;
     if (s.drawMode !== "none") return;
+    if (s.reticleActive) return; // taps select vertices in reticle mode
     if (s.parcelLoading || isLoading) return;
     if (Date.now() - lastFinishRef.current < 600) return;
     lookupParcel(lat, lon);
@@ -82,9 +99,18 @@ export function MapPage() {
       {/* Overlays panel: floating on desktop, shared Sheet on mobile */}
       {isMobile ? <LayersSheetMobile /> : <LayersPanelDesktop />}
 
-      {/* Phone action bar (hidden while a sheet is up, to keep one clear
-          focus per moment on a small screen) */}
-      {isMobile && !showResults && <MobileBottomBar />}
+      {/* Phone action bar (hidden while a sheet is up or while the
+          reticle tray has taken its place, to keep one clear focus per
+          moment on a small screen) */}
+      {isMobile && !showResults && !reticleActive && <MobileBottomBar />}
+
+      {/* Reticle draw mode: the crosshair overlay plus its button tray */}
+      {isMobile && reticleActive && (
+        <>
+          <ReticleOverlay />
+          <ReticleTray onFinish={handleReticleFinished} />
+        </>
+      )}
 
       {/* Gentle hint while a draw tool is armed */}
       {drawMode !== "none" && !isLoading && (
