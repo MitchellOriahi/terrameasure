@@ -1,0 +1,196 @@
+/* index.css
+   The entire design system lives here.
+
+   How Tailwind v4 works (different from v3): there is no tailwind.config.js.
+   You import Tailwind, then declare your design tokens (colors, fonts) in a
+   special "@theme" block, and Tailwind generates utility classes from them.
+   Example: declaring --color-accent below gives us "bg-accent", "text-accent"
+   and so on, for free. */
+
+@import "tailwindcss";
+
+/* Self-hosted fonts (no external CDN calls, works offline as a PWA).
+   Inter is the UI font. JetBrains Mono is ONLY for numeric measurement
+   values, so numbers line up like a proper instrument readout. */
+@import "@fontsource-variable/inter";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/600.css";
+
+/* MapLibre ships its own CSS for map controls, popups and attribution.
+   Without this import, the zoom buttons render as unstyled text. */
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+/* ------------------------------------------------------------------ */
+/* Raw design tokens: one warm near-black charcoal family, one confident
+   emerald/forest green accent. This is the whole palette on purpose:
+   restraint is what makes it feel premium.                            */
+/* ------------------------------------------------------------------ */
+:root {
+  /* Surfaces, warm charcoal (a touch of brown keeps it from feeling cold) */
+  --background: #131211;
+  --surface: #1b1a18;
+  --surface-2: #232120;
+  --border: rgba(255, 255, 255, 0.09);
+
+  /* Text */
+  --foreground: #e9e6e1;
+  --muted-foreground: #9b968e;
+
+  /* The one accent: emerald / forest green family (CEO brand direction) */
+  --accent: #10b981;
+  --accent-bright: #34d399;
+  --accent-deep: #1a3326;
+
+  /* Verdict colors (GO / CAUTION / NO-GO) */
+  --go: #34d399;
+  --caution: #f5b942;
+  --nogo: #f16a5c;
+}
+
+/* Map our raw tokens to Tailwind utility names. "inline" means Tailwind
+   substitutes the var() reference so runtime theming still works. */
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-bright: var(--accent-bright);
+  --color-accent-deep: var(--accent-deep);
+  --color-go: var(--go);
+  --color-caution: var(--caution);
+  --color-nogo: var(--nogo);
+
+  --font-sans: "Inter Variable", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* ------------------------------------------------------------------ */
+/* Base element styling                                                */
+/* ------------------------------------------------------------------ */
+html,
+body,
+#root {
+  /* 100vh first as a fallback for old browsers, then 100dvh, which is
+     the "dynamic" viewport height that tracks the iOS address bar
+     collapsing. Order matters: later valid lines win. */
+  height: 100vh;
+  height: 100dvh;
+}
+
+* {
+  /* Kill the gray flash iOS paints on every tap */
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  /* Kill the browser's default pull-to-refresh bounce; it fights the
+     mobile bottom sheet drag gesture. */
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ------------------------------------------------------------------ */
+/* Reusable component classes                                          */
+/* ------------------------------------------------------------------ */
+
+/* The floating "glass" panel look used by every overlay in the app:
+   semi-transparent charcoal, frosted blur, hairline border, soft shadow. */
+.glass {
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* Numeric readouts: monospace, slightly tighter */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Safe-area helpers for phones with notches / home indicators */
+.pt-safe,
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pb-safe,
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* The map fills the screen and owns all touch gestures; without
+   touch-action: none the browser fights the map for pan/zoom. */
+.map-shell {
+  position: fixed;
+  inset: 0;
+  touch-action: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* MapLibre control restyling so the default controls match the theme  */
+/* ------------------------------------------------------------------ */
+.maplibregl-ctrl-group {
+  background: color-mix(in srgb, var(--surface) 85%, transparent) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+.maplibregl-ctrl-group button {
+  width: 40px !important;
+  height: 40px !important;
+  background: transparent !important;
+}
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--border) !important;
+}
+/* The control icons are dark SVGs by default; invert them for dark chrome */
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(0.85);
+}
+.maplibregl-ctrl-scale {
+  background: color-mix(in srgb, var(--surface) 70%, transparent) !important;
+  color: var(--muted-foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-top: none !important;
+  font-family: var(--font-mono);
+  font-size: 10px !important;
+  border-radius: 0 0 6px 6px;
+}
+.maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--background) 60%, transparent) !important;
+  font-size: 10px;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--muted-foreground) !important;
+}
+
+/* On phones, lift the zoom/locate controls above the bottom action bar
+   (and above the home-indicator safe area). */
+@media (max-width: 768px) {
+  .maplibregl-ctrl-bottom-right {
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+  .maplibregl-ctrl-bottom-left {
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Thin, theme-colored scrollbars inside panels */
+.panel-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.panel-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
