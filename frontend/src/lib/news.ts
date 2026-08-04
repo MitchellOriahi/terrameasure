@@ -150,10 +150,19 @@ export function relativeTime(timeMs: number): string {
 }
 
 // Strip HTML tags from ReliefWeb report bodies (they arrive as markup).
+// DOMParser, NOT element.innerHTML: assigning third-party HTML to a real
+// element (even a detached one) still loads images and can run onerror
+// handlers, which is an XSS door. DOMParser parses inertly: nothing loads,
+// nothing executes.
 function stripHtml(html: string): string {
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return (div.textContent ?? "").replace(/\s+/g, " ").trim();
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return (doc.body.textContent ?? "").replace(/\s+/g, " ").trim();
+}
+
+// Feed items become <a href> links, so only plain web URLs are allowed
+// through ("javascript:" and friends never get to be a citation).
+function isSafeLink(url: string): boolean {
+  return /^https?:\/\//i.test(url);
 }
 
 // Small helper: fetch a URL with a timeout and parse JSON, throwing a
@@ -235,7 +244,7 @@ export async function fetchReliefWebNews(
   return (json.data ?? [])
     .map((item): NewsItem | null => {
       const f = item.fields;
-      if (!f.url) return null; // no citation, no card
+      if (!f.url || !isSafeLink(f.url)) return null; // no citation, no card
       return {
         id: `rw-${item.id}`,
         title: f.title ?? "Untitled report",
@@ -304,7 +313,7 @@ export async function fetchEarthquakeNews(
     .slice(0, 20)
     .map((f): NewsItem | null => {
       const p = f.properties;
-      if (!p.url) return null; // no citation, no card
+      if (!p.url || !isSafeLink(p.url)) return null; // no citation, no card
       const depth = f.geometry?.coordinates?.[2];
       const bits = [
         p.place ?? "",

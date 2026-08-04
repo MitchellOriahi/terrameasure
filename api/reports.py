@@ -215,6 +215,16 @@ _rate_hits: dict[str, list[float]] = {}
 def _check_rate_limit(ip: str) -> None:
     """Raise 429 if this IP already created RATE_LIMIT_MAX reports this hour."""
     now = time.time()
+
+    # Housekeeping: drop IPs whose entire history has aged out of the
+    # window. Without this the dict grows one entry per unique IP forever
+    # (a slow memory leak on a long-lived server).
+    if len(_rate_hits) > 500:
+        stale = [k for k, v in _rate_hits.items()
+                 if not v or now - v[-1] >= RATE_LIMIT_WINDOW_S]
+        for k in stale:
+            del _rate_hits[k]
+
     hits = _rate_hits.setdefault(ip, [])
     # Forget anything older than the window, so old activity does not count.
     hits[:] = [t for t in hits if now - t < RATE_LIMIT_WINDOW_S]

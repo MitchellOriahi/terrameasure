@@ -40,6 +40,14 @@ export function useParcel() {
     onSettled: () => setParcelLoading(false),
     onSuccess: (parcel) => {
       if (parcel.status === "ok") {
+        // "ok" can also mean "the county answered, but no parcel contains
+        // this point" (a road, water, public land). Every field is null
+        // then; showing the card would be a wall of "not published" with
+        // no boundary and no Survey button. A toast is the honest UI.
+        if (parcel.parcel_id === null && parcel.boundary === null) {
+          showToast("No parcel at this exact point (road, water, or public land)");
+          return;
+        }
         setParcel(parcel);
       } else if (parcel.status === "no_coverage") {
         showToast("No parcel data here yet (pilot counties only)");

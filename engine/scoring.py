@@ -216,11 +216,16 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
                 force_caution = True
                 zones = sorted({z.get("zone") for z in flood.get("zones", [])
                                 if z.get("high_risk") and z.get("zone")})
+                # Only claim a coverage number we actually computed; when the
+                # geometry was unusable, say "coverage unknown" honestly.
+                coverage_txt = (f"{frac * 100:.0f}% coverage"
+                                if flood_frac is not None
+                                else "coverage unknown")
                 breakdown.append({"factor": "flood zone",
                                   "effect": f"-{penalty}",
                                   "note": f"Site intersects FEMA high-risk "
                                           f"flood zone(s) {', '.join(zones)} "
-                                          f"({frac * 100:.0f}% coverage). "
+                                          f"({coverage_txt}). "
                                           "Flood insurance and elevated "
                                           "construction likely required."})
             else:
@@ -229,9 +234,22 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
                                           "mapped on the site."})
 
     # ---- Apply caps and clamp to 0-100. ----
+    # The breakdown promises "no black-box score", so any cap or clamp that
+    # moves the number gets its own line. Without this, a lake site's bars
+    # would sum to (say) 54 while the headline says 20, and the mismatch
+    # reads as a bug (or worse, as dishonesty).
+    pre_adjust = int(round(max(0.0, min(100.0, score))))
     if caps:
         score = min(score, min(caps))
     score = int(round(max(0.0, min(100.0, score))))
+    if score != pre_adjust:
+        breakdown.append({
+            "factor": "hard cap",
+            "effect": f"{score - pre_adjust:+d}",
+            "note": ("Heavy water/wetland coverage caps the score at "
+                     f"{score}: good terrain math cannot rescue a site "
+                     "that is mostly not land."),
+        })
 
     # ---- Water-adjusted buildable percentage. ----
     # Slope math says water is "buildable" (it is flat!), so scale the

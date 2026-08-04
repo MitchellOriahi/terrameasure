@@ -44,7 +44,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import requests as http_requests
 
 from fetchers.dem_source import OpenElevationFetcher
@@ -143,13 +143,31 @@ class SurveyResponse(BaseModel):
     disclaimer: str = scoring.DISCLAIMER
 
 
+class VertexIn(BaseModel):
+    """One polygon corner. Typed so a malformed vertex ({"lat": "x"} or a
+    missing key) is a clean 422 from FastAPI instead of a KeyError 500."""
+    lat: float = Field(..., ge=-90, le=90)
+    lon: float = Field(..., ge=-180, le=180)
+
+
 class PolygonSurveyRequest(BaseModel):
-    vertices: list[dict]      # [{lat: float, lon: float}, ...]
-    resolution_m: float = 10.0
+    vertices: list[VertexIn]
+    # Same bounds as GET /survey: without them a tiny resolution over a big
+    # polygon would ask for a multi-million-cell grid.
+    resolution_m: float = Field(10.0, ge=1, le=100)
 
 
 class ContextRequest(BaseModel):
-    vertices: list[dict]      # [{lat: float, lon: float}, ...]
+    vertices: list[VertexIn]
+
+
+# GET /survey caps each side at 5 km; the polygon route must enforce the
+# same ceiling or a continent-sized drawn shape becomes a giant DEM fetch.
+# 5750 = the 5 km cap plus the same 15% padding the polygon route applies.
+MAX_POLYGON_SPAN_M = 5750.0
+# And a floor: a sliver-thin polygon would produce a 0-cell DEM grid and
+# crash downstream, so pad tiny shapes up to a few DEM cells across.
+MIN_POLYGON_SPAN_M = 30.0
 
 
 # ---------------------------------------------------------------------------
@@ -384,8 +402,8 @@ def survey_polygon(req: PolygonSurveyRequest):
         raise HTTPException(status_code=400,
                             detail="Polygon needs at least 3 vertices.")
 
-    lats = [v["lat"] for v in req.vertices]
-    lons = [v["lon"] for v in req.vertices]
+    lats = [v.lat for v in req.vertices]
+    lons = [v.lon for v in req.vertices]
     min_lat, max_lat = min(lats), max(lats)
     min_lon, max_lon = min(lons), max(lons)
     center_lat = (min_lat + max_lat) / 2
@@ -396,11 +414,23 @@ def survey_polygon(req: PolygonSurveyRequest):
     width_m  = (max_lon - min_lon) * m_per_deg_lon * 1.15   # 15% padding
     height_m = (max_lat - min_lat) * m_per_deg_lat * 1.15
 
+    # Enforce the same size ceiling as GET /survey (see MAX_POLYGON_SPAN_M).
+    if width_m > MAX_POLYGON_SPAN_M or height_m > MAX_POLYGON_SPAN_M:
+        raise HTTPException(
+            status_code=400,
+            detail=(f"Survey area too large: about "
+                    f"{max(width_m, height_m) / 1000:.1f} km across. "
+                    "The free tier supports areas up to about 5 km across; "
+                    "draw a smaller shape."))
+    # Pad sliver-thin shapes up to a few DEM cells so the grid is never empty.
+    width_m = max(width_m, MIN_POLYGON_SPAN_M)
+    height_m = max(height_m, MIN_POLYGON_SPAN_M)
+
     dem_result, dem_note = _fetch_dem(
         center_lat, center_lon, width_m, height_m, req.resolution_m)
 
     # Mask DEM to the drawn polygon shape
-    poly_coords = [(v["lat"], v["lon"]) for v in req.vertices]
+    poly_coords = [(v.lat, v.lon) for v in req.vertices]
     dem_result.heights = M.mask_dem_to_polygon(
         dem_result.heights, dem_result.cell_size,
         center_lat, center_lon, poly_coords,
@@ -408,7 +438,7 @@ def survey_polygon(req: PolygonSurveyRequest):
 
     # Context checks use the ACTUAL drawn polygon, not the bounding box,
     # so a shoreline parcel is judged on the shape the user drew.
-    context = _fetch_context([[v["lat"], v["lon"]] for v in req.vertices])
+    context = _fetch_context([[v.lat, v.lon] for v in req.vertices])
 
     try:
         return run_survey(dem_result, context=context, dem_source_note=dem_note)
@@ -495,7 +525,7 @@ def context_check(req: ContextRequest):
     if len(req.vertices) < 3:
         raise HTTPException(status_code=400,
                             detail="Polygon needs at least 3 vertices.")
-    polygon = [[v["lat"], v["lon"]] for v in req.vertices]
+    polygon = [[v.lat, v.lon] for v in req.vertices]
     result = _fetch_context(polygon)
     result["disclaimer"] = scoring.DISCLAIMER
     return result

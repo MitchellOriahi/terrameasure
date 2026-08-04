@@ -47,8 +47,17 @@ export function useSurvey() {
     };
   }, [isPending]);
 
+  // Never two surveys at once: the draw tools stay usable while a survey
+  // is in flight, so without this guard a second shape would fire a second
+  // request, and whichever response landed LAST would win, possibly
+  // showing the first shape's numbers against the second shape's outline.
+  function runSurvey(vertices: LatLon[]) {
+    if (mutation.isPending) return;
+    mutation.mutate(vertices);
+  }
+
   return {
-    runSurvey: mutation.mutate,
+    runSurvey,
     isLoading: mutation.isPending,
     error: mutation.error,
     reset: mutation.reset,
