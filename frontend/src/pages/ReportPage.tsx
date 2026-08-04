@@ -503,7 +503,7 @@ function ReportBody({ report }: { report: ReportResponse }) {
         <p className="mx-auto mt-3 max-w-md text-[10px] leading-relaxed text-muted">
           {report.disclaimer}
         </p>
-        <Link to="/" className="mt-4 inline-block">
+        <Link to="/map" className="mt-4 inline-block">
           <Button variant="primary" size="md" tabIndex={-1}>
             Run your own survey free
           </Button>
@@ -558,7 +558,7 @@ function NotFound() {
         This report does not exist or was removed. Check that the link was
         copied completely.
       </p>
-      <Link to="/" className="mt-6 inline-block">
+      <Link to="/map" className="mt-6 inline-block">
         <Button variant="primary" size="sm" tabIndex={-1}>
           Run your own survey free
         </Button>
@@ -578,6 +578,12 @@ export default function ReportPage() {
     queryFn: () => fetchReport(slug ?? ""),
     enabled: Boolean(slug),
     staleTime: Infinity, // a stored report never changes
+    // A 404 means "this report does not exist" and asking again will not
+    // change that, so never retry client errors (4xx). Anything else
+    // (server hiccup, cold start) gets the default one retry.
+    retry: (failureCount, err) =>
+      !(err instanceof ApiError && err.status >= 400 && err.status < 500) &&
+      failureCount < 1,
   });
 
   const notFound =
@@ -589,7 +595,7 @@ export default function ReportPage() {
       <header className="pt-safe border-b border-line">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
           <Wordmark />
-          <Link to="/">
+          <Link to="/map">
             <Button variant="ghost" size="sm" tabIndex={-1}>
               Run your own survey free
             </Button>

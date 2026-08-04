@@ -13,11 +13,14 @@ import {
   Mountain,
   FileText,
   Crosshair,
+  HelpCircle,
   Newspaper,
   User,
 } from "lucide-react";
 import { useAppStore } from "@/store/appStore";
 import { useAuthStore } from "@/store/authStore";
+import { useWelcomeStore } from "@/store/welcomeStore";
+import { getCompletedSurveyCount } from "@/lib/hints";
 import { Button } from "@/components/ui/button";
 import { SearchBox } from "./SearchBox";
 
@@ -106,6 +109,26 @@ export function TopBar() {
   const layersPanelOpen = useAppStore((s) => s.layersPanelOpen);
   const setLayersPanelOpen = useAppStore((s) => s.setLayersPanelOpen);
 
+  // For the beginner hint pill under the draw tools (desktop only; the
+  // mobile reticle mode carries its own hint). Subscribing to these
+  // slices means the pill disappears the moment a survey starts.
+  const survey = useAppStore((s) => s.survey);
+  const drawnVertices = useAppStore((s) => s.drawnVertices);
+  const welcomeOpen = useWelcomeStore((s) => s.open);
+  const setWelcomeOpen = useWelcomeStore((s) => s.setOpen);
+
+  // Show "draw an area" only to a genuine newcomer: nothing drawn yet,
+  // no results up, no tool armed, welcome card out of the way, and this
+  // browser has never completed a survey (the localStorage counter).
+  // Once the first survey is submitted the counter bumps, so the pill
+  // is gone permanently on every later visit.
+  const showDrawHint =
+    !welcomeOpen &&
+    drawMode === "none" &&
+    survey === null &&
+    drawnVertices === null &&
+    getCompletedSurveyCount() < 1;
+
   return (
     <header className="pt-safe pointer-events-none absolute inset-x-0 top-0 z-20 p-3">
       <div className="pointer-events-auto flex flex-wrap items-center gap-2">
@@ -117,29 +140,42 @@ export function TopBar() {
 
         {/* Row 2 (wraps below on narrow screens): tools */}
         <div className="flex items-center gap-2">
-          {/* Draw tools: pressing again cancels the mode */}
-          <Button
-            size="icon"
-            data-active={drawMode === "polygon"}
-            aria-label="Draw a polygon to survey"
-            title="Draw polygon"
-            onClick={() =>
-              setDrawMode(drawMode === "polygon" ? "none" : "polygon")
-            }
-          >
-            <Pentagon size={18} />
-          </Button>
-          <Button
-            size="icon"
-            data-active={drawMode === "rectangle"}
-            aria-label="Draw a rectangle to survey"
-            title="Draw rectangle"
-            onClick={() =>
-              setDrawMode(drawMode === "rectangle" ? "none" : "rectangle")
-            }
-          >
-            <Square size={18} />
-          </Button>
+          {/* Draw tools: pressing again cancels the mode. The relative
+              wrapper anchors the newcomer hint pill right beneath them. */}
+          <div className="relative flex items-center gap-2">
+            <Button
+              size="icon"
+              data-active={drawMode === "polygon"}
+              aria-label="Draw a polygon to survey"
+              title="Draw polygon"
+              onClick={() =>
+                setDrawMode(drawMode === "polygon" ? "none" : "polygon")
+              }
+            >
+              <Pentagon size={18} />
+            </Button>
+            <Button
+              size="icon"
+              data-active={drawMode === "rectangle"}
+              aria-label="Draw a rectangle to survey"
+              title="Draw rectangle"
+              onClick={() =>
+                setDrawMode(drawMode === "rectangle" ? "none" : "rectangle")
+              }
+            >
+              <Square size={18} />
+            </Button>
+
+            {/* First-use nudge, desktop only (max-md:hidden): points a
+                newcomer at these two buttons until their first survey.
+                Purely decorative, so clicks pass straight through it. */}
+            {showDrawHint && (
+              <div className="glass pointer-events-none absolute left-0 top-full mt-2 hidden w-max items-center gap-2 px-3 py-1.5 text-[11px] text-foreground md:flex">
+                <span className="h-1.5 w-1.5 rounded-full bg-accent-bright" />
+                Draw an area to survey it
+              </div>
+            )}
+          </div>
 
           {/* Basemap switcher: a two-option segmented control */}
           <div className="glass flex h-11 items-center p-1">
@@ -179,6 +215,21 @@ export function TopBar() {
             onClick={() => setLayersPanelOpen(!layersPanelOpen)}
           >
             <Layers size={18} />
+          </Button>
+
+          {/* Help: reopens the welcome card (with the demo survey) any
+              time. Small on purpose; it should be findable, not loud.
+              Visible on every screen size, unlike the nav links. */}
+          <Button
+            size="iconSm"
+            variant="ghost"
+            className="glass"
+            aria-label="Help and quick tour"
+            title="Help"
+            data-active={welcomeOpen}
+            onClick={() => setWelcomeOpen(true)}
+          >
+            <HelpCircle size={16} />
           </Button>
 
           {/* Nav links to the other screens (hidden on the smallest

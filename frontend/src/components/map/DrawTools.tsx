@@ -43,7 +43,6 @@ const SKETCH_STYLES = {
 export function DrawTools({ onShapeFinished }: DrawToolsProps) {
   const { current: mapRef } = useMap();
   const drawMode = useAppStore((s) => s.drawMode);
-  const basemap = useAppStore((s) => s.basemap);
   const setDrawMode = useAppStore((s) => s.setDrawMode);
   const setDrawnVertices = useAppStore((s) => s.setDrawnVertices);
 
@@ -54,8 +53,12 @@ export function DrawTools({ onShapeFinished }: DrawToolsProps) {
   finishRef.current = onShapeFinished;
 
   // ---- Create / destroy the TerraDraw instance ----
-  // We rebuild it whenever the basemap changes, because switching styles
-  // wipes all custom layers from the map, including terra-draw's.
+  // A basemap switch calls MapLibre's setStyle(), which wipes ALL custom
+  // layers from the map, terra-draw's sketch layers included. Guessing
+  // WHEN that wipe happens is fragile (a URL style loads over the
+  // network, an object style applies instantly), so we do not guess:
+  // the map fires "style.load" every time a new style finishes loading,
+  // and we simply rebuild terra-draw on that signal, every time.
   useEffect(() => {
     if (!mapRef) return;
     const map = mapRef.getMap() as unknown as MaplibreMap;
@@ -64,6 +67,14 @@ export function DrawTools({ onShapeFinished }: DrawToolsProps) {
 
     const setup = () => {
       if (cancelled) return;
+      // Tear down the previous instance first (a rebuild after a style
+      // swap). Its layers are usually already gone with the old style,
+      // so failures here are expected and harmless.
+      try {
+        draw?.stop();
+      } catch {
+        // Old sketch layers vanished with the old style; nothing to do.
+      }
       draw = new TerraDraw({
         adapter: new TerraDrawMapLibreGLAdapter({ map }),
         modes: [
@@ -91,22 +102,46 @@ export function DrawTools({ onShapeFinished }: DrawToolsProps) {
         // permanent shape is rendered declaratively by MapView instead.
         setDrawnVertices(vertices);
         setDrawMode("none");
-        draw.clear();
+        // Clearing the sketch touches map layers, which can fail if a
+        // style switch stole them mid-draw. Starting the survey matters
+        // more than tidying pixels, so never let a clear() hiccup stop it.
+        try {
+          draw.clear();
+        } catch {
+          // Sketch layers already gone; nothing to clear.
+        }
         if (vertices.length >= 3) finishRef.current(vertices);
       });
 
       drawRef.current = draw;
+
+      // If a draw tool was already armed while we were rebuilding (say,
+      // the user hit Polygon right as the basemap switched), arm it now
+      // so the button state and the actual tool never drift apart.
+      const armed = useAppStore.getState().drawMode;
+      if (armed !== "none") {
+        try {
+          draw.setMode(armed);
+        } catch {
+          // Mode not ready yet; the mode-sync effect below will retry.
+        }
+      }
     };
 
-    // Style must be loaded before terra-draw can add its layers.
+    // Build now if the current style is already usable (normal case when
+    // this component mounts after the map finished loading)...
     if (map.isStyleLoaded()) {
       setup();
-    } else {
-      map.once("idle", setup);
     }
+    // ...and rebuild EVERY time a style finishes loading from then on.
+    // This single subscription covers the initial load (if the style was
+    // still loading above) and every basemap switch, with no timing
+    // guesswork about which style isStyleLoaded() was talking about.
+    map.on("style.load", setup);
 
     return () => {
       cancelled = true;
+      map.off("style.load", setup);
       try {
         draw?.stop();
       } catch {
@@ -114,7 +149,7 @@ export function DrawTools({ onShapeFinished }: DrawToolsProps) {
       }
       drawRef.current = null;
     };
-  }, [mapRef, basemap, setDrawMode, setDrawnVertices]);
+  }, [mapRef, setDrawMode, setDrawnVertices]);
 
   // ---- Keep terra-draw's mode in sync with the toolbar buttons ----
   useEffect(() => {
@@ -130,7 +165,7 @@ export function DrawTools({ onShapeFinished }: DrawToolsProps) {
     } catch {
       // setMode can throw if called mid-teardown; safe to ignore.
     }
-  }, [drawMode, basemap]);
+  }, [drawMode]);
 
   return null;
 }

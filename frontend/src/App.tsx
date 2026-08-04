@@ -8,7 +8,7 @@
 //   BrowserRouter       : URL-based navigation between screens
 
 import { lazy, Suspense, useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MapProvider } from "@vis.gl/react-maplibre";
 import { FileText, Crosshair, Loader2 } from "lucide-react";
@@ -21,6 +21,10 @@ import { initAuth } from "@/store/authStore";
 // screen's bundle stays lean. Auth and profile get the same treatment;
 // most sessions never open them.
 const ReportPage = lazy(() => import("@/pages/ReportPage"));
+// The marketing landing page at "/". Also lazy: someone opening a direct
+// /map link (or the installed PWA, whose start_url is /map) never
+// downloads the landing page's code at all.
+const LandingPage = lazy(() => import("@/pages/LandingPage"));
 const NewsPage = lazy(() => import("@/pages/NewsPage"));
 const AuthPage = lazy(() => import("@/pages/AuthPage"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
@@ -57,7 +61,17 @@ export default function App() {
       <MapProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<MapPage />} />
+            {/* The front door: what TerraMeasure is and one big CTA */}
+            <Route
+              path="/"
+              element={
+                <Suspense fallback={<PageSpinner />}>
+                  <LandingPage />
+                </Suspense>
+              }
+            />
+            {/* The app itself: the full-screen survey map */}
+            <Route path="/map" element={<MapPage />} />
             {/* Public shared report: anyone with the link, no login */}
             <Route
               path="/r/:slug"
@@ -115,8 +129,12 @@ export default function App() {
                 </Suspense>
               }
             />
-            {/* Anything unknown goes back to the map */}
-            <Route path="*" element={<MapPage />} />
+            {/* Anything unknown redirects to the map. Why the map and
+                not the landing page? The whole app used to live at every
+                path (the old catch-all rendered the map), so any stale
+                bookmark or old link is almost certainly a map link.
+                "replace" keeps the bad URL out of browser history. */}
+            <Route path="*" element={<Navigate to="/map" replace />} />
           </Routes>
         </BrowserRouter>
       </MapProvider>

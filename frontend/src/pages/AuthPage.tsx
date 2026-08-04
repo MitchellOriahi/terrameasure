@@ -76,15 +76,16 @@ export default function AuthPage() {
   const [resent, setResent] = useState(false);
 
   // The path to go back to after signing in. Router state wins; the
-  // sessionStorage copy covers the OAuth reload; "/" is the fallback.
+  // sessionStorage copy covers the OAuth reload; the map is the fallback
+  // (a fresh sign-in should land in the app, not on the marketing page).
   const fromState = (location.state as { from?: string } | null)?.from;
 
   function returnPath(): string {
     if (fromState) return fromState;
     try {
-      return sessionStorage.getItem(RETURN_KEY) ?? "/";
+      return sessionStorage.getItem(RETURN_KEY) ?? "/map";
     } catch {
-      return "/";
+      return "/map";
     }
   }
 
@@ -150,9 +151,9 @@ export default function AuthPage() {
     // to return to. (The camera is stashed continuously by MapView.)
     saveDraft();
     try {
-      sessionStorage.setItem(RETURN_KEY, fromState ?? "/");
+      sessionStorage.setItem(RETURN_KEY, fromState ?? "/map");
     } catch {
-      // Storage blocked: the user still signs in, just lands on "/".
+      // Storage blocked: the user still signs in, just lands on the map.
     }
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -187,7 +188,7 @@ export default function AuthPage() {
     <div className="flex h-dvh flex-col bg-background">
       {/* Slim header, same skeleton as every non-map screen */}
       <header className="pt-safe flex items-center gap-3 border-b border-line px-4 py-3">
-        <Link to="/" aria-label="Back to map">
+        <Link to="/map" aria-label="Back to map">
           <Button variant="ghost" size="iconSm" tabIndex={-1}>
             <ArrowLeft size={16} />
           </Button>

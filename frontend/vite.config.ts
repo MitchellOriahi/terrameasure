@@ -30,7 +30,10 @@ export default defineConfig({
         theme_color: "#131211",
         background_color: "#131211",
         display: "standalone",
-        start_url: "/",
+        // Installed-app users have already chosen TerraMeasure: skip the
+        // marketing landing page (which lives at "/") and open straight
+        // into the survey map.
+        start_url: "/map",
         icons: [
           { src: "pwa-192.png", sizes: "192x192", type: "image/png" },
           { src: "pwa-512.png", sizes: "512x512", type: "image/png" },
@@ -49,6 +52,15 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
         // Map libraries produce big chunks; raise the cacheable size limit.
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // Ship updates immediately. Without these, a user who installed an
+        // old (broken) build could stay pinned to it: the new service
+        // worker would sit in "waiting" until every tab closed.
+        // skipWaiting = the new worker takes over as soon as it installs;
+        // clientsClaim = it controls already-open tabs too;
+        // cleanupOutdatedCaches = old precaches are deleted, not hoarded.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
       },
     }),
   ],

@@ -22,7 +22,9 @@ import { Sheet } from "@/components/ui/sheet";
 import { MobileBottomBar } from "@/components/MobileBottomBar";
 import { ReticleOverlay } from "@/components/ReticleOverlay";
 import { ReticleTray } from "@/components/ReticleTray";
+import { WelcomeOverlay } from "@/components/WelcomeOverlay";
 import { bumpCompletedSurveyCount } from "@/lib/hints";
+import type { LatLon } from "@/lib/geo";
 import {
   ResultsContent,
   UncertifiedLabel,
@@ -84,6 +86,10 @@ export function MapPage() {
 
   function handleShapeFinished(vertices: { lat: number; lon: number }[]) {
     lastFinishRef.current = Date.now();
+    // Feed the "stop showing beginner hints" counter. It lives here (the
+    // one funnel every survey submission passes through) so desktop
+    // drawing, the mobile reticle, and the demo survey all count once.
+    bumpCompletedSurveyCount();
     // A hand-drawn shape has no parcel behind it; forget any earlier one
     // so a shared report never carries the wrong parcel's facts.
     useAppStore.getState().setSurveyParcel(null);
@@ -96,9 +102,16 @@ export function MapPage() {
     const s = useAppStore.getState();
     const vertices = [...s.reticleVertices];
     if (vertices.length < 3) return;
-    bumpCompletedSurveyCount(); // feeds the "stop showing the hint" counter
     s.stopReticle();
     s.setDrawnVertices(vertices);
+    handleShapeFinished(vertices);
+  }
+
+  // "Try a demo survey" from the welcome card lands here: store the
+  // preset shape (so it renders on the map exactly like a drawn one),
+  // then submit it through the very same path a hand-drawn shape uses.
+  function handleDemoRun(vertices: LatLon[]) {
+    useAppStore.getState().setDrawnVertices(vertices);
     handleShapeFinished(vertices);
   }
 
@@ -249,8 +262,20 @@ export function MapPage() {
 
       {/* ---- Parcel Card: appears after tapping a parcel on the map ---- */}
       {parcel && !showResults && !isLoading && (
-        <ParcelCard parcel={parcel} onSurvey={(v) => runSurvey(v)} />
+        <ParcelCard
+          parcel={parcel}
+          onSurvey={(v) => {
+            // Parcel surveys skip handleShapeFinished (they must keep
+            // their parcel attached), so count them for the hints here.
+            bumpCompletedSurveyCount();
+            runSurvey(v);
+          }}
+        />
       )}
+
+      {/* ---- First-run welcome card + demo survey (auto-opens once;
+              the "?" button in the TopBar reopens it any time) ---- */}
+      <WelcomeOverlay onRunDemo={handleDemoRun} surveyLoading={isLoading} />
 
       {/* ---- Tiny toast pill (e.g. "No parcel data here yet") ---- */}
       {toast && (

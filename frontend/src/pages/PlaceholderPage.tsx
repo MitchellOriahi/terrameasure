@@ -24,7 +24,7 @@ export function PlaceholderPage({
     <div className="flex h-dvh flex-col bg-background">
       {/* Slim header with the wordmark and a way back to the map */}
       <header className="pt-safe flex items-center gap-3 border-b border-line px-4 py-3">
-        <Link to="/" aria-label="Back to map">
+        <Link to="/map" aria-label="Back to map">
           <Button variant="ghost" size="iconSm" tabIndex={-1}>
             <ArrowLeft size={16} />
           </Button>
@@ -44,7 +44,7 @@ export function PlaceholderPage({
             coming in this rebuild
           </span>
           <div className="mt-6">
-            <Link to="/">
+            <Link to="/map">
               <Button variant="primary" size="sm" tabIndex={-1}>
                 Back to the map
               </Button>

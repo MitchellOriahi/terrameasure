@@ -89,7 +89,7 @@ export default function NewsPage() {
     <div className="flex h-dvh flex-col bg-background">
       {/* Slim header: back to the map, wordmark, refresh */}
       <header className="pt-safe flex items-center gap-3 border-b border-line px-4 py-3">
-        <Link to="/" aria-label="Back to map">
+        <Link to="/map" aria-label="Back to map">
           <Button variant="ghost" size="iconSm" tabIndex={-1}>
             <ArrowLeft size={16} />
           </Button>

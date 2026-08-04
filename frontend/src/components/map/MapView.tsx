@@ -132,8 +132,20 @@ export function MapView({ onShapeFinished, onMapClick }: MapViewProps) {
       mapStyle={basemap === "map" ? DARK_STYLE_URL : SATELLITE_STYLE}
       // When 3D is on, tell MapLibre to drape the map over the elevation
       // tiles declared in the "terrain-dem" source below.
+      // IMPORTANT: when 3D is off this must be null, NOT undefined.
+      // react-maplibre treats undefined as "not my job, leave the map
+      // alone", so the terrain would silently stay on forever. That
+      // stuck terrain then wrecks 2D rendering: at high-elevation spots
+      // (like Colorado) the camera ends up almost touching the ground,
+      // and the map looks insanely zoomed in and blurry. null means
+      // "actively remove the terrain".
+      // (The cast is needed because the wrapper's TypeScript types only
+      // admit undefined, while its runtime code specifically handles null
+      // as the "remove terrain" signal. Runtime wins here.)
       terrain={
-        terrain3d ? { source: "terrain-dem", exaggeration: 1.3 } : undefined
+        terrain3d
+          ? { source: "terrain-dem", exaggeration: 1.3 }
+          : (null as unknown as undefined)
       }
       maxPitch={terrain3d ? 70 : 60}
       style={{ width: "100%", height: "100%" }}
@@ -141,6 +153,14 @@ export function MapView({ onShapeFinished, onMapClick }: MapViewProps) {
       onClick={(e: MapLayerMouseEvent) =>
         onMapClick?.(e.lngLat.lat, e.lngLat.lng)
       }
+      // Dev-only escape hatch: expose the raw MapLibre map on window so
+      // diagnostic scripts (scripts/e2e-diagnose.mjs) can inspect layers
+      // and sources. Stripped from production builds by the DEV guard.
+      onLoad={(e) => {
+        if (import.meta.env.DEV) {
+          (window as unknown as { __tmMap?: unknown }).__tmMap = e.target;
+        }
+      }}
     >
       {/* ---- Built-in map controls (bottom right, above mobile sheet) ---- */}
       <NavigationControl position="bottom-right" showCompass visualizePitch />

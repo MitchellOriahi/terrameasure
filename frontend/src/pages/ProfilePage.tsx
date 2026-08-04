@@ -102,13 +102,13 @@ export default function ProfilePage() {
 
   async function handleSignOut() {
     await signOut();
-    navigate("/", { replace: true });
+    navigate("/map", { replace: true });
   }
 
-  /** Tapping a saved survey flies the map to it: we navigate home and
-      hand MapPage the coordinates through router state. */
+  /** Tapping a saved survey flies the map to it: we navigate to the map
+      screen and hand MapPage the coordinates through router state. */
   function flyToSurvey(row: SurveyRow) {
-    navigate("/", { state: { flyTo: { lat: row.lat, lon: row.lon } } });
+    navigate("/map", { state: { flyTo: { lat: row.lat, lon: row.lon } } });
   }
 
   // Still checking the stored session, or mid-bounce to /auth
@@ -125,7 +125,7 @@ export default function ProfilePage() {
   return (
     <div className="flex h-dvh flex-col bg-background">
       <header className="pt-safe flex items-center gap-3 border-b border-line px-4 py-3">
-        <Link to="/" aria-label="Back to map">
+        <Link to="/map" aria-label="Back to map">
           <Button variant="ghost" size="iconSm" tabIndex={-1}>
             <ArrowLeft size={16} />
           </Button>
