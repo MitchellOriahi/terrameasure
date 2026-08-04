@@ -17,8 +17,51 @@ import {
   User,
 } from "lucide-react";
 import { useAppStore } from "@/store/appStore";
+import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/button";
 import { SearchBox } from "./SearchBox";
+
+/** The account entry in the top bar: a small initial-in-a-circle when
+    signed in (links to the profile), a quiet person icon labeled
+    "Sign in" when anonymous (links to /auth). Deliberately subtle;
+    accounts are optional in this app. */
+export function ProfileButton() {
+  const status = useAuthStore((s) => s.status);
+  const user = useAuthStore((s) => s.user);
+  const location = useLocation();
+
+  if (status === "signed-in" && user) {
+    return (
+      <Link to="/profile" aria-label="Your profile" title={user.name}>
+        <Button
+          size="iconSm"
+          variant="ghost"
+          className="glass"
+          data-active={location.pathname === "/profile"}
+          tabIndex={-1}
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-deep text-[10px] font-semibold text-accent-bright">
+            {user.name.charAt(0).toUpperCase()}
+          </span>
+        </Button>
+      </Link>
+    );
+  }
+
+  // Anonymous (or still checking): a plain sign-in entry. Never a nag.
+  return (
+    <Link
+      to="/auth"
+      state={{ from: location.pathname }}
+      aria-label="Sign in"
+      title="Sign in"
+    >
+      <Button size="iconSm" variant="ghost" className="glass" tabIndex={-1}>
+        <User size={16} />
+      </Button>
+    </Link>
+  );
+}
 
 /** The Terra(diamond)Measure wordmark, per the brand direction. */
 export function Wordmark() {
@@ -50,7 +93,6 @@ const NAV_LINKS = [
   { to: "/reports", icon: FileText, label: "Reports" },
   { to: "/photo", icon: Crosshair, label: "Ground Truth" },
   { to: "/news", icon: Newspaper, label: "News" },
-  { to: "/profile", icon: User, label: "Profile" },
 ];
 
 export function TopBar() {
@@ -156,6 +198,9 @@ export function TopBar() {
                 </Button>
               </Link>
             ))}
+            {/* Account entry: avatar initial when signed in, sign-in
+                link when not */}
+            <ProfileButton />
           </nav>
         </div>
       </div>

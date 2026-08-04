@@ -17,9 +17,10 @@ import {
   GeolocateControl,
   ScaleControl,
 } from "@vis.gl/react-maplibre";
-import type { MapLayerMouseEvent } from "@vis.gl/react-maplibre";
+import type { MapLayerMouseEvent, ViewStateChangeEvent } from "@vis.gl/react-maplibre";
 import type { Feature, Polygon } from "geojson";
 import { useAppStore } from "@/store/appStore";
+import { loadCamera, saveCamera } from "@/lib/mapState";
 import type { LatLon } from "@/lib/geo";
 import {
   DARK_STYLE_URL,
@@ -56,6 +57,10 @@ export function MapView({ onShapeFinished, onMapClick }: MapViewProps) {
   const drawnVertices = useAppStore((s) => s.drawnVertices);
   const survey = useAppStore((s) => s.survey);
   const parcel = useAppStore((s) => s.parcel);
+
+  // Where the user last left the map in this tab. Read once per mount:
+  // it survives the Google sign-in round trip, which reloads the page.
+  const savedCamera = loadCamera();
 
   // The looked-up parcel's outline as a GeoJSON feature for display.
   const parcelFeature = useMemo<Feature<Polygon> | null>(() => {
@@ -103,12 +108,27 @@ export function MapView({ onShapeFinished, onMapClick }: MapViewProps) {
   return (
     <Map
       id="main"
-      initialViewState={{
-        // Continental US, comfortably framed
-        longitude: -98.5,
-        latitude: 39.5,
-        zoom: 4,
-      }}
+      initialViewState={savedCamera
+        ? {
+            longitude: savedCamera.lon,
+            latitude: savedCamera.lat,
+            zoom: savedCamera.zoom,
+          }
+        : {
+            // First visit in this tab: continental US, comfortably framed
+            longitude: -98.5,
+            latitude: 39.5,
+            zoom: 4,
+          }}
+      // Stash the camera after every pan/zoom settles, so a reload at
+      // any moment comes back to the same view.
+      onMoveEnd={(e: ViewStateChangeEvent) =>
+        saveCamera({
+          lat: e.viewState.latitude,
+          lon: e.viewState.longitude,
+          zoom: e.viewState.zoom,
+        })
+      }
       mapStyle={basemap === "map" ? DARK_STYLE_URL : SATELLITE_STYLE}
       // When 3D is on, tell MapLibre to drape the map over the elevation
       // tiles declared in the "terrain-dem" source below.

@@ -10,12 +10,24 @@
 import { useNavigate } from "react-router-dom";
 import { Layers, Pentagon, Bookmark } from "lucide-react";
 import { useAppStore } from "@/store/appStore";
+import { useAuthStore } from "@/store/authStore";
 
 export function MobileBottomBar() {
   const navigate = useNavigate();
   const startReticle = useAppStore((s) => s.startReticle);
   const layersPanelOpen = useAppStore((s) => s.layersPanelOpen);
   const setLayersPanelOpen = useAppStore((s) => s.setLayersPanelOpen);
+  const authStatus = useAuthStore((s) => s.status);
+
+  // Saved surveys live on the profile page; anonymous users go to the
+  // sign-in page first (and come right back here after).
+  function openSaved() {
+    if (authStatus === "signed-in") {
+      navigate("/profile");
+    } else {
+      navigate("/auth", { state: { from: "/profile" } });
+    }
+  }
 
   return (
     <div className="pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-20 px-4 pb-3">
@@ -41,12 +53,12 @@ export function MobileBottomBar() {
           Survey
         </button>
 
-        {/* Saved (placeholder destination for now) */}
+        {/* Saved surveys (profile page; sign-in first when anonymous) */}
         <button
           type="button"
-          onClick={() => navigate("/profile")}
+          onClick={openSaved}
           className="glass flex h-11 w-11 items-center justify-center rounded-full text-foreground"
-          aria-label="Saved sites"
+          aria-label="Saved surveys"
         >
           <Bookmark size={20} />
         </button>

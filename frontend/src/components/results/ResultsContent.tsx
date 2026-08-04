@@ -23,6 +23,7 @@ import { MetricRow } from "./MetricRow";
 import { ElevationChart } from "./ElevationChart";
 import { RiskFlags } from "./RiskFlags";
 import { ShareReport } from "./ShareReport";
+import { SaveSurvey } from "./SaveSurvey";
 
 // Verdict banner styling: color + a one-line meaning. The verdict word
 // itself is always text, so color is never the only signal.
@@ -114,8 +115,10 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
         <p className="mt-0.5 text-xs text-foreground/80">{meta.blurb}</p>
       </div>
 
-      {/* ---- Share this survey as a public read-only report link ---- */}
+      {/* ---- Share this survey as a public read-only report link,
+           and Save it to the signed-in user's profile ---- */}
       <ShareReport survey={survey} vertices={vertices} />
+      <SaveSurvey survey={survey} vertices={vertices} />
 
       {/* ---- Cost to develop: right under the verdict per spec ---- */}
       <div className="rounded-xl border border-line bg-surface-2/60 px-4 py-3">

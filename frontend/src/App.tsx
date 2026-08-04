@@ -7,25 +7,32 @@
 //                         search box) grab a handle to it by id
 //   BrowserRouter       : URL-based navigation between screens
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MapProvider } from "@vis.gl/react-maplibre";
-import {
-  FileText,
-  Crosshair,
-  Newspaper,
-  User,
-  KeyRound,
-  Loader2,
-} from "lucide-react";
+import { FileText, Crosshair, Loader2 } from "lucide-react";
 import { MapPage } from "@/pages/MapPage";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
+import { initAuth } from "@/store/authStore";
 
 // The public shared-report page is lazy-loaded: React only downloads its
 // code when someone actually opens a /r/{slug} link, so the map home
-// screen's bundle stays lean.
+// screen's bundle stays lean. Auth and profile get the same treatment;
+// most sessions never open them.
 const ReportPage = lazy(() => import("@/pages/ReportPage"));
+const NewsPage = lazy(() => import("@/pages/NewsPage"));
+const AuthPage = lazy(() => import("@/pages/AuthPage"));
+const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
+
+// A shared full-screen spinner for the lazy routes above.
+function PageSpinner() {
+  return (
+    <div className="flex h-dvh items-center justify-center bg-background">
+      <Loader2 className="animate-spin text-accent" size={28} />
+    </div>
+  );
+}
 
 // One QueryClient for the whole app. Surveys are expensive (up to 50s on
 // a cold start), so never auto-retry them; the user gets an explicit
@@ -38,6 +45,13 @@ const queryClient = new QueryClient({
 });
 
 export default function App() {
+  // Wake up the auth store once: it checks for a stored session and then
+  // listens for sign-ins and sign-outs. If anything fails, the store
+  // lands on "anonymous" and the app carries on; auth never blocks.
+  useEffect(() => {
+    initAuth();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <MapProvider>
@@ -48,16 +62,7 @@ export default function App() {
             <Route
               path="/r/:slug"
               element={
-                <Suspense
-                  fallback={
-                    <div className="flex h-dvh items-center justify-center bg-background">
-                      <Loader2
-                        className="animate-spin text-accent"
-                        size={28}
-                      />
-                    </div>
-                  }
-                >
+                <Suspense fallback={<PageSpinner />}>
                   <ReportPage />
                 </Suspense>
               }
@@ -82,34 +87,32 @@ export default function App() {
                 />
               }
             />
+            {/* TerraIntel: land-relevant news (ReliefWeb + USGS feeds) */}
             <Route
               path="/news"
               element={
-                <PlaceholderPage
-                  title="News"
-                  blurb="Land-intelligence headlines for your saved areas: zoning changes, listings, and local development activity."
-                  icon={Newspaper}
-                />
+                <Suspense fallback={<PageSpinner />}>
+                  <NewsPage />
+                </Suspense>
               }
             />
+            {/* Profile: the one route with an auth gate (it bounces
+                anonymous visitors to /auth itself) */}
             <Route
               path="/profile"
               element={
-                <PlaceholderPage
-                  title="Profile"
-                  blurb="Your saved sites, survey history, and preferences, synced across devices."
-                  icon={User}
-                />
+                <Suspense fallback={<PageSpinner />}>
+                  <ProfilePage />
+                </Suspense>
               }
             />
+            {/* Sign in / sign up. Always optional; the map never needs it */}
             <Route
               path="/auth"
               element={
-                <PlaceholderPage
-                  title="Sign in"
-                  blurb="Accounts return here soon (Supabase email and Google sign-in). The map works fully without an account."
-                  icon={KeyRound}
-                />
+                <Suspense fallback={<PageSpinner />}>
+                  <AuthPage />
+                </Suspense>
               }
             />
             {/* Anything unknown goes back to the map */}

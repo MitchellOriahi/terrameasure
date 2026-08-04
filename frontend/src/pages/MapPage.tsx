@@ -6,8 +6,11 @@
 // No sign-in is ever required here: drawing and surveying work for
 // everyone, always.
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useMap } from "@vis.gl/react-maplibre";
 import { AlertTriangle, Loader2 } from "lucide-react";
+import { restoreDraftOnce } from "@/lib/mapState";
 import { MapView } from "@/components/map/MapView";
 import { ParcelCard } from "@/components/ParcelCard";
 import { TopBar } from "@/components/TopBar";
@@ -44,6 +47,34 @@ export function MapPage() {
   const { lookupParcel } = useParcel();
   const parcel = useAppStore((s) => s.parcel);
   const toast = useAppStore((s) => s.toast);
+
+  // If the user went off to Google sign-in mid-draw, the shape they were
+  // drawing was stashed in sessionStorage before the redirect. Put it
+  // back exactly once; on a normal visit this finds nothing and no-ops.
+  useEffect(() => {
+    restoreDraftOnce();
+  }, []);
+
+  // Tapping a saved survey on the profile page navigates here with the
+  // coordinates in router state; fly the map there once it is ready.
+  const { main: map } = useMap();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const flyTarget = (
+    location.state as { flyTo?: { lat: number; lon: number } } | null
+  )?.flyTo;
+  useEffect(() => {
+    if (!map || !flyTarget) return;
+    map.flyTo({
+      center: [flyTarget.lon, flyTarget.lat],
+      zoom: 16,
+      duration: 1600,
+      essential: true,
+    });
+    // Clear the state so a browser refresh does not re-fly.
+    navigate(location.pathname, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, flyTarget]);
 
   // Finishing a polygon ends with a click on the map. That same click
   // also reaches the map's onClick handler, and by then drawMode is
