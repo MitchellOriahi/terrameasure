@@ -6,6 +6,9 @@ __pycache__/
 .Python
 *.egg-info/
 dist/
+# ...but the React production bundle IS shipped in git, because Render's
+# Python host has no Node.js to build it. See frontend/.gitignore.
+!frontend/dist/
 build/
 *.egg
 .eggs/
