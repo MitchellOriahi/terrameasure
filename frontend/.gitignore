@@ -8,7 +8,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+# dist is COMMITTED on purpose: Render's Python host has no Node.js, so the
+# production bundle is built locally (npm run build) and shipped in git.
 dist-ssr
 *.local
 

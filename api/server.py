@@ -556,12 +556,52 @@ def geocode(q: str = Query(...)):
 def health():
     return {"status": "ok", "version": "0.4.0"}
 
-@app.get("/")
-def root():
-    return RedirectResponse(url="/web/index.html")
+# ---------------------------------------------------------------------------
+# Static serving: the NEW React app (frontend/dist) is the product now.
+#
+# How this works, in plain terms:
+#   * frontend/dist is what "npm run build" produces: one index.html plus
+#     hashed asset files. It is committed to the repo so Render (a Python
+#     host with no Node.js) can serve it without building it.
+#   * A single-page app does its own routing in the browser, so EVERY page
+#     URL (/, /news, /profile, /r/abc123...) must be answered with the same
+#     index.html; React then looks at the URL and renders the right page.
+#     That is what the catch-all route at the bottom does.
+#   * The old vanilla app stays reachable at /web/ during the transition.
+# ---------------------------------------------------------------------------
 
-_web_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web")
+_root_dir = os.path.dirname(os.path.dirname(__file__))
+_web_dir = os.path.join(_root_dir, "web")
+_dist_dir = os.path.join(_root_dir, "frontend", "dist")
+
 app.mount("/web", StaticFiles(directory=_web_dir), name="web")
+
+if os.path.isdir(_dist_dir):
+    # Hashed JS/CSS bundles live under /assets, so mount that folder directly.
+    app.mount(
+        "/assets",
+        StaticFiles(directory=os.path.join(_dist_dir, "assets")),
+        name="assets",
+    )
+
+    from fastapi.responses import FileResponse
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa(full_path: str):
+        # Serve real files from dist when they exist (icons, manifest,
+        # service worker); everything else falls back to index.html so the
+        # React router can handle the URL. API routes are unaffected: they
+        # are registered above, and FastAPI matches them first.
+        candidate = os.path.normpath(os.path.join(_dist_dir, full_path))
+        # Safety: never serve anything outside the dist folder.
+        if candidate.startswith(_dist_dir) and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(os.path.join(_dist_dir, "index.html"))
+else:
+    # Local dev without a built frontend: keep the old behavior.
+    @app.get("/")
+    def root():
+        return RedirectResponse(url="/web/index.html")
 
 if __name__ == "__main__":
     import uvicorn

@@ -51,3 +51,8 @@ server_err.txt
 # Byte-compiled / cached data files
 *.db
 *.sqlite3
+
+# Generated map images from demo/test runs
+*_clean.png
+contour_map.png
+slope_map.png
