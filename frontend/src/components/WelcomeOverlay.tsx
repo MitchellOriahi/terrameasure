@@ -25,6 +25,7 @@ import {
   markWelcomeSeen,
 } from "@/store/welcomeStore";
 import type { LatLon } from "@/lib/geo";
+import { safeFlyTo } from "@/lib/mapCamera";
 
 // ------------------------------------------------------------------
 // Demo survey constants
@@ -144,7 +145,9 @@ export function WelcomeOverlay({
     sawLoadingRef.current = false;
     // Fly to the demo terrain. "essential: true" tells MapLibre this
     // motion matters even when the OS asks for reduced motion.
-    map?.flyTo({
+    // safeFlyTo turns this into an instant jump when 3D terrain is on
+    // (animated moves + terrain = black screen bug in MapLibre 6).
+    safeFlyTo(map, {
       center: [DEMO_CENTER.lon, DEMO_CENTER.lat],
       zoom: DEMO_ZOOM,
       duration: DEMO_FLY_MS,

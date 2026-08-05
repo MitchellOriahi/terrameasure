@@ -37,9 +37,11 @@ export function ActionSheet({ title, actions, onCancel }: ActionSheetProps) {
         className="absolute inset-0 bg-black/40"
         onClick={onCancel}
       />
-      {/* The sheet itself, hugging the bottom edge above the safe area */}
+      {/* The sheet itself, hugging the bottom edge above the safe area.
+          max-w + mx-auto keep it phone-width even on a wide desktop
+          screen; full-bleed buttons across 1440px look broken. */}
       <div
-        className="glass pb-safe absolute inset-x-2 bottom-2 p-3"
+        className="glass pb-safe absolute inset-x-2 bottom-2 mx-auto max-w-md p-3"
         style={{ animation: "sheet-up 200ms ease-out" }}
         role="alertdialog"
         aria-label={title}

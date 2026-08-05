@@ -27,6 +27,7 @@ import type {
 } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import { useAppStore } from "@/store/appStore";
+import { safeEaseTo } from "@/lib/mapCamera";
 
 // How close (in screen pixels) the crosshair must get to the first vertex
 // before we offer to close the shape. 24px is roughly half a fingertip.
@@ -73,7 +74,9 @@ export function ReticleLayers() {
     const padBottom = Math.round(
       map.getContainer().clientHeight * BOTTOM_PAD_FRACTION,
     );
-    map.easeTo({
+    // safeEaseTo: animated on a flat map, instant when 3D terrain is
+    // on (animated moves + terrain = black screen bug in MapLibre 6).
+    safeEaseTo(map, {
       padding: { top: 0, bottom: padBottom, left: 0, right: 0 },
       duration: 250,
     });
@@ -104,7 +107,7 @@ export function ReticleLayers() {
       map.off("click", onClick);
       // Give the camera its normal center back when leaving draw mode.
       try {
-        map.easeTo({
+        safeEaseTo(map, {
           padding: { top: 0, bottom: 0, left: 0, right: 0 },
           duration: 250,
         });
@@ -130,7 +133,7 @@ export function ReticleLayers() {
     if (!v) return;
     const map = mapRef.getMap() as unknown as MaplibreMap;
     // Camera padding is already set, so "center" means "under the crosshair".
-    map.easeTo({ center: [v.lon, v.lat], duration: 350 });
+    safeEaseTo(map, { center: [v.lon, v.lat], duration: 350 });
   }, [mapRef, active, selected]);
 
   // ---- GeoJSON for the three visual pieces (memoized so the map is only

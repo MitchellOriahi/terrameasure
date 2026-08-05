@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMap } from "@vis.gl/react-maplibre";
 import { Search, Loader2 } from "lucide-react";
 import { geocode, type GeocodeResult } from "@/lib/api";
+import { safeFlyTo } from "@/lib/mapCamera";
 
 export function SearchBox() {
   const [text, setText] = useState("");
@@ -50,7 +51,9 @@ export function SearchBox() {
     setOpen(false);
     setText(r.display_name.split(",")[0]);
     // Nominatim sends coordinates as strings; convert before flying.
-    map?.flyTo({
+    // safeFlyTo animates on a flat map but jumps instantly when 3D
+    // terrain is on (animated moves + terrain = black screen bug).
+    safeFlyTo(map, {
       center: [parseFloat(r.lon), parseFloat(r.lat)],
       zoom: 15,
       duration: 2200,

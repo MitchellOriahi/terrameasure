@@ -25,6 +25,7 @@ import { ReticleTray } from "@/components/ReticleTray";
 import { WelcomeOverlay } from "@/components/WelcomeOverlay";
 import { bumpCompletedSurveyCount } from "@/lib/hints";
 import type { LatLon } from "@/lib/geo";
+import { safeFlyTo } from "@/lib/mapCamera";
 import {
   ResultsContent,
   UncertifiedLabel,
@@ -67,7 +68,9 @@ export function MapPage() {
   )?.flyTo;
   useEffect(() => {
     if (!map || !flyTarget) return;
-    map.flyTo({
+    // safeFlyTo animates on a flat map but jumps instantly when 3D
+    // terrain is on (animated moves + terrain = black screen bug).
+    safeFlyTo(map, {
       center: [flyTarget.lon, flyTarget.lat],
       zoom: 16,
       duration: 1600,

@@ -60,12 +60,29 @@ class DEMFetcher:
 class OpenElevationFetcher(DEMFetcher):
     API = "https://api.open-elevation.com/api/v1/lookup"
 
+    # Open-Elevation answers ONE POST containing every grid point. A big
+    # drawn area at a fine resolution (say 4 km at 10 m = 160,000 points)
+    # would be a multi-megabyte request the free API rejects or times out
+    # on, and the whole survey would die with it. So we cap the grid at
+    # this many cells per side and coarsen the resolution to fit. Honest
+    # trade: this source is ~5 m vertical error anyway, so a finer grid
+    # over a large area adds bytes, not accuracy.
+    MAX_CELLS_PER_SIDE = 70
+
     def get_dem(self, lat, lon, width_m, height_m, resolution_m) -> DEMResult:
         # Roughly how many degrees of lat/lon correspond to our cell size.
         # 1 degree latitude ~= 111,320 meters. Longitude shrinks toward poles,
         # so we scale it by cos(latitude).
         m_per_deg_lat = 111_320.0
         m_per_deg_lon = 111_320.0 * np.cos(np.radians(lat))
+
+        # Coarsen the resolution if the requested grid would be too big
+        # for one Open-Elevation request (see MAX_CELLS_PER_SIDE above).
+        resolution_m = max(
+            resolution_m,
+            width_m / self.MAX_CELLS_PER_SIDE,
+            height_m / self.MAX_CELLS_PER_SIDE,
+        )
 
         n_cols = max(2, int(width_m / resolution_m))
         n_rows = max(2, int(height_m / resolution_m))

@@ -7,6 +7,7 @@
 // tiny style object ourselves around Esri's free World Imagery tiles.
 
 import type { StyleSpecification } from "maplibre-gl";
+import { API_BASE } from "@/lib/api";
 
 // CARTO's dark basemap: vector tiles, crisp labels, perfect for dark chrome.
 export const DARK_STYLE_URL =
@@ -47,14 +48,21 @@ export const TERRARIUM_TILES =
 
 // FEMA's National Flood Hazard Layer, served as map images. The special
 // {bbox-epsg-3857} token is filled in by MapLibre for each tile request.
+// "layers=show:27,28" limits the picture to Flood Hazard Boundaries and
+// Flood Hazard Zones. Without it the service also draws FIRM panel
+// labels, survey baselines, and a dozen other engineering layers, which
+// buries the map under red "PANEL 08059C0188G" text.
 export const FEMA_NFHL_TILES =
   "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export" +
-  "?dpi=96&transparent=true&format=png32&bbox={bbox-epsg-3857}" +
+  "?dpi=96&transparent=true&format=png32&layers=show:27,28&bbox={bbox-epsg-3857}" +
   "&bboxSR=3857&imageSR=3857&size=256,256&f=image";
 
-// US Fish and Wildlife Service wetlands, via the standard WMS protocol.
+// US Fish and Wildlife Service wetlands.
+// The USFWS server sends no CORS header, so the browser is not allowed
+// to fetch its images directly (the old direct URL failed silently and
+// the overlay never drew). Instead we ask OUR OWN backend, which
+// fetches the image server-to-server (no CORS there) and passes it
+// back: see the /tiles/wetlands endpoint in api/server.py. MapLibre
+// still fills in the {bbox-epsg-3857} token per tile.
 export const WETLANDS_WMS_TILES =
-  "https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/services/Wetlands/MapServer/WMSServer" +
-  "?service=WMS&request=GetMap&version=1.1.1&layers=1&styles=" +
-  "&srs=EPSG:3857&bbox={bbox-epsg-3857}&width=256&height=256" +
-  "&format=image%2Fpng&transparent=true";
+  `${API_BASE}/tiles/wetlands?bbox={bbox-epsg-3857}`;

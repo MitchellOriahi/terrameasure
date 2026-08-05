@@ -42,7 +42,7 @@ import numpy as np
 from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 import requests as http_requests
@@ -547,6 +547,64 @@ def geocode(q: str = Query(...)):
         return r.json()
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Wetlands overlay tile proxy
+#
+# Why this exists: the map's Wetlands overlay needs picture tiles from the
+# USFWS National Wetlands Inventory server. That server does not send the
+# CORS header (Access-Control-Allow-Origin), so a browser is forbidden
+# from fetching its images directly and the overlay silently drew nothing.
+# The fix is the classic one: the browser asks OUR server (same origin,
+# no CORS involved), and our server fetches the image and passes it back.
+# The backend already talks to this exact host for wetland risk checks,
+# so this adds no new dependency.
+# ---------------------------------------------------------------------------
+_WETLANDS_EXPORT_URL = (
+    "https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/rest/services/"
+    "Wetlands/MapServer/export"
+)
+
+
+@app.get("/tiles/wetlands")
+def wetlands_tile(bbox: str = Query(...)):
+    # MapLibre fills in bbox as "minX,minY,maxX,maxY" (EPSG:3857 meters).
+    # Parse and re-emit the numbers ourselves so nothing else from the
+    # query string can be smuggled through to the upstream server.
+    try:
+        parts = [float(p) for p in bbox.split(",")]
+        if len(parts) != 4:
+            raise ValueError
+    except ValueError:
+        raise HTTPException(status_code=400, detail="bbox must be 4 numbers")
+
+    try:
+        r = http_requests.get(
+            _WETLANDS_EXPORT_URL,
+            params={
+                "dpi": 96,
+                "transparent": "true",
+                "format": "png32",
+                "bbox": ",".join(str(p) for p in parts),
+                "bboxSR": 3857,
+                "imageSR": 3857,
+                "size": "256,256",
+                "f": "image",
+            },
+            timeout=15,
+        )
+        r.raise_for_status()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    # Tiles never change day to day; let the browser keep them for a day
+    # so panning back and forth does not re-download the same squares.
+    return Response(
+        content=r.content,
+        media_type=r.headers.get("Content-Type", "image/png"),
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 # ---------------------------------------------------------------------------

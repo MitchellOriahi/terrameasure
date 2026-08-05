@@ -21,10 +21,10 @@
 // This file is lazy-loaded from App.tsx so the map home screen never
 // pays for it.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Map, Source, Layer } from "@vis.gl/react-maplibre";
+import { Map, Source, Layer, type MapRef } from "@vis.gl/react-maplibre";
 import type { Feature, Polygon } from "geojson";
 import { FileQuestion, Loader2, AlertTriangle } from "lucide-react";
 import {
@@ -136,6 +136,31 @@ function ReportMap({
 }) {
   const [overlay, setOverlay] = useState<OverlayChoice>("none");
 
+  // MapLibre measures its container the moment it mounts. On this page
+  // the map mounts right as the loading skeleton swaps out for the real
+  // report, so that first measurement can happen before the layout has
+  // settled and the satellite picture ends up filling only part of its
+  // card. The cure is to re-measure after mount: mapRef gives us a
+  // handle to call map.resize(), and a ResizeObserver on the card keeps
+  // the map honest if the card's size ever changes again (fonts
+  // finishing, the window resizing, phone rotation).
+  const mapRef = useRef<MapRef>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    const remeasure = () => mapRef.current?.resize();
+    const observer = new ResizeObserver(remeasure);
+    observer.observe(box);
+    // One delayed re-measure covers the "settled but never resized
+    // again" case the observer alone would miss.
+    const timer = window.setTimeout(remeasure, 350);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+    };
+  }, []);
+
   // The polygon as GeoJSON (rings close on themselves).
   const feature = useMemo<Feature<Polygon> | null>(() => {
     if (!vertices || vertices.length < 3) return null;
@@ -185,9 +210,13 @@ function ReportMap({
 
   return (
     <div className="overflow-hidden rounded-xl border border-line">
-      <div className="h-64 sm:h-80">
+      <div ref={boxRef} className="h-64 sm:h-80">
         <Map
+          ref={mapRef}
           id="report-map"
+          // Belt and suspenders with the effect above: the moment the
+          // map's own style finishes loading, re-check the container.
+          onLoad={(e) => e.target.resize()}
           initialViewState={{
             bounds,
             fitBoundsOptions: { padding: 48 },

@@ -147,6 +147,15 @@ export function MapView({ onShapeFinished, onMapClick }: MapViewProps) {
           ? { source: "terrain-dem", exaggeration: 1.3 }
           : (null as unknown as undefined)
       }
+      // Why this flag: by default MapLibre "clamps" the camera's focal
+      // point to the ground. The moment terrain switches on, the ground
+      // under the camera JUMPS UP by the local elevation (Golden, CO is
+      // ~1,700 m high), MapLibre recomputes the zoom against that raised
+      // ground, and the view dives to a featureless ultra-close-up that
+      // looks like a black screen. With clamping off, the focal point
+      // stays at sea level, so toggling 3D keeps the view scale the user
+      // had; the mountains simply rise toward the camera as expected.
+      centerClampedToGround={false}
       maxPitch={terrain3d ? 70 : 60}
       style={{ width: "100%", height: "100%" }}
       attributionControl={{ compact: true }}

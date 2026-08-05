@@ -6,6 +6,7 @@
 // below) so every control keeps a 44px touch target.
 
 import { Link, useLocation } from "react-router-dom";
+import { useMap } from "@vis.gl/react-maplibre";
 import {
   Pentagon,
   Square,
@@ -100,6 +101,10 @@ const NAV_LINKS = [
 
 export function TopBar() {
   const location = useLocation();
+  // Handle to the map (via MapProvider) so the 3D toggle can tilt the
+  // camera. Terrain alone is invisible from straight above; without a
+  // tilt the button looks like it does nothing.
+  const { main: map } = useMap();
   const drawMode = useAppStore((s) => s.drawMode);
   const setDrawMode = useAppStore((s) => s.setDrawMode);
   const basemap = useAppStore((s) => s.basemap);
@@ -195,13 +200,34 @@ export function TopBar() {
             ))}
           </div>
 
-          {/* 3D terrain toggle */}
+          {/* 3D terrain toggle. Turning 3D on also tilts the camera
+              (pitch 60) so the relief is actually visible; turning it
+              off levels the view back to straight-down 2D. */}
           <Button
             size="icon"
             data-active={terrain3d}
             aria-label="Toggle 3D terrain"
             title="3D terrain"
-            onClick={toggleTerrain3d}
+            onClick={() => {
+              // ORDER MATTERS here. MapLibre 6 renders a BLACK SCREEN
+              // if an ANIMATED camera move runs while terrain is on,
+              // and also when terrain is switched on mid-animation
+              // (see lib/mapCamera.ts). What is proven to work:
+              // enable terrain on the flat map, then tilt with an
+              // INSTANT jump once the terrain has finished loading.
+              toggleTerrain3d();
+              if (!map) return;
+              if (!terrain3d) {
+                // Turning ON. "idle" fires when the map has finished
+                // all pending work, including loading the elevation
+                // tiles, so the jump lands on a ready 3D scene.
+                map.once("idle", () => map.jumpTo({ pitch: 60 }));
+              } else {
+                // Turning OFF: terrain drops instantly (safe), then a
+                // normal animation levels the now-flat map back to 2D.
+                map.easeTo({ pitch: 0, duration: 900, essential: true });
+              }
+            }}
           >
             <Mountain size={18} />
           </Button>

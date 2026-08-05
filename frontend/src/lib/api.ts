@@ -7,12 +7,16 @@
 // Where is the backend?
 // In development, Vite proxies "/api/..." to http://localhost:8000
 // (see vite.config.ts), which avoids CORS headaches entirely.
-// In production, we talk straight to the deployed API. The URL can be
-// overridden at build time with the VITE_API_URL environment variable.
+// In production, the FastAPI server that answers the API calls is the
+// SAME server that served this page (it hosts frontend/dist at the
+// root). So the base is simply "" and every call is a relative URL
+// like "/survey/polygon": it works on Render, on localhost, and on any
+// future domain without rebuilding. A split deployment (static host +
+// separate API) can still override this at build time with VITE_API_URL.
 // ------------------------------------------------------------------
 export const API_BASE: string = import.meta.env.DEV
   ? "/api"
-  : (import.meta.env.VITE_API_URL ?? "https://terrameasurev2.onrender.com");
+  : (import.meta.env.VITE_API_URL ?? "");
 
 // ------------------------------------------------------------------
 // Response shapes. These mirror the Pydantic models in api/server.py.

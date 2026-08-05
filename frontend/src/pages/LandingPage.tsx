@@ -218,9 +218,11 @@ export default function LandingPage() {
             >
               Sign in
             </Link>
+            {/* h-11 on phones keeps this a 44px touch target; h-9 on
+                desktop keeps the nav slim (mouse pointers are precise). */}
             <Link
               to="/map"
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-accent px-4 text-xs font-semibold text-black transition-colors hover:bg-accent-bright"
+              className="inline-flex h-11 items-center gap-1.5 rounded-xl bg-accent px-4 text-xs font-semibold text-black transition-colors hover:bg-accent-bright sm:h-9"
             >
               Open the map
               <ArrowRight size={14} />

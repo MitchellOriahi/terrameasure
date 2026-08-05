@@ -271,6 +271,16 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
              "Good" if score >= 65 else
              "Fair" if score >= 45 else "Challenging")
 
+    # A verdict override can leave a high score with a worse verdict: for
+    # example, lovely terrain that clips a FEMA flood zone still forces
+    # CAUTION. Showing "CAUTION" right next to "Excellent" reads as a
+    # contradiction, so the label is never allowed to outrank the verdict:
+    # a caution site caps at "Good", a no-go site caps at "Fair".
+    if verdict == "caution" and label == "Excellent":
+        label = "Good"
+    elif verdict == "no-go" and label in ("Excellent", "Good"):
+        label = "Fair"
+
     return {
         "value": score,
         "verdict": verdict,
