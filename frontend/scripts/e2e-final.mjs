@@ -240,7 +240,7 @@ async function desktopPass(browser) {
         // Note: several headings render uppercase via CSS, and innerText
         // returns the rendered casing, so these checks are case-insensitive.
         const verdict = /(GO|CAUTION|NO-GO)/.test(txt);
-        const cost = /estimated earthwork cost/i.test(txt);
+        const cost = /(building pad earthwork|estimated earthwork cost)/i.test(txt);
         const why = /why this verdict/i.test(txt);
         const risk = /risk flags/i.test(txt);
         const score = /site score|\/100/i.test(txt);
@@ -845,8 +845,8 @@ async function reportPass(browser) {
   const parts = {
     verdict: /(GO|CAUTION|NO-GO)/.test(txt),
     score: /site score \d+\/100/i.test(txt),
-    why: /why this score/i.test(txt),
-    cost: /estimated earthwork cost/i.test(txt),
+    why: /why this verdict/i.test(txt),
+    cost: /(building pad earthwork|estimated earthwork cost)/i.test(txt),
     profile: /elevation profile/i.test(txt),
     errorBounds: /error bounds/i.test(txt),
     cta: /run your own survey free/i.test(txt),

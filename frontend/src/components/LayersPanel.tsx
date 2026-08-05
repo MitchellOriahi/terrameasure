@@ -170,9 +170,11 @@ export function LayersSheetMobile() {
           <h2 className="text-[11px] font-semibold uppercase tracking-widest text-muted">
             Overlays
           </h2>
+          {/* Full 44px icon size here: this close button is tapped with
+              a thumb, unlike its desktop twin above. */}
           <Button
             variant="ghost"
-            size="iconSm"
+            size="icon"
             aria-label="Close overlays panel"
             onClick={() => setOpen(false)}
           >

@@ -13,6 +13,14 @@ Why this moved out of the frontend:
   go/no-go terrain decision in about 60 seconds", and defensible means
   showing your work.
 
+How the score is calibrated (recalibrated after CEO review):
+  Every site starts at a NEUTRAL 50. Terrain (slope, relief, buildable
+  area) can move it up to the low 90s or down toward 0, and the context
+  layers (water, wetlands, flood) subtract using the CONTEXT_WEIGHTS
+  table below. The old version started at 72 and squeezed almost every
+  site into 70-90, which made the number meaningless; real terrain should
+  plausibly spread from about 10 to 95.
+
 Like everything in engine/, this file does pure math on inputs it is given.
 It never fetches anything; the API layer hands it the DEM stats and the
 context dict. Same seam philosophy as the rest of the engine.
@@ -30,13 +38,68 @@ DISCLAIMER = ("Preliminary and uncertified. A licensed Professional Land "
 
 
 # ---------------------------------------------------------------------------
-# Verdict thresholds, named so the policy reads like English.
+# Verdict policy, named so it reads like English.
+#
+# The verdict WORD is driven by the score band; the nuance lives in the
+# breakdown and the headline_reason. One voice, no mixed messages like
+# "CAUTION" sitting next to "81/100 Excellent".
+#   score >= GO_SCORE and nothing forcing  -> "go"      ("Favorable")
+#   forcing condition, or 45..74           -> "caution" ("Proceed with conditions")
+#   score < NO_GO_SCORE or a hard blocker  -> "no-go"   ("Not recommended")
 # ---------------------------------------------------------------------------
-NO_GO_SCORE = 35          # below this the terrain alone says walk away
-CAUTION_SCORE = 65        # below this, proceed but budget for problems
+GO_SCORE = 75             # at/above this, with no forcing conditions: go
+NO_GO_SCORE = 45          # below this the terrain alone says walk away
 NO_GO_WATER_FRACTION = 0.50    # half the site underwater = not a site
 NO_GO_WETLAND_FRACTION = 0.60  # mostly wetland = permitting nightmare
 HEAVY_WATER_FRACTION = 0.80    # this much open water caps the score at 10
+
+# Exactly one label per verdict, no second adjective. The label is just the
+# verdict said politely; nuance goes in headline_reason and the breakdown.
+VERDICT_LABELS = {
+    "go": "Favorable",
+    "caution": "Proceed with conditions",
+    "no-go": "Not recommended",
+}
+
+# What this score deliberately does NOT evaluate. Shipped with every score
+# so the UI can show a scope strip under the verdict, and so nobody reads
+# "Favorable" as "nothing else can go wrong".
+NOT_CHECKED = [
+    "Zoning and land-use restrictions",
+    "Septic and soil percolation",
+    "Legal access and easements",
+    "Utility availability",
+]
+
+# ---------------------------------------------------------------------------
+# CONTEXT WEIGHT TABLE: the deliberate, documented relative weights.
+#
+# Per factor:
+#   threshold        coverage fraction below which the factor costs nothing
+#                    (but the breakdown still SAYS the coverage, see below)
+#   points_per_10pct score points lost per 10% of site coverage
+#   cap              most points this one factor may remove
+#   base_points      flat penalty the moment the factor is present at all
+#                    (flood only: touching an SFHA has fixed consequences
+#                    like insurance, regardless of coverage)
+#
+# Why these relative weights:
+#   open water (8/10%) > wetland (6/10%): water is flatly unbuildable;
+#   wetland is buildable-with-permits (Clean Water Act Section 404).
+#   Wetland coverage above its 5% threshold ALWAYS costs points; the old
+#   code could show "open water -6 at 7%" next to "wetlands 0 at 8%",
+#   which was incoherent.
+#   Note the wetland charge is applied to TOTAL mapped wetland coverage.
+#   Where wetland overlaps open water the site is penalized on both lines;
+#   that is deliberate (it is both unbuildable AND jurisdictional), and the
+#   wetland rate is set lower partly to keep that stacking fair.
+# ---------------------------------------------------------------------------
+CONTEXT_WEIGHTS = {
+    "open_water": {"threshold": 0.02, "points_per_10pct": 8.0, "cap": 80},
+    "wetland":    {"threshold": 0.05, "points_per_10pct": 6.0, "cap": 45},
+    "flood":      {"threshold": 0.00, "points_per_10pct": 4.0, "cap": 45,
+                   "base_points": 10},
+}
 
 
 def site_score(dem_result, measurements: dict, context: dict | None = None) -> dict:
@@ -57,9 +120,11 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
       {
         "value": 0-100,
         "verdict": "go" | "caution" | "no-go",
-        "label": "Excellent" | "Good" | "Fair" | "Challenging",
+        "label": "Favorable" | "Proceed with conditions" | "Not recommended",
+        "headline_reason": one sentence, the biggest negative factor,
+        "not_checked": list of things this score does not evaluate,
         "buildable_area_pct": water-adjusted buildable %,
-        "breakdown": [{"factor": ..., "effect": "+15", "note": ...}, ...],
+        "breakdown": [{"factor": ..., "effect": "+20", "note": ...}, ...],
         "note": one-line summary
       }
     """
@@ -71,32 +136,33 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
     valid = heights[~np.isnan(heights)]
     relief = float(valid.max() - valid.min()) if valid.size else 0.0
 
-    # ---- Terrain portion: a faithful port of the old frontend formula ----
-    # (calcSiteScore in web/terrascan.html), so scores stay comparable for
-    # dry land. Start at 72, adjust for slope, relief, and buildable area.
-    score = 72.0
-    breakdown.append({"factor": "baseline", "effect": "+72",
-                      "note": "Every site starts at 72; terrain and context "
-                              "move it from there."})
+    # ---- Terrain portion, rebased so 50 is neutral. ----
+    # The old baseline of 72 compressed nearly every site into 70-90. With a
+    # neutral 50 and wider terrain swings (+43 best case, -64 worst case
+    # before context) the number can actually separate good land from bad.
+    score = 50.0
+    breakdown.append({"factor": "baseline", "effect": "+50",
+                      "note": "Every site starts at a neutral 50; terrain "
+                              "and context move it from there."})
 
     if avg_slope < 3:
-        score += 15
-        breakdown.append({"factor": "slope", "effect": "+15",
+        score += 20
+        breakdown.append({"factor": "slope", "effect": "+20",
                           "note": f"Very gentle average slope "
                                   f"({avg_slope:.1f} deg)."})
     elif avg_slope < 8:
-        score += 8
-        breakdown.append({"factor": "slope", "effect": "+8",
+        score += 10
+        breakdown.append({"factor": "slope", "effect": "+10",
                           "note": f"Gentle average slope "
                                   f"({avg_slope:.1f} deg)."})
     elif avg_slope > 25:
-        score -= 22
-        breakdown.append({"factor": "slope", "effect": "-22",
+        score -= 30
+        breakdown.append({"factor": "slope", "effect": "-30",
                           "note": f"Steep average slope "
                                   f"({avg_slope:.1f} deg)."})
     elif avg_slope > 15:
-        score -= 12
-        breakdown.append({"factor": "slope", "effect": "-12",
+        score -= 15
+        breakdown.append({"factor": "slope", "effect": "-15",
                           "note": f"Moderately steep average slope "
                                   f"({avg_slope:.1f} deg)."})
     else:
@@ -104,32 +170,33 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
                           "note": f"Manageable average slope "
                                   f"({avg_slope:.1f} deg)."})
 
-    # Elevation relief (total height range). Note: the old frontend checked
-    # ">50" before ">100" so the bigger penalty could never fire; we check
-    # largest first, which is clearly what was intended.
+    # Elevation relief (total height range), checked largest-first.
     if relief < 10:
-        score += 5
-        breakdown.append({"factor": "relief", "effect": "+5",
+        score += 8
+        breakdown.append({"factor": "relief", "effect": "+8",
                           "note": f"Nearly level site ({relief:.0f} m of "
                                   "elevation change)."})
     elif relief > 100:
-        score -= 18
-        breakdown.append({"factor": "relief", "effect": "-18",
+        score -= 20
+        breakdown.append({"factor": "relief", "effect": "-20",
                           "note": f"Large elevation change ({relief:.0f} m)."})
     elif relief > 50:
-        score -= 8
-        breakdown.append({"factor": "relief", "effect": "-8",
+        score -= 10
+        breakdown.append({"factor": "relief", "effect": "-10",
                           "note": f"Notable elevation change ({relief:.0f} m)."})
     else:
         breakdown.append({"factor": "relief", "effect": "0",
                           "note": f"Moderate elevation change "
                                   f"({relief:.0f} m)."})
 
-    build_bonus = min(buildable / 100.0 * 10.0, 10.0)
-    score += build_bonus
-    breakdown.append({"factor": "buildable area", "effect": f"+{build_bonus:.0f}",
+    # Buildable area now swings BOTH ways: 50% buildable is neutral, 100%
+    # earns +15, 0% costs -15. (Old version only awarded 0..+10, which was
+    # part of the compression problem.)
+    build_pts = int(round((buildable - 50.0) * 0.3))
+    score += build_pts
+    breakdown.append({"factor": "buildable area", "effect": f"{build_pts:+d}",
                       "note": f"{buildable:.0f}% of the site has slope gentle "
-                              "enough to build on."})
+                              "enough to build on (50% is neutral)."})
 
     # ---- Context portion: the water-aware part that fixes the lake bug ----
     water_frac = None
@@ -150,14 +217,17 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
         flood = context.get("flood", {})
 
         # --- Open water: the CEO's lake bug lives and dies right here. ---
+        w = CONTEXT_WEIGHTS["open_water"]
         if water_frac is None:
             breakdown.append({"factor": "open water", "effect": "0",
                               "note": "Water sources unavailable; open-water "
                                       "coverage unknown, not evaluated."})
-        elif water_frac > 0.02:
-            # Penalty grows with coverage; heavy coverage adds hard caps so
-            # good terrain math can never rescue a lake.
-            penalty = round(80 * water_frac)
+        elif water_frac > w["threshold"]:
+            # Penalty grows with coverage per the weight table; heavy
+            # coverage adds hard caps so good terrain math can never
+            # rescue a lake.
+            penalty = round(min(w["cap"],
+                                w["points_per_10pct"] * water_frac * 10.0))
             score -= penalty
             if water_frac >= HEAVY_WATER_FRACTION:
                 caps.append(10)
@@ -175,17 +245,20 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
             breakdown.append({"factor": "open water", "effect": "0",
                               "note": "No significant open water on the site."})
 
-        # --- Wetlands (the vegetated kind, beyond any open water). ---
+        # --- Wetlands. ONE source of truth: the same coverage number the ---
+        # --- risk flags show is the number this line talks about.        ---
+        w = CONTEXT_WEIGHTS["wetland"]
         if wetlands.get("status") != "ok":
             breakdown.append({"factor": "wetlands", "effect": "0",
                               "note": "Wetland source unavailable; unknown, "
                                       "not evaluated."})
         else:
             wetland_frac = wetlands.get("coverage_fraction") or 0.0
-            # Only count the portion that is not already penalized as water.
-            veg_frac = max(0.0, wetland_frac - (water_frac or 0.0))
-            if veg_frac > 0.05:
-                penalty = round(min(40, 45 * veg_frac))
+            if wetland_frac > w["threshold"]:
+                # Charged on TOTAL mapped wetland coverage (see the weight
+                # table comment about deliberate overlap with open water).
+                penalty = round(min(w["cap"],
+                                    w["points_per_10pct"] * wetland_frac * 10.0))
                 score -= penalty
                 if wetland_frac >= NO_GO_WETLAND_FRACTION:
                     caps.append(30)
@@ -193,15 +266,27 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
                 else:
                     force_caution = True
                 breakdown.append({"factor": "wetlands", "effect": f"-{penalty}",
-                                  "note": f"{veg_frac * 100:.0f}% of the site "
-                                          "is mapped wetland. Building here "
-                                          "usually needs federal permits "
+                                  "note": f"{wetland_frac * 100:.0f}% of the "
+                                          "site is mapped wetland. Building "
+                                          "here usually needs federal permits "
                                           "(Clean Water Act Section 404)."})
+            elif wetland_frac > 0:
+                # Below the scoring threshold is NOT the same as "none".
+                # The old wording ("No significant mapped wetlands") read
+                # as a contradiction next to a risk flag showing 8%
+                # coverage from the very same survey.
+                breakdown.append({"factor": "wetlands", "effect": "0",
+                                  "note": f"{wetland_frac * 100:.0f}% mapped "
+                                          "wetlands, below the "
+                                          f"{w['threshold'] * 100:.0f}% "
+                                          "scoring threshold."})
             else:
                 breakdown.append({"factor": "wetlands", "effect": "0",
-                                  "note": "No significant mapped wetlands."})
+                                  "note": "No mapped wetlands intersect "
+                                          "the site."})
 
         # --- FEMA flood zones. ---
+        w = CONTEXT_WEIGHTS["flood"]
         if flood.get("status") != "ok":
             breakdown.append({"factor": "flood zone", "effect": "0",
                               "note": "Flood source unavailable; unknown, "
@@ -211,7 +296,11 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
             flood_frac = flood.get("high_risk_fraction")
             if flood_high:
                 frac = flood_frac if flood_frac is not None else 0.5
-                penalty = round(10 + 25 * frac)
+                # Flat base_points for touching the SFHA at all (insurance,
+                # elevated construction), plus coverage-scaled points.
+                penalty = round(min(w["cap"],
+                                    w["base_points"]
+                                    + w["points_per_10pct"] * frac * 10.0))
                 score -= penalty
                 force_caution = True
                 zones = sorted({z.get("zone") for z in flood.get("zones", [])
@@ -259,32 +348,41 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
         unusable = min(1.0, unusable + max(0.0, wetland_frac - (water_frac or 0.0)))
     adjusted_buildable = round(buildable * (1.0 - unusable), 1)
 
-    # ---- Verdict. ----
+    # ---- Verdict: one voice. ----
+    # Score band picks the word; forcing conditions (water, wetland, flood)
+    # can only pull the verdict DOWN, never up. The label is just the
+    # verdict spelled politely, so the two can never disagree again.
     if force_no_go or score < NO_GO_SCORE:
         verdict = "no-go"
-    elif force_caution or score < CAUTION_SCORE:
+    elif force_caution or score < GO_SCORE:
         verdict = "caution"
     else:
         verdict = "go"
+    label = VERDICT_LABELS[verdict]
 
-    label = ("Excellent" if score >= 80 else
-             "Good" if score >= 65 else
-             "Fair" if score >= 45 else "Challenging")
+    # ---- Headline reason: the single biggest negative factor, as one ----
+    # ---- sentence the UI can print right under the verdict.           ----
+    def _effect_int(item: dict) -> int:
+        try:
+            return int(item["effect"])
+        except (KeyError, ValueError):
+            return 0
 
-    # A verdict override can leave a high score with a worse verdict: for
-    # example, lovely terrain that clips a FEMA flood zone still forces
-    # CAUTION. Showing "CAUTION" right next to "Excellent" reads as a
-    # contradiction, so the label is never allowed to outrank the verdict:
-    # a caution site caps at "Good", a no-go site caps at "Fair".
-    if verdict == "caution" and label == "Excellent":
-        label = "Good"
-    elif verdict == "no-go" and label in ("Excellent", "Good"):
-        label = "Fair"
+    negatives = [b for b in breakdown if _effect_int(b) < 0]
+    if negatives:
+        worst = min(negatives, key=_effect_int)
+        # First sentence of that factor's note, so it stays headline-sized.
+        headline_reason = worst["note"].split(". ")[0].rstrip(".") + "."
+    else:
+        headline_reason = "No significant negative factors were found."
 
     return {
         "value": score,
         "verdict": verdict,
         "label": label,
+        "headline_reason": headline_reason,
+        # Copy, so a caller mutating its response cannot edit our constant.
+        "not_checked": list(NOT_CHECKED),
         "buildable_area_pct": adjusted_buildable,
         "breakdown": breakdown,
         "note": f"{label} ({score}/100), verdict: {verdict.upper()}. "
@@ -294,46 +392,122 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
 
 # ---------------------------------------------------------------------------
 # Earthwork cost: the "cost-to-develop" layer.
+#
+# The honest cost model (fixed after CEO review):
+#   The old model priced cut at $18/m3 AND fill at $14/m3. On a
+#   mass-balanced site (cut == fill) that priced the SAME dirt twice,
+#   roughly doubling reality: you dig it once and place it once, one
+#   machine operation chain, one bill.
+#
+#   New model:
+#     balanced volume  = min(cut, fill)      dirt moved WITHIN the site,
+#                                            priced ONCE at cut-and-place
+#     net imbalance    = abs(cut - fill)     dirt that must be trucked in
+#                                            or hauled off, priced at the
+#                                            import/export haul rate
 # ---------------------------------------------------------------------------
-# US average unit rates the old frontend used: $18 per cubic meter to cut
-# (excavate and haul) and $14 per cubic meter to fill (import and compact).
-CUT_RATE_USD_PER_M3 = 18.0
-FILL_RATE_USD_PER_M3 = 14.0
+
+# $13/m3 cut-and-place: mid-range of typical US $12-15/m3 for on-site
+# excavate + move + compact (mass grading, no long haul).
+CUT_AND_PLACE_RATE_USD_PER_M3 = 13.0
+
+# $16/m3 for the net imbalance: import or export includes trucking and
+# tipping/purchase, so it costs more per m3 than moving dirt on site.
+HAUL_RATE_USD_PER_M3 = 16.0
 
 # Real bids swing widely with region, soil, haul distance, and fuel prices,
 # so we publish a RANGE around the base estimate instead of one fake-precise
-# number. 0.75x to 1.6x brackets typical regional variation.
+# number. 0.75x to 1.6x = a -25%/+60% regional rate spread.
 RANGE_LOW_FACTOR = 0.75
 RANGE_HIGH_FACTOR = 1.6
 
+# Pad-based costing: nobody levels a whole 30-acre parcel, so the full-site
+# figure alone produced seven-figure nonsense. A typical building pad is
+# about 2000 m2 (house + drive + yard grading), or 5% of the site if that
+# is larger, never more than the site itself.
+PAD_MIN_AREA_M2 = 2000.0
+PAD_SITE_FRACTION = 0.05
 
-def earthwork_cost(cut_m3: float, fill_m3: float) -> dict:
+
+def earthwork_cost(cut_m3: float, fill_m3: float,
+                   site_area_m2: float | None = None) -> dict:
     """
-    Rough grading-and-earthwork cost estimate for cutting and filling the
-    site to grade, returned as a low/high RANGE in US dollars.
+    Rough grading-and-earthwork cost estimate, returned as a low/high RANGE
+    in US dollars.
+
+    The headline figure is a THEORETICAL FULL-SITE BALANCE: what it would
+    cost to grade the entire site flat to its balance grade. Almost nobody
+    does that, so when site_area_m2 is given we also return "pad_cost":
+    the same rates applied to grading just a typical building pad.
 
     Returns:
       {
         "low_usd": ..., "high_usd": ..., "base_usd": ...,
         "cut_m3": ..., "fill_m3": ...,
+        "balanced_m3": dirt moved within the site (priced once),
+        "net_m3": import/export imbalance,
+        "scope": "theoretical full-site balance",
+        "pad_cost": {...} when site_area_m2 was provided,
         "note": the honesty caveat
       }
     """
     cut_m3 = max(0.0, float(cut_m3))
     fill_m3 = max(0.0, float(fill_m3))
-    base = cut_m3 * CUT_RATE_USD_PER_M3 + fill_m3 * FILL_RATE_USD_PER_M3
-    return {
+
+    # The dirt you dig here and place there: priced ONCE.
+    balanced = min(cut_m3, fill_m3)
+    # The dirt you must truck in (or haul away): priced at the haul rate.
+    net = abs(cut_m3 - fill_m3)
+
+    base = (balanced * CUT_AND_PLACE_RATE_USD_PER_M3
+            + net * HAUL_RATE_USD_PER_M3)
+
+    note = ("Rough preliminary estimate, theoretical full-site balance: "
+            "grading the whole site to its balance grade. Balanced volume "
+            f"is priced once at ${CUT_AND_PLACE_RATE_USD_PER_M3:.0f}/m3 "
+            "cut-and-place; only the net import/export imbalance is priced "
+            f"at ${HAUL_RATE_USD_PER_M3:.0f}/m3 haul. The range reflects a "
+            "-25%/+60% regional rate spread. Get local bids before "
+            "budgeting.")
+
+    result = {
         "low_usd": round(base * RANGE_LOW_FACTOR),
         "high_usd": round(base * RANGE_HIGH_FACTOR),
         "base_usd": round(base),
         "cut_m3": round(cut_m3, 1),
         "fill_m3": round(fill_m3, 1),
-        "note": ("Rough preliminary estimate of grading and earthwork cost, "
-                 f"from US average rates (${CUT_RATE_USD_PER_M3:.0f}/m3 cut, "
-                 f"${FILL_RATE_USD_PER_M3:.0f}/m3 fill). Regional rates, "
-                 "soil conditions, and haul distance vary significantly; "
-                 "get local bids before budgeting."),
+        "balanced_m3": round(balanced, 1),
+        "net_m3": round(net, 1),
+        "scope": "theoretical full-site balance",
+        "note": note,
     }
+
+    # --- Pad-based costing: the number a normal buyer actually needs. ---
+    if site_area_m2 and site_area_m2 > 0:
+        pad_area = min(float(site_area_m2),
+                       max(PAD_MIN_AREA_M2,
+                           PAD_SITE_FRACTION * float(site_area_m2)))
+        # Scale the site's cut/fill volumes down by the pad's share of the
+        # site. This assumes the pad's terrain is roughly average for the
+        # site; in practice a builder picks the flattest corner, so this
+        # leans conservative (slightly high), which is the safe direction.
+        frac = pad_area / float(site_area_m2)
+        pad_base = (balanced * frac * CUT_AND_PLACE_RATE_USD_PER_M3
+                    + net * frac * HAUL_RATE_USD_PER_M3)
+        result["pad_cost"] = {
+            "pad_area_m2": round(pad_area),
+            "low_usd": round(pad_base * RANGE_LOW_FACTOR),
+            "high_usd": round(pad_base * RANGE_HIGH_FACTOR),
+            "base_usd": round(pad_base),
+            "note": ("Cost to grade only a typical building pad "
+                     f"({round(pad_area):,} m2: 2000 m2 or 5% of the site, "
+                     "whichever is larger, capped at the site size), at the "
+                     "same rates. This is the realistic number for building "
+                     "a structure; the full-site figure above is a "
+                     "theoretical ceiling."),
+        }
+
+    return result
 
 
 # ---------------------------------------------------------------------------

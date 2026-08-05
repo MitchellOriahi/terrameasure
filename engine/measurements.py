@@ -163,6 +163,19 @@ def average_slope(dem: np.ndarray, cell_size: float,
     )
 
 
+# How much of the DEM's vertical error behaves as one shared, site-wide
+# bias rather than independent per-cell noise. Lidar/DEM elevation error is
+# NOT independent from cell to cell: a whole sensor pass shares the same
+# GPS/IMU calibration, atmosphere, and ground-classification choices, so
+# neighboring cells tend to be wrong TOGETHER in the same direction (this
+# correlated bias is well documented in DEM accuracy literature, e.g. the
+# ASPRS positional accuracy standards treat systematic error separately
+# from random error). 0.6 says: treat roughly 60% of the stated vertical
+# error as a shared bias. Practical range is about 0.5 to 0.7; we pick the
+# middle and would tighten it with a geodesy advisor.
+DEM_BIAS_CORRELATION = 0.6
+
+
 def volume_to_grade(dem: np.ndarray, cell_size: float,
                     target_height: float,
                     vertical_error: float = 0.15) -> dict[str, Measurement]:
@@ -176,6 +189,23 @@ def volume_to_grade(dem: np.ndarray, cell_size: float,
       - ground higher than target -> must CUT (remove dirt)
       - ground lower than target  -> must FILL (add dirt)
     Sum them up separately.
+
+    The error model (fixed after CEO review):
+      The old bound treated every cell's height error as independent, so
+      errors mostly canceled and a big site claimed an absurd sub-1% bound.
+      Real DEM error has a correlated component (see DEM_BIAS_CORRELATION
+      above), and a shared bias does NOT cancel: if the whole DEM reads
+      0.1 m high, every cell's volume is wrong in the same direction.
+
+      So the bound has two parts, combined in quadrature (sqrt of sum of
+      squares, the standard way to combine independent error sources):
+        random_term      = vertical_error * cell_area * sqrt(n_cells)
+                           (per-cell noise, partially cancels over n cells)
+        systematic_term  = site_area * vertical_error * DEM_BIAS_CORRELATION
+                           (shared bias, scales with the WHOLE site area)
+      On large sites the systematic term dominates and the honest bound
+      lands around 10-40% or more of the volume, depending on site size,
+      terrain, and DEM source. That is the truth; the old number was not.
     """
     cell_area = cell_size * cell_size
     valid = ~np.isnan(dem)
@@ -186,13 +216,26 @@ def volume_to_grade(dem: np.ndarray, cell_size: float,
     net  = cut - fill
 
     n_cells = int(np.sum(valid)) or dem.size
-    vol_error = vertical_error * cell_area * math.sqrt(n_cells)
+    site_area = n_cells * cell_area
 
+    # Part 1: independent per-cell noise (the old model, kept as one term).
+    random_term = vertical_error * cell_area * math.sqrt(n_cells)
+    # Part 2: the shared site-wide bias that does not cancel.
+    systematic_term = site_area * vertical_error * DEM_BIAS_CORRELATION
+    vol_error = math.sqrt(random_term ** 2 + systematic_term ** 2)
+
+    # Net = cut - fill. The random parts of cut and fill are independent
+    # (so their variances add: factor sqrt(2) on the random term), but the
+    # shared bias shifts cut and fill in opposite directions at once, so it
+    # hits net at full strength, not reduced.
+    net_error = math.sqrt(2 * random_term ** 2 + systematic_term ** 2)
+
+    err_note = "error includes correlated DEM bias"
     return {
-        "cut": Measurement(cut, "m^3", vol_error, "dirt to remove"),
-        "fill": Measurement(fill, "m^3", vol_error, "dirt to add"),
-        "net": Measurement(net, "m^3", vol_error * math.sqrt(2),
-                           "net (positive = export)"),
+        "cut": Measurement(cut, "m^3", vol_error, f"dirt to remove ({err_note})"),
+        "fill": Measurement(fill, "m^3", vol_error, f"dirt to add ({err_note})"),
+        "net": Measurement(net, "m^3", net_error,
+                           f"net (positive = export; {err_note})"),
     }
 
 

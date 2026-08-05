@@ -1,0 +1,49 @@
+/* pages/report.css
+   Styles that only the shared report page needs. Kept out of index.css
+   so the report page owns its own look and nothing here can leak into
+   the main map screen. Imported by ReportPage.tsx. */
+
+/* ------------------------------------------------------------------
+   Map attribution (Esri requires credit on satellite imagery).
+   Problems this fixes:
+     1. index.css lifts ".maplibregl-ctrl-bottom-*" 88px on phones to
+        clear the app's bottom bar; the report page HAS no bottom bar,
+        so the attribution floated into the middle of the map image.
+     2. The full Esri credit line is long and could wrap into a tall
+        block over the picture.
+   The cure: pin it to the bottom-LEFT corner, one compact 10px line on
+   a translucent bar. The map uses MapLibre's compact mode, so the full
+   credit text stays available behind the (i) button.
+   ------------------------------------------------------------------ */
+.report-map .maplibregl-ctrl-bottom-right,
+.report-map .maplibregl-ctrl-bottom-left {
+  bottom: 0 !important;
+  top: auto !important;
+  left: 0 !important;
+  right: auto !important;
+}
+
+.report-map .maplibregl-ctrl-attrib {
+  margin: 0 !important;
+  padding: 1px 6px !important;
+  font-size: 10px !important;
+  line-height: 1.5;
+  background: rgba(0, 0, 0, 0.45) !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+  border-radius: 0 6px 0 0;
+  /* One line, never a wrapped block over the imagery */
+  max-width: calc(100% - 8px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.report-map .maplibregl-ctrl-attrib a {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* The compact-mode (i) toggle button stays subtle on the imagery */
+.report-map .maplibregl-ctrl-attrib-button {
+  background-color: rgba(0, 0, 0, 0.45) !important;
+  filter: invert(0.9);
+}

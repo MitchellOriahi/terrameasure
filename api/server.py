@@ -135,7 +135,18 @@ class SurveyResponse(BaseModel):
     # client can store to compare predictions against reality later.
     score: Optional[dict] = None
     # Rough low/high grading cost range (the "cost-to-develop" layer).
+    # Now carries scope "theoretical full-site balance" plus a "pad_cost"
+    # sub-dict costing just a typical building pad (the realistic number).
     earthwork_cost: Optional[dict] = None
+    # The balance grade: the single elevation where cut and fill cancel,
+    # requiring no import or export. The cut/fill volumes above are
+    # computed against this elevation. ("Balance grade" is the honest name
+    # for what the UI used to call "level grade".)
+    balance_grade: Optional[dict] = None
+    # General currency statement for the elevation data itself. The DEM
+    # services do not report a per-tile collection date, so this is an
+    # honest general note, never a fabricated specific date.
+    dem_data_vintage: str = ""
     # When the high-accuracy USGS source fails and we fall back to
     # Open-Elevation, this says why. Empty string = no fallback happened.
     dem_source_note: str = ""
@@ -325,13 +336,45 @@ def run_survey(dem_result, context: Optional[dict] = None,
         context=context,
     )
 
-    # Rough grading cost range (the "cost-to-develop" layer).
-    cost = scoring.earthwork_cost(vols["cut"].value, vols["fill"].value)
+    # Rough grading cost range (the "cost-to-develop" layer). The site
+    # area (valid cells only, so a masked polygon counts just its own
+    # cells) lets the cost model also price a realistic building pad
+    # instead of only the theoretical full-site figure.
+    n_valid_cells = int(np.sum(~np.isnan(dem)))
+    site_area_m2 = n_valid_cells * dem_result.cell_size ** 2
+    cost = scoring.earthwork_cost(vols["cut"].value, vols["fill"].value,
+                                  site_area_m2=site_area_m2)
+
+    # The cut/fill target is the mean ground height, which is exactly the
+    # balance grade: grade the site to this one elevation and cut equals
+    # fill, so no dirt needs to be imported or exported.
+    balance_grade = {
+        "elevation_m": round(target, 2),
+        "note": ("Balance grade: the single elevation where cut and fill "
+                 "cancel, requiring no import or export."),
+    }
+
+    # Honest general note on how current the elevation data is. Neither
+    # source reports a per-tile acquisition date in its response, so we
+    # state the dataset's general currency instead of inventing a date.
+    src_lower = (dem_result.source or "").lower()
+    if "3dep" in src_lower or "usgs" in src_lower:
+        dem_vintage = ("USGS 3DEP lidar; acquisition year varies by "
+                       "project area and is not reported per tile. "
+                       "Recent construction may not be reflected.")
+    elif "open-elevation" in src_lower or "srtm" in src_lower:
+        dem_vintage = ("Open-Elevation blends public datasets, largely "
+                       "SRTM (collected February 2000); terrain changes "
+                       "since collection are not reflected.")
+    else:
+        dem_vintage = "Elevation data vintage not reported by the source."
 
     return SurveyResponse(
         context=context,
         score=score,
         earthwork_cost=cost,
+        balance_grade=balance_grade,
+        dem_data_vintage=dem_vintage,
         dem_source_note=dem_source_note,
         source=dem_result.source,
         vertical_error_m=dem_result.vertical_error,

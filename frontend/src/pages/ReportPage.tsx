@@ -7,7 +7,9 @@
 // from one GET /reports/{slug} call.
 //
 // Order of sections (per the strategy doc, "The report artifact"):
+//   0. Site identity header (WHERE this is: name, county, coordinates)
 //   1. Verdict banner (GO / CAUTION / NO-GO, score, one-line reason)
+//      plus the scope strip (what the verdict does NOT check)
 //   2. Parcel facts strip (when the survey came from a parcel)
 //   3. Score breakdown bars (no black-box score)
 //   4. The map: satellite basemap + the surveyed outline, with an
@@ -18,6 +20,10 @@
 //   8. Error bounds box (every key number's +/- and the DEM source)
 //   9. Footer: wordmark, date, verbatim disclaimer, "run your own" CTA
 //
+// A sticky mini-header (site name, score, verdict, Share) slides in
+// once the reader scrolls past the verdict banner, so the headline and
+// the share action are always one glance away.
+//
 // This file is lazy-loaded from App.tsx so the map home screen never
 // pays for it.
 
@@ -26,7 +32,13 @@ import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Map, Source, Layer, type MapRef } from "@vis.gl/react-maplibre";
 import type { Feature, Polygon } from "geojson";
-import { FileQuestion, Loader2, AlertTriangle } from "lucide-react";
+import {
+  FileQuestion,
+  Loader2,
+  AlertTriangle,
+  Share2,
+  Check,
+} from "lucide-react";
 import {
   fetchReport,
   ApiError,
@@ -39,19 +51,32 @@ import {
   polygonAreaM2,
   polygonPerimeterM,
   fmt,
-  fmtArea,
   type LatLon,
 } from "@/lib/geo";
+import {
+  areaPair,
+  elevationPair,
+  elevValue,
+  elevUnit,
+  volumePair,
+  cleanUnitText,
+  M2_PER_ACRE,
+} from "@/lib/units";
 import { assessSite, fmtUsdK, type SiteAssessment } from "@/lib/verdict";
 import { SATELLITE_STYLE } from "@/components/map/basemaps";
-import { VERDICT_META } from "@/components/results/ResultsContent";
+import { VERDICT_META, withSlopeBound } from "@/components/results/ResultsContent";
 import { RiskFlags } from "@/components/results/RiskFlags";
 import { MetricRow } from "@/components/results/MetricRow";
 import { ElevationChart } from "@/components/results/ElevationChart";
 import { ScoreDial } from "@/components/results/ScoreDial";
+import { ScopeStrip } from "@/components/results/ScopeStrip";
+import { UnitsToggle } from "@/components/results/UnitsToggle";
+import { copyText } from "@/components/results/ShareReport";
 import { Wordmark } from "@/components/TopBar";
 import { Button } from "@/components/ui/button";
 import { loadingMessage } from "@/hooks/useSurvey";
+import { useAppStore } from "@/store/appStore";
+import "./report.css";
 
 // ------------------------------------------------------------------
 // Small helpers
@@ -64,12 +89,13 @@ function effectMagnitude(effect: string): number {
 }
 
 /**
- * The one-line reason under the big verdict. We lead with the WORST
- * negative factor from the score breakdown (that is the honest headline);
- * when nothing dragged the score down we fall back to the score's own
- * note, then to the generic verdict blurb.
+ * The one-line reason under the big verdict, used only when the backend
+ * did not send its own headline_reason. We lead with the WORST negative
+ * factor from the score breakdown (that is the honest headline); when
+ * nothing dragged the score down we fall back to the score's own note,
+ * then to the generic verdict blurb.
  */
-function headlineReason(a: SiteAssessment, survey: SurveyResponse): string {
+function fallbackHeadline(a: SiteAssessment, survey: SurveyResponse): string {
   const negatives = a.breakdown
     .filter((b) => b.effect.trim().startsWith("-"))
     .sort((x, y) => effectMagnitude(y.effect) - effectMagnitude(x.effect));
@@ -118,6 +144,153 @@ function SectionCard({
       </h2>
       {children}
     </section>
+  );
+}
+
+// ------------------------------------------------------------------
+// Site identity: WHERE is this report about?
+//
+// The best available name wins: the title the sharer typed (or the
+// parcel address the app filled in), else "Near {lat}, {lon}". The
+// backend geocoder only does forward search (name to coordinates), so
+// there is no reverse lookup to lean on; county comes from parcel data
+// when the survey started from a parcel.
+// ------------------------------------------------------------------
+
+/** Average of the polygon corners: good enough to say "here". */
+function centroidOf(vertices: LatLon[] | null): LatLon | null {
+  if (!vertices || vertices.length === 0) return null;
+  return {
+    lat: vertices.reduce((s, v) => s + v.lat, 0) / vertices.length,
+    lon: vertices.reduce((s, v) => s + v.lon, 0) / vertices.length,
+  };
+}
+
+function IdentityHeader({
+  title,
+  parcel,
+  center,
+  acreage,
+  acreageSource,
+}: {
+  title: string;
+  parcel: ParcelResponse | null;
+  center: LatLon | null;
+  acreage: number | null;
+  acreageSource: "recorded" | "outline" | null;
+}) {
+  return (
+    <header className="rounded-xl border border-line bg-surface-2/40 px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-semibold leading-tight text-foreground">
+            {title}
+          </h1>
+          {/* County line only when parcel data told us one */}
+          {parcel?.county && (
+            <p className="mt-0.5 text-xs text-muted">{parcel.county}</p>
+          )}
+        </div>
+        {/* The compact ft/m switch lives up here so a reader can flip
+            every number on the page before reading any of them */}
+        <div className="shrink-0 pt-0.5">
+          <UnitsToggle />
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+        {center && (
+          <span className="num text-[11px] text-muted">
+            {center.lat.toFixed(5)}, {center.lon.toFixed(5)}
+          </span>
+        )}
+        {acreage !== null && (
+          <span className="num text-[11px] text-muted">
+            {fmt(acreage, 2)} acres
+            {acreageSource === "outline" ? " (drawn outline)" : ""}
+          </span>
+        )}
+        {/* Parcel ID row ONLY when parcel data exists; no blank rows */}
+        {parcel?.parcel_id && (
+          <span className="num text-[11px] text-muted">
+            APN {parcel.parcel_id}
+          </span>
+        )}
+      </div>
+    </header>
+  );
+}
+
+// ------------------------------------------------------------------
+// Sticky mini-header: appears after the verdict banner scrolls away.
+// Transform-only animation (translateY), safe-area aware, always in
+// the DOM so showing it never causes layout work.
+// ------------------------------------------------------------------
+function StickyHeader({
+  visible,
+  title,
+  assessment,
+}: {
+  visible: boolean;
+  title: string;
+  assessment: SiteAssessment;
+}) {
+  const meta = VERDICT_META[assessment.verdict];
+  const [copied, setCopied] = useState(false);
+
+  async function handleShare() {
+    const url = window.location.href;
+    // Phones get the native share sheet; desktops copy the link.
+    if ("share" in navigator) {
+      try {
+        await navigator.share({ title: `TerraMeasure report: ${title}`, url });
+        return;
+      } catch {
+        // User closed the sheet, or share failed; fall through to copy.
+      }
+    }
+    const ok = await copyText(url);
+    if (ok) {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  return (
+    <div
+      aria-hidden={!visible}
+      className={`fixed inset-x-0 top-0 z-40 transition-transform duration-200 ease-out ${
+        visible ? "translate-y-0" : "-translate-y-full"
+      }`}
+      style={{ willChange: "transform" }}
+    >
+      <div className="pt-safe border-b border-line bg-surface/95 backdrop-blur">
+        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-2">
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+            {title}
+          </span>
+          {/* Verdict chip: word + color, never color alone */}
+          <span
+            className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold ${meta.className}`}
+          >
+            {assessment.verdict}
+          </span>
+          <span className="num shrink-0 text-xs text-muted">
+            {assessment.score}/100
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleShare}
+            aria-label="Share this report"
+            // Keyboard users should reach this only when it is on screen
+            tabIndex={visible ? 0 : -1}
+          >
+            {copied ? <Check size={14} /> : <Share2 size={14} />}
+            {copied ? "Copied" : "Share"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -209,7 +382,7 @@ function ReportMap({
         : undefined;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line">
+    <div className="report-map overflow-hidden rounded-xl border border-line">
       <div ref={boxRef} className="h-64 sm:h-80">
         <Map
           ref={mapRef}
@@ -249,13 +422,14 @@ function ReportMap({
               />
             </Source>
           )}
-          {/* The surveyed outline itself */}
+          {/* The surveyed outline itself: ~15% fill + solid stroke so
+              the AOI reads clearly over any imagery */}
           {feature && (
             <Source id="report-shape" type="geojson" data={feature}>
               <Layer
                 id="report-shape-fill"
                 type="fill"
-                paint={{ "fill-color": "#34d399", "fill-opacity": 0.1 }}
+                paint={{ "fill-color": "#34d399", "fill-opacity": 0.15 }}
               />
               <Layer
                 id="report-shape-line"
@@ -308,10 +482,56 @@ function ReportBody({ report }: { report: ReportResponse }) {
   const survey = report.snapshot.survey;
   const parcel: ParcelResponse | null = report.snapshot.parcel ?? null;
   const vertices: LatLon[] | null = report.snapshot.vertices ?? null;
+  const units = useAppStore((s) => s.units);
 
   const assessment = useMemo(() => assessSite(survey), [survey]);
   const meta = VERDICT_META[assessment.verdict];
-  const reason = headlineReason(assessment, survey);
+
+  // The one-line reason under the verdict word: the backend's own
+  // headline sentence when present, else the worst-factor fallback.
+  // Either way, a slope claim carries its error bound inline.
+  const reason = withSlopeBound(
+    survey.score?.headline_reason ?? fallbackHeadline(assessment, survey),
+    survey.avg_slope,
+  );
+
+  // ---- Site identity ----
+  const center = useMemo(() => {
+    const c = centroidOf(vertices);
+    if (c) return c;
+    // Reports saved without vertices still know the DEM's center.
+    if (survey.dem_center_lat) {
+      return { lat: survey.dem_center_lat, lon: survey.dem_center_lon };
+    }
+    return null;
+  }, [vertices, survey]);
+
+  // Best available site name, in order: sharer's title (or the parcel
+  // address the share flow filled in), else plain coordinates. The
+  // geocoder has no reverse mode, so we never pretend to know a name.
+  const siteTitle =
+    report.title ??
+    parcel?.address ??
+    (center ? `Near ${center.lat.toFixed(5)}, ${center.lon.toFixed(5)}` : "Surveyed site");
+
+  // Outline area, same 2D geometry + honesty math as the live panel.
+  const outline = useMemo(() => {
+    if (!vertices || vertices.length < 3) return null;
+    const areaM2 = polygonAreaM2(vertices);
+    const perimM = polygonPerimeterM(vertices);
+    return {
+      areaM2,
+      // Half a DEM cell of slack along every meter of edge.
+      areaErrM2: perimM * (survey.cell_size_m / 2),
+    };
+  }, [vertices, survey.cell_size_m]);
+
+  // Acreage for the identity header: the county's recorded number when
+  // we have it, else the drawn outline's area (and we say which).
+  const acreage =
+    parcel?.acreage ?? (outline ? outline.areaM2 / M2_PER_ACRE : null);
+  const acreageSource: "recorded" | "outline" | null =
+    parcel?.acreage != null ? "recorded" : outline ? "outline" : null;
 
   // Browser tab title: the verdict IS the headline.
   useEffect(() => {
@@ -321,17 +541,24 @@ function ReportBody({ report }: { report: ReportResponse }) {
     };
   }, [assessment]);
 
-  // Outline area, same 2D geometry + honesty math as the live panel.
-  const outline = useMemo(() => {
-    if (!vertices || vertices.length < 3) return null;
-    const areaM2 = polygonAreaM2(vertices);
-    const perimM = polygonPerimeterM(vertices);
-    return {
-      area: fmtArea(areaM2),
-      // Half a DEM cell of slack along every meter of edge.
-      areaErr: fmtArea(perimM * (survey.cell_size_m / 2)),
-    };
-  }, [vertices, survey.cell_size_m]);
+  // ---- Sticky header visibility: on once the banner scrolls off-top ----
+  const bannerRef = useRef<HTMLElement>(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const banner = bannerRef.current;
+    if (!banner) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Show the mini-header only when the banner left through the
+        // TOP of the screen (scrolled past), not while it is still
+        // below the fold during initial load.
+        setStuck(!entry.isIntersecting && entry.boundingClientRect.top < 0);
+      },
+      { threshold: 0 },
+    );
+    observer.observe(banner);
+    return () => observer.disconnect();
+  }, []);
 
   // The largest bar in the breakdown sets the scale for all the bars.
   const maxEffect = Math.max(
@@ -349,13 +576,44 @@ function ReportBody({ report }: { report: ReportResponse }) {
     }
   }
 
-  const elevRange = survey.max_height - survey.min_height;
-  const elevRangeErr = survey.vertical_error_m * Math.SQRT2;
+  // ---- Display measurements, converted through lib/units.ts ----
+  const area = outline ? areaPair(outline.areaM2, outline.areaErrM2, units) : null;
+  const elevRange = elevationPair(
+    survey.max_height - survey.min_height,
+    survey.vertical_error_m * Math.SQRT2,
+    units,
+  );
+  const cut = volumePair(survey.cut_volume.value, survey.cut_volume.error, units);
+  const fill = volumePair(
+    survey.fill_volume.value,
+    survey.fill_volume.error,
+    units,
+  );
+
+  // Pad-based cost (newer backends): the realistic headline number.
+  const padCost = survey.earthwork_cost?.pad_cost;
+  const hasPadCost =
+    padCost != null &&
+    Number.isFinite(padCost.low_usd) &&
+    Number.isFinite(padCost.high_usd);
 
   return (
     <div className="flex flex-col gap-4">
+      {/* ---- Sticky mini-header (slides in past the banner) ---- */}
+      <StickyHeader visible={stuck} title={siteTitle} assessment={assessment} />
+
+      {/* ---- 0. Site identity: what land is this about ---- */}
+      <IdentityHeader
+        title={siteTitle}
+        parcel={parcel}
+        center={center}
+        acreage={acreage}
+        acreageSource={acreageSource}
+      />
+
       {/* ---- 1. Verdict banner ---- */}
       <section
+        ref={bannerRef}
         className={`rounded-xl border px-5 py-4 ${meta.className}`}
         role="status"
       >
@@ -366,7 +624,11 @@ function ReportBody({ report }: { report: ReportResponse }) {
             </div>
             <div className="num mt-1 text-sm text-foreground/80">
               Site score {assessment.score}/100
-              {assessment.label ? ` (${assessment.label})` : ""}
+              {/* One qualifier under the verdict, never two: the label
+                  word steps aside when a headline sentence exists */}
+              {assessment.label && !survey.score?.headline_reason
+                ? ` (${assessment.label})`
+                : ""}
             </div>
             <p className="mt-2 text-sm leading-snug text-foreground/90">
               {reason}
@@ -381,6 +643,9 @@ function ReportBody({ report }: { report: ReportResponse }) {
           </div>
         </div>
       </section>
+
+      {/* ---- Scope strip: what this verdict does NOT check ---- */}
+      <ScopeStrip notChecked={survey.score?.not_checked} />
 
       {/* ---- 2. Parcel facts strip ---- */}
       {parcel && (
@@ -398,7 +663,7 @@ function ReportBody({ report }: { report: ReportResponse }) {
 
       {/* ---- 3. Score breakdown bars: no black-box score ---- */}
       {assessment.breakdown.length > 0 && (
-        <SectionCard title="Why this score">
+        <SectionCard title="Why this verdict">
           <ul className="flex flex-col gap-3">
             {assessment.breakdown.map((item, i) => {
               const mag = effectMagnitude(item.effect);
@@ -438,7 +703,7 @@ function ReportBody({ report }: { report: ReportResponse }) {
                     />
                   </div>
                   <p className="mt-1 text-[11px] leading-snug text-muted">
-                    {item.note}
+                    {withSlopeBound(item.note, survey.avg_slope)}
                   </p>
                 </li>
               );
@@ -451,17 +716,38 @@ function ReportBody({ report }: { report: ReportResponse }) {
       <ReportMap survey={survey} vertices={vertices} />
 
       {/* ---- 5. Earthwork cost range ---- */}
-      <SectionCard title="Estimated earthwork cost">
-        <div className="num text-2xl font-semibold text-foreground">
-          {fmtUsdK(assessment.costLow)}
-          <span className="mx-1 text-muted">to</span>
-          {fmtUsdK(assessment.costHigh)}
-        </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-muted">
-          {survey.earthwork_cost?.note ??
-            "Rough planning range from cut and fill volume, not a contractor quote."}
-        </p>
-      </SectionCard>
+      {hasPadCost ? (
+        <SectionCard title="Building pad earthwork">
+          <div className="num text-2xl font-semibold text-foreground">
+            {fmtUsdK(padCost.low_usd)}
+            <span className="mx-1 text-muted">to</span>
+            {fmtUsdK(padCost.high_usd)}
+          </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted">
+            {padCost.note
+              ? cleanUnitText(padCost.note)
+              : "Cost to grade a building pad, not the whole site. Not a contractor quote."}
+          </p>
+          {/* Full-site figure demoted to context, labeled for what it is */}
+          <p className="num mt-2 border-t border-line pt-2 text-[11px] text-muted">
+            Theoretical full-site balance: {fmtUsdK(assessment.costLow)} to{" "}
+            {fmtUsdK(assessment.costHigh)}
+          </p>
+        </SectionCard>
+      ) : (
+        <SectionCard title="Estimated earthwork cost">
+          <div className="num text-2xl font-semibold text-foreground">
+            {fmtUsdK(assessment.costLow)}
+            <span className="mx-1 text-muted">to</span>
+            {fmtUsdK(assessment.costHigh)}
+          </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted">
+            {survey.earthwork_cost?.note
+              ? cleanUnitText(survey.earthwork_cost.note)
+              : "Rough planning range from cut and fill volume, not a contractor quote."}
+          </p>
+        </SectionCard>
+      )}
 
       {/* ---- 6. Elevation profile ---- */}
       <SectionCard title="Elevation profile (site diagonal)">
@@ -476,13 +762,16 @@ function ReportBody({ report }: { report: ReportResponse }) {
 
       {/* ---- 8. Error bounds box: the trust signature ---- */}
       <SectionCard title="Error bounds">
+        <div className="flex justify-end pb-1">
+          <UnitsToggle />
+        </div>
         <div>
-          {outline && (
+          {area && (
             <MetricRow
               label="Area"
-              value={outline.area.value}
-              unit={outline.area.unit}
-              error={`± ${outline.areaErr.value}`}
+              value={area.value}
+              unit={area.unit}
+              error={`± ${area.err}`}
               note="from the surveyed outline"
             />
           )}
@@ -494,30 +783,49 @@ function ReportBody({ report }: { report: ReportResponse }) {
           />
           <MetricRow
             label="Elevation range"
-            value={fmt(elevRange, 1)}
-            unit="m"
-            error={`± ${fmt(elevRangeErr, 1)}`}
-            note={`${fmt(survey.min_height, 0)} to ${fmt(survey.max_height, 0)} m`}
+            value={elevRange.value}
+            unit={elevRange.unit}
+            error={`± ${elevRange.err}`}
+            note={`${elevValue(survey.min_height, units)} to ${elevValue(survey.max_height, units)} ${elevUnit(units)}`}
           />
           <MetricRow
             label="Cut volume"
-            value={fmt(survey.cut_volume.value)}
-            unit={survey.cut_volume.unit}
-            error={`± ${fmt(survey.cut_volume.error)}`}
-            note="dirt to remove to reach level grade"
+            value={cut.value}
+            unit={cut.unit}
+            error={`± ${cut.err}`}
+            note="dirt to remove to reach balance grade"
           />
           <MetricRow
             label="Fill volume"
-            value={fmt(survey.fill_volume.value)}
-            unit={survey.fill_volume.unit}
-            error={`± ${fmt(survey.fill_volume.error)}`}
-            note="dirt to add to reach level grade"
+            value={fill.value}
+            unit={fill.unit}
+            error={`± ${fill.err}`}
+            note="dirt to add to reach balance grade"
           />
+          {/* What "balance grade" means, from the backend when it says so */}
+          {survey.balance_grade &&
+            Number.isFinite(survey.balance_grade.elevation_m) && (
+              <p className="border-t border-line py-2 text-[11px] leading-snug text-muted">
+                <span className="text-foreground/80">Balance grade:</span>{" "}
+                <span className="num">
+                  {elevValue(survey.balance_grade.elevation_m, units, 1)}{" "}
+                  {elevUnit(units)}
+                </span>
+                {survey.balance_grade.note
+                  ? `, ${cleanUnitText(survey.balance_grade.note)}.`
+                  : "."}
+              </p>
+            )}
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-muted">
-          Elevation source: {survey.source}, {survey.cell_size_m.toFixed(0)} m
-          grid, vertical accuracy about ±{survey.vertical_error_m.toFixed(1)}{" "}
-          m.{survey.dem_source_note ? ` ${survey.dem_source_note}` : ""}
+          Elevation source: {survey.source}
+          {survey.dem_data_vintage ? ` (${survey.dem_data_vintage})` : ""},{" "}
+          {elevValue(survey.cell_size_m, units)} {elevUnit(units)} grid,
+          vertical accuracy about ±
+          {elevValue(survey.vertical_error_m, units, 1)} {elevUnit(units)}.
+          {survey.dem_source_note
+            ? ` ${cleanUnitText(survey.dem_source_note)}`
+            : ""}
         </p>
       </SectionCard>
 

@@ -71,6 +71,26 @@ FLOOD_URL = (
     "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query"
 )
 
+# ---------------------------------------------------------------------------
+# Data vintage notes, one per source.
+#
+# Why static text: the fields we query from these services do not include a
+# per-feature effective/collection date, and inventing one would be worse
+# than saying nothing. So each check ships an honest GENERAL statement of
+# how current that dataset tends to be. If a service ever starts returning
+# a real date, prefer that over these.
+# ---------------------------------------------------------------------------
+NWI_DATA_VINTAGE = (
+    "NWI mapping vintage varies by county; much of it is based on imagery "
+    "from the 1980s-2010s. Wetland boundaries on the ground may have "
+    "changed since mapping.")
+WATER_DATA_VINTAGE = (
+    "3DHP hydrography is compiled from elevation-derived sources of "
+    "varying dates; currency varies by watershed.")
+FLOOD_DATA_VINTAGE = (
+    "NFHL effective dates vary by FIRM panel; this layer does not report "
+    "a per-panel effective date. Check the local FIRM panel for its date.")
+
 
 # ---------------------------------------------------------------------------
 # The shared helper: one function that knows how to talk ArcGIS REST.
@@ -261,6 +281,7 @@ def check_wetlands(polygon_latlon: list) -> dict:
             "wetland_types": [], "features": [],
             "coverage_fraction": None, "open_water_fraction": None,
             "source": "USFWS National Wetlands Inventory",
+            "data_vintage": NWI_DATA_VINTAGE,
             "note": f"Could not check wetlands: {result['error']}. "
                     "Treat as unknown, not as clear.",
         }
@@ -292,6 +313,7 @@ def check_wetlands(polygon_latlon: list) -> dict:
         "coverage_fraction": frac,
         "open_water_fraction": water_frac,
         "source": "USFWS National Wetlands Inventory",
+        "data_vintage": NWI_DATA_VINTAGE,
         "note": (f"{len(cleaned)} wetland polygon(s) intersect the site"
                  if cleaned else "No mapped wetlands intersect the site"),
     }
@@ -321,6 +343,7 @@ def check_water(polygon_latlon: list) -> dict:
             "status": "unavailable",
             "waterbodies": [], "coverage_fraction": None,
             "source": "USGS 3D Hydrography Program (waterbodies)",
+            "data_vintage": WATER_DATA_VINTAGE,
             "note": f"Could not check waterbodies: {result['error']}. "
                     "Treat as unknown, not as clear.",
         }
@@ -342,6 +365,7 @@ def check_water(polygon_latlon: list) -> dict:
         "waterbodies": bodies,
         "coverage_fraction": frac,
         "source": "USGS 3D Hydrography Program (waterbodies)",
+        "data_vintage": WATER_DATA_VINTAGE,
         "note": (f"{len(bodies)} waterbody(ies) intersect the site"
                  if bodies else "No mapped waterbodies intersect the site"),
     }
@@ -382,6 +406,7 @@ def check_flood(polygon_latlon: list) -> dict:
             "status": "unavailable",
             "zones": [], "in_high_risk_zone": None, "high_risk_fraction": None,
             "source": "FEMA National Flood Hazard Layer",
+            "data_vintage": FLOOD_DATA_VINTAGE,
             "note": f"Could not check flood zones: {result['error']}. "
                     "Treat as unknown, not as clear.",
         }
@@ -392,13 +417,23 @@ def check_flood(polygon_latlon: list) -> dict:
     for f in feats:
         a = f.get("attributes", {})
         zone = a.get("FLD_ZONE")
-        subtype = a.get("ZONE_SUBTY")
+        # Normalize the subtype before deduping: FEMA panels sometimes
+        # return "" and sometimes null for "no subtype", and without this
+        # the same zone showed up twice ("X, AE (high risk), X, AE ...").
+        subtype = a.get("ZONE_SUBTY") or None
+        if isinstance(subtype, str):
+            subtype = subtype.strip() or None
         # SFHA_TF is FEMA's own "is this the high-risk floodplain?" flag.
         high = (a.get("SFHA_TF") == "T") or (zone in HIGH_RISK_FLOOD_ZONES)
         key = (zone, subtype)
         if key not in seen:
             seen.add(key)
             zones.append({"zone": zone, "subtype": subtype, "high_risk": high})
+
+    # High-risk zones first (they are the ones a buyer must see), then
+    # alphabetically so the order is stable between runs.
+    zones.sort(key=lambda z: (not z["high_risk"], z["zone"] or "",
+                              z["subtype"] or ""))
 
     high_feats = [f for f in feats
                   if f.get("attributes", {}).get("SFHA_TF") == "T"
@@ -414,6 +449,7 @@ def check_flood(polygon_latlon: list) -> dict:
         "in_high_risk_zone": in_high,
         "high_risk_fraction": high_frac,
         "source": "FEMA National Flood Hazard Layer",
+        "data_vintage": FLOOD_DATA_VINTAGE,
         "note": (f"Site intersects flood zone(s): "
                  + ", ".join(sorted({z['zone'] for z in zones if z['zone']}))
                  if zones else "No mapped flood zones intersect the site "

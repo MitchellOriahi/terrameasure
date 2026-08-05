@@ -21,6 +21,7 @@ import type { MapLayerMouseEvent, ViewStateChangeEvent } from "@vis.gl/react-map
 import type { Feature, Polygon } from "geojson";
 import { useAppStore } from "@/store/appStore";
 import { loadCamera, saveCamera } from "@/lib/mapState";
+import { demCorners } from "@/lib/site3d";
 import type { LatLon } from "@/lib/geo";
 import {
   DARK_STYLE_URL,
@@ -57,6 +58,12 @@ export function MapView({ onShapeFinished, onMapClick }: MapViewProps) {
   const drawnVertices = useAppStore((s) => s.drawnVertices);
   const survey = useAppStore((s) => s.survey);
   const parcel = useAppStore((s) => s.parcel);
+  // Site 3D mode (the "View site in 3D" experience): while active it
+  // owns the terrain (with its own exaggeration) and may drape one of
+  // the survey's images over the site footprint.
+  const site3d = useAppStore((s) => s.site3d);
+  const site3dDrape = useAppStore((s) => s.site3dDrape);
+  const site3dExaggeration = useAppStore((s) => s.site3dExaggeration);
 
   // Where the user last left the map in this tab. Read once per mount:
   // it survives the Google sign-in round trip, which reloads the page.
@@ -79,31 +86,24 @@ export function MapView({ onShapeFinished, onMapClick }: MapViewProps) {
     [drawnVertices],
   );
 
-  // Where to pin the contour image overlay: the backend tells us the DEM's
-  // center and size in meters; convert that to the four corner coordinates
-  // an image source needs (top-left, top-right, bottom-right, bottom-left).
-  const contourCorners = useMemo(() => {
-    if (!survey || !survey.contour_map_clean_b64 || !survey.dem_center_lat) {
-      return null;
-    }
-    const mPerDegLat = 111_320;
-    const mPerDegLon =
-      111_320 * Math.cos((survey.dem_center_lat * Math.PI) / 180);
-    const halfW = survey.dem_width_m / 2 / mPerDegLon;
-    const halfH = survey.dem_height_m / 2 / mPerDegLat;
-    const { dem_center_lat: lat, dem_center_lon: lon } = survey;
-    return [
-      [lon - halfW, lat + halfH],
-      [lon + halfW, lat + halfH],
-      [lon + halfW, lat - halfH],
-      [lon - halfW, lat - halfH],
-    ] as [
-      [number, number],
-      [number, number],
-      [number, number],
-      [number, number],
-    ];
-  }, [survey]);
+  // Where to pin image overlays (contours, the Site 3D drape): the
+  // backend tells us the DEM's center and size in meters; demCorners
+  // (lib/site3d.ts) converts that to the four corner coordinates an
+  // image source needs (top-left, top-right, bottom-right, bottom-left).
+  const surveyCorners = useMemo(() => demCorners(survey), [survey]);
+
+  // Which of the survey's images (if any) is draped over the site in
+  // Site 3D mode. "satellite" deliberately maps to no extra image: the
+  // satellite basemap is already stretched over the terrain, and its
+  // live tiles are sharper than any snapshot pinned on top.
+  const drapeB64 =
+    site3d && survey
+      ? site3dDrape === "slope"
+        ? survey.slope_map_clean_b64
+        : site3dDrape === "contours"
+          ? survey.contour_map_clean_b64
+          : undefined
+      : undefined;
 
   return (
     <Map
@@ -142,10 +142,14 @@ export function MapView({ onShapeFinished, onMapClick }: MapViewProps) {
       // (The cast is needed because the wrapper's TypeScript types only
       // admit undefined, while its runtime code specifically handles null
       // as the "remove terrain" signal. Runtime wins here.)
+      // Site 3D mode owns the terrain while it runs (with its user-set
+      // exaggeration); otherwise the TopBar's global 3D toggle does.
       terrain={
-        terrain3d
-          ? { source: "terrain-dem", exaggeration: 1.3 }
-          : (null as unknown as undefined)
+        site3d
+          ? { source: "terrain-dem", exaggeration: site3dExaggeration }
+          : terrain3d
+            ? { source: "terrain-dem", exaggeration: 1.3 }
+            : (null as unknown as undefined)
       }
       // Why this flag: by default MapLibre "clamps" the camera's focal
       // point to the ground. The moment terrain switches on, the ground
@@ -156,7 +160,7 @@ export function MapView({ onShapeFinished, onMapClick }: MapViewProps) {
       // stays at sea level, so toggling 3D keeps the view scale the user
       // had; the mountains simply rise toward the camera as expected.
       centerClampedToGround={false}
-      maxPitch={terrain3d ? 70 : 60}
+      maxPitch={terrain3d || site3d ? 70 : 60}
       style={{ width: "100%", height: "100%" }}
       attributionControl={{ compact: true }}
       onClick={(e: MapLayerMouseEvent) =>
@@ -251,18 +255,46 @@ export function MapView({ onShapeFinished, onMapClick }: MapViewProps) {
       )}
 
       {/* ---- Contour overlay: the survey's contour map image, pinned to
-           the exact ground footprint the backend reported ---- */}
-      {layers.contours && contourCorners && survey && (
+           the exact ground footprint the backend reported. Hidden while
+           Site 3D is up: the 3D drape below covers the same ground and
+           double-drawing the contours would look muddy. ---- */}
+      {layers.contours &&
+        surveyCorners &&
+        survey?.contour_map_clean_b64 &&
+        !site3d && (
+          <Source
+            id="survey-contours"
+            type="image"
+            url={`data:image/png;base64,${survey.contour_map_clean_b64}`}
+            coordinates={surveyCorners}
+          >
+            <Layer
+              id="survey-contours-layer"
+              type="raster"
+              paint={{ "raster-opacity": 0.9, "raster-fade-duration": 0 }}
+            />
+          </Source>
+        )}
+
+      {/* ---- Site 3D drape: one of the survey's images stretched over
+           the surveyed ground while in 3D mode. The key forces a clean
+           source swap when the user picks a different drape (image
+           sources cache their URL, so remounting is the reliable way).
+           MapLibre automatically molds a raster image source onto the
+           3D terrain, which is exactly the draped-mesh effect the old
+           Three.js panel had. ---- */}
+      {site3d && surveyCorners && drapeB64 && (
         <Source
-          id="survey-contours"
+          key={`site3d-drape-${site3dDrape}`}
+          id="site3d-drape"
           type="image"
-          url={`data:image/png;base64,${survey.contour_map_clean_b64}`}
-          coordinates={contourCorners}
+          url={`data:image/png;base64,${drapeB64}`}
+          coordinates={surveyCorners}
         >
           <Layer
-            id="survey-contours-layer"
+            id="site3d-drape-layer"
             type="raster"
-            paint={{ "raster-opacity": 0.9, "raster-fade-duration": 0 }}
+            paint={{ "raster-opacity": 0.92, "raster-fade-duration": 0 }}
           />
         </Source>
       )}

@@ -56,6 +56,24 @@ export interface ScoreOut {
   buildable_area_pct: number; // water-adjusted, 0 to 100
   breakdown: ScoreFactor[];
   note: string;
+  // ---- Newer backends only; check before using ----
+  // One-sentence headline: the single biggest constraint on the site,
+  // shown right under the verdict word.
+  headline_reason?: string;
+  // What the score does NOT cover (zoning, septic, access, ...), for the
+  // scope strip under the verdict banner.
+  not_checked?: string[];
+}
+
+// The cost of grading just a building pad (newer backends). Shaped like
+// the main cost range: a low/high USD bracket plus a note about the
+// assumptions (pad size, placement).
+export interface PadCostOut {
+  low_usd: number;
+  high_usd: number;
+  base_usd?: number;
+  pad_area_m2?: number;
+  note?: string;
 }
 
 // Rough grading cost range computed server-side from cut + fill volume.
@@ -66,6 +84,15 @@ export interface EarthworkCostOut {
   cut_m3: number;
   fill_m3: number;
   note: string;
+  // ---- Newer backends only; check before using ----
+  // Volume that balances on site, and the leftover to import/export.
+  balanced_m3?: number;
+  net_m3?: number;
+  // What the main range actually covers ("theoretical full-site balance").
+  scope?: string;
+  // Pad-based costing (the realistic headline number); when present the
+  // UI shows it FIRST and demotes the full-site figure.
+  pad_cost?: PadCostOut;
 }
 
 // Each context source reports "ok" or, honestly, "unavailable".
@@ -78,6 +105,10 @@ export interface WetlandsContext {
   open_water_fraction: number | null; // subset that is open water
   source: string;
   note: string;
+  // Newer backends: when the source data was published or last updated
+  // (e.g. "NWI data effective 2019"). Shown next to the source name;
+  // when absent we show nothing rather than invent a date.
+  data_vintage?: string;
 }
 
 export interface WaterbodyOut {
@@ -92,6 +123,8 @@ export interface WaterContext {
   coverage_fraction: number | null;
   source: string;
   note: string;
+  // Newer backends: source publication/effective info (see WetlandsContext).
+  data_vintage?: string;
 }
 
 export interface FloodZoneOut {
@@ -107,6 +140,8 @@ export interface FloodContext {
   high_risk_fraction: number | null;
   source: string;
   note: string;
+  // Newer backends: FEMA map effective date info (see WetlandsContext).
+  data_vintage?: string;
 }
 
 // The bundle of all three checks plus a combined open-water estimate.
@@ -116,6 +151,9 @@ export interface SurveyContext {
   flood: FloodContext;
   open_water_fraction: number | null;
   note: string;
+  // Newer backends: one general "how current is this data" line, used
+  // as the fallback when a source has no data_vintage of its own.
+  data_currency_note?: string;
 }
 
 export interface SurveyResponse {
@@ -159,6 +197,12 @@ export interface SurveyResponse {
   context?: SurveyContext | null;
   // Set when the primary DEM source failed and a fallback was used.
   dem_source_note?: string;
+  // Newer backends: elevation data collection vintage (e.g. lidar year).
+  dem_data_vintage?: string;
+  // Newer backends: the "balance grade", the single elevation where cut
+  // and fill cancel out (no dirt trucked in or out). The note explains
+  // this in plain language and the UI shows it verbatim.
+  balance_grade?: { elevation_m: number; note?: string };
   // The uncertified-survey disclaimer, verbatim from the backend.
   disclaimer?: string;
 }

@@ -6,15 +6,22 @@
 
 import { useMemo } from "react";
 import { X } from "lucide-react";
-import type { SurveyResponse } from "@/lib/api";
+import type { MeasurementOut, SurveyResponse } from "@/lib/api";
 import {
   polygonAreaM2,
   polygonPerimeterM,
   fmt,
-  fmtArea,
-  fmtLength,
   type LatLon,
 } from "@/lib/geo";
+import {
+  areaPair,
+  distancePair,
+  elevationPair,
+  elevValue,
+  elevUnit,
+  volumePair,
+  cleanUnitText,
+} from "@/lib/units";
 import { assessSite, fmtUsdK, type Verdict } from "@/lib/verdict";
 import { useAppStore } from "@/store/appStore";
 import { Button } from "@/components/ui/button";
@@ -24,6 +31,9 @@ import { ElevationChart } from "./ElevationChart";
 import { RiskFlags } from "./RiskFlags";
 import { ShareReport } from "./ShareReport";
 import { SaveSurvey } from "./SaveSurvey";
+import { Site3DEntryButton } from "@/components/site3d/Site3DEntryButton";
+import { ScopeStrip } from "./ScopeStrip";
+import { UnitsToggle } from "./UnitsToggle";
 
 // Verdict banner styling: color + a one-line meaning. The verdict word
 // itself is always text, so color is never the only signal.
@@ -46,6 +56,19 @@ export const VERDICT_META: Record<
   },
 };
 
+/**
+ * Slope-confidence rule: any sentence that CHARACTERIZES the slope
+ * ("very gentle average slope") must carry its error bound inline, so
+ * the adjective can never sound more certain than the data. Exported
+ * because the shared-report page applies the same rule.
+ */
+export function withSlopeBound(text: string, slope: MeasurementOut): string {
+  // Only touch sentences that talk about slope, and never double-append
+  // a bound onto text that already shows one.
+  if (!/slope/i.test(text) || text.includes("±")) return text;
+  return `${text} (${fmt(slope.value, 1)}° ± ${fmt(slope.error, 1)}°)`;
+}
+
 interface ResultsContentProps {
   survey: SurveyResponse;
   vertices: LatLon[] | null;
@@ -53,12 +76,18 @@ interface ResultsContentProps {
 
 export function ResultsContent({ survey, vertices }: ResultsContentProps) {
   const clearSurvey = useAppStore((s) => s.clearSurvey);
+  // Which measurement system to display (imperial by default, toggleable).
+  const units = useAppStore((s) => s.units);
 
   // Score, verdict and cost range. The backend computes these when it
   // can; assessSite falls back to a client heuristic for old backends
   // (see lib/verdict.ts for the whole story).
   const assessment = useMemo(() => assessSite(survey), [survey]);
   const meta = VERDICT_META[assessment.verdict];
+
+  // The one-sentence headline under the verdict word: the backend's
+  // biggest-constraint sentence when present, the generic blurb otherwise.
+  const headline = survey.score?.headline_reason ?? meta.blurb;
 
   // Area and perimeter come from the drawn outline (pure 2D geometry).
   // Their error bound is tied to the DEM cell size: you cannot trust an
@@ -76,14 +105,36 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
     };
   }, [vertices, survey.cell_size_m]);
 
-  const area = outline ? fmtArea(outline.areaM2) : null;
-  const areaErr = outline ? fmtArea(outline.areaErrM2) : null;
-  const perim = outline ? fmtLength(outline.perimM) : null;
+  // Every displayed pair (value + error, same unit) goes through
+  // lib/units.ts so imperial/metric can never get out of sync.
+  const area = outline ? areaPair(outline.areaM2, outline.areaErrM2, units) : null;
+  const perim = outline
+    ? distancePair(outline.perimM, outline.perimErrM, units)
+    : null;
 
-  const elevRange = survey.max_height - survey.min_height;
+  const elevRangeM = survey.max_height - survey.min_height;
   // Range of two independently uncertain heights: errors add in quadrature
   // (sqrt of 2 factor). A simplification, and an honest one.
-  const elevRangeErr = survey.vertical_error_m * Math.SQRT2;
+  const elevRange = elevationPair(
+    elevRangeM,
+    survey.vertical_error_m * Math.SQRT2,
+    units,
+  );
+  const cut = volumePair(survey.cut_volume.value, survey.cut_volume.error, units);
+  const fill = volumePair(
+    survey.fill_volume.value,
+    survey.fill_volume.error,
+    units,
+  );
+
+  // Pad-based cost (newer backends): the realistic headline number.
+  // Guarded hard because a concurrent backend build may or may not
+  // send it, or send it half-formed.
+  const padCost = survey.earthwork_cost?.pad_cost;
+  const hasPadCost =
+    padCost != null &&
+    Number.isFinite(padCost.low_usd) &&
+    Number.isFinite(padCost.high_usd);
 
   return (
     <div className="flex flex-col gap-4">
@@ -95,9 +146,10 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
         <div className="flex items-center justify-between">
           <span className="text-2xl font-bold tracking-tight">
             {assessment.verdict}
-            {/* The backend's one-word grade ("Good", "Fair", ...), when
-                the server computed this verdict */}
-            {assessment.label && (
+            {/* The backend's one-word grade ("Good", "Fair", ...) only
+                when there is no headline sentence: one qualifier under
+                the verdict, never two. */}
+            {assessment.label && !survey.score?.headline_reason && (
               <span className="ml-2 text-sm font-medium opacity-80">
                 {assessment.label}
               </span>
@@ -112,27 +164,62 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
             <X size={16} />
           </Button>
         </div>
-        <p className="mt-0.5 text-xs text-foreground/80">{meta.blurb}</p>
+        <p className="mt-0.5 text-xs text-foreground/80">
+          {withSlopeBound(headline, survey.avg_slope)}
+        </p>
       </div>
+
+      {/* ---- Scope strip: what this verdict does NOT check ---- */}
+      <ScopeStrip notChecked={survey.score?.not_checked} />
 
       {/* ---- Share this survey as a public read-only report link,
            and Save it to the signed-in user's profile ---- */}
       <ShareReport survey={survey} vertices={vertices} />
       <SaveSurvey survey={survey} vertices={vertices} />
+      {/* Fly into a 3D view of this site (hides itself if unavailable) */}
+      <Site3DEntryButton />
 
       {/* ---- Cost to develop: right under the verdict per spec ---- */}
       <div className="rounded-xl border border-line bg-surface-2/60 px-4 py-3">
-        <div className="text-[11px] uppercase tracking-widest text-muted">
-          Estimated earthwork cost
-        </div>
-        <div className="num mt-1 text-2xl font-semibold text-foreground">
-          {fmtUsdK(assessment.costLow)}
-          <span className="mx-1 text-muted">to</span>
-          {fmtUsdK(assessment.costHigh)}
-        </div>
-        <div className="text-[11px] text-muted">
-          rough planning range, from cut and fill volume
-        </div>
+        {hasPadCost ? (
+          <>
+            {/* Pad costing: what it costs to grade a building pad. This
+                is the number a buyer can act on, so it leads. */}
+            <div className="text-[11px] uppercase tracking-widest text-muted">
+              Building pad earthwork
+            </div>
+            <div className="num mt-1 text-2xl font-semibold text-foreground">
+              {fmtUsdK(padCost.low_usd)}
+              <span className="mx-1 text-muted">to</span>
+              {fmtUsdK(padCost.high_usd)}
+            </div>
+            <div className="text-[11px] text-muted">
+              {padCost.note
+                ? cleanUnitText(padCost.note)
+                : "grading a building pad, not the whole site"}
+            </div>
+            {/* The old full-site figure stays visible but demoted, with
+                a label that says what it really is. */}
+            <div className="num mt-2 border-t border-line pt-2 text-[11px] text-muted">
+              Theoretical full-site balance: {fmtUsdK(assessment.costLow)} to{" "}
+              {fmtUsdK(assessment.costHigh)}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-[11px] uppercase tracking-widest text-muted">
+              Estimated earthwork cost
+            </div>
+            <div className="num mt-1 text-2xl font-semibold text-foreground">
+              {fmtUsdK(assessment.costLow)}
+              <span className="mx-1 text-muted">to</span>
+              {fmtUsdK(assessment.costHigh)}
+            </div>
+            <div className="text-[11px] text-muted">
+              rough planning range, from cut and fill volume
+            </div>
+          </>
+        )}
       </div>
 
       {/* ---- Score dial: supports the verdict ---- */}
@@ -171,7 +258,7 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
                     {item.factor}
                   </span>
                   <span className="block text-[11px] leading-snug text-muted">
-                    {item.note}
+                    {withSlopeBound(item.note, survey.avg_slope)}
                   </span>
                 </span>
               </li>
@@ -185,21 +272,28 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
 
       {/* ---- The metric rows ---- */}
       <div className="rounded-xl border border-line bg-surface-2/40 px-4 py-1">
-        {area && areaErr && outline && (
+        {/* Header row: name the section and hold the units switch */}
+        <div className="flex items-center justify-between border-b border-line py-2">
+          <span className="text-[11px] uppercase tracking-widest text-muted">
+            Measurements
+          </span>
+          <UnitsToggle />
+        </div>
+        {area && (
           <MetricRow
             label="Area"
             value={area.value}
             unit={area.unit}
-            error={`± ${areaErr.value}`}
+            error={`± ${area.err}`}
             note="from your drawn outline"
           />
         )}
-        {perim && outline && (
+        {perim && (
           <MetricRow
             label="Perimeter"
             value={perim.value}
             unit={perim.unit}
-            error={`± ${fmt(outline.perimErrM, 1)}`}
+            error={`± ${perim.err}`}
           />
         )}
         <MetricRow
@@ -224,25 +318,39 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
         />
         <MetricRow
           label="Elevation range"
-          value={fmt(elevRange, 1)}
-          unit="m"
-          error={`± ${fmt(elevRangeErr, 1)}`}
-          note={`${fmt(survey.min_height, 0)} to ${fmt(survey.max_height, 0)} m`}
+          value={elevRange.value}
+          unit={elevRange.unit}
+          error={`± ${elevRange.err}`}
+          note={`${elevValue(survey.min_height, units)} to ${elevValue(survey.max_height, units)} ${elevUnit(units)}`}
         />
         <MetricRow
           label="Cut volume"
-          value={fmt(survey.cut_volume.value)}
-          unit={survey.cut_volume.unit}
-          error={`± ${fmt(survey.cut_volume.error)}`}
-          note="dirt to remove to reach level grade"
+          value={cut.value}
+          unit={cut.unit}
+          error={`± ${cut.err}`}
+          note="dirt to remove to reach balance grade"
         />
         <MetricRow
           label="Fill volume"
-          value={fmt(survey.fill_volume.value)}
-          unit={survey.fill_volume.unit}
-          error={`± ${fmt(survey.fill_volume.error)}`}
-          note="dirt to add to reach level grade"
+          value={fill.value}
+          unit={fill.unit}
+          error={`± ${fill.err}`}
+          note="dirt to add to reach balance grade"
         />
+        {/* What "balance grade" means, from the backend when it says so */}
+        {survey.balance_grade &&
+          Number.isFinite(survey.balance_grade.elevation_m) && (
+            <p className="border-t border-line py-2 text-[11px] leading-snug text-muted">
+              <span className="text-foreground/80">Balance grade:</span>{" "}
+              <span className="num">
+                {elevValue(survey.balance_grade.elevation_m, units, 1)}{" "}
+                {elevUnit(units)}
+              </span>
+              {survey.balance_grade.note
+                ? `, ${cleanUnitText(survey.balance_grade.note)}.`
+                : "."}
+            </p>
+          )}
       </div>
 
       {/* ---- Elevation profile ---- */}
@@ -258,11 +366,16 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
 
       {/* ---- Data source note ---- */}
       <p className="text-[11px] leading-relaxed text-muted">
-        Elevation source: {survey.source}, {survey.cell_size_m.toFixed(0)} m
-        grid, vertical accuracy about ±{survey.vertical_error_m.toFixed(1)} m.
+        Elevation source: {survey.source}
+        {/* Data vintage only when the backend actually knows it */}
+        {survey.dem_data_vintage ? ` (${survey.dem_data_vintage})` : ""},{" "}
+        {elevValue(survey.cell_size_m, units)} {elevUnit(units)} grid, vertical
+        accuracy about ±{elevValue(survey.vertical_error_m, units, 1)}{" "}
+        {elevUnit(units)}.
         {/* When the backend fell back to a coarser DEM it says so here */}
-        {survey.dem_source_note ? ` ${survey.dem_source_note}` : ""} Tip: turn
-        on the Contours layer to see this survey's contour lines on the map.
+        {survey.dem_source_note ? ` ${cleanUnitText(survey.dem_source_note)}` : ""} Tip:
+        turn on the Contours layer to see this survey's contour lines on the
+        map.
       </p>
 
       {/* ---- The disclaimer, verbatim from the backend when present ---- */}

@@ -2,9 +2,14 @@
 // The floating command bar across the top of the map:
 //   wordmark | search | draw tools | basemap + 3D | layers | nav links
 //
-// On phones it stacks into two rows (logo + search on top, tool chips
-// below) so every control keeps a 44px touch target.
+// Desktop gets the full toolbar. On phones most tools HIDE here: the
+// draw tools, basemap switch, and layers button all live in the
+// bottom-of-screen controls instead (MobileBottomBar / the Survey
+// flow), because the top of a tall phone is a two-hand reach. What
+// stays up top on mobile: the wordmark, search (used about once per
+// session), the 3D toggle, and help.
 
+import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useMap } from "@vis.gl/react-maplibre";
 import {
@@ -22,7 +27,10 @@ import { useAppStore } from "@/store/appStore";
 import { useAuthStore } from "@/store/authStore";
 import { useWelcomeStore } from "@/store/welcomeStore";
 import { getCompletedSurveyCount } from "@/lib/hints";
+import { API_BASE } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
+import { CoachMarks } from "@/components/CoachMarks";
 import { SearchBox } from "./SearchBox";
 
 /** The account entry in the top bar: a small initial-in-a-circle when
@@ -36,34 +44,37 @@ export function ProfileButton() {
 
   if (status === "signed-in" && user) {
     return (
-      <Link to="/profile" aria-label="Your profile" title={user.name}>
-        <Button
-          size="iconSm"
-          variant="ghost"
-          className="glass"
-          data-active={location.pathname === "/profile"}
-          tabIndex={-1}
-        >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-deep text-[10px] font-semibold text-accent-bright">
-            {user.name.charAt(0).toUpperCase()}
-          </span>
-        </Button>
-      </Link>
+      <Tooltip label={`Your profile (${user.name})`} align="end">
+        <Link to="/profile" aria-label="Your profile">
+          <Button
+            size="iconSm"
+            variant="ghost"
+            className="glass"
+            data-active={location.pathname === "/profile"}
+            tabIndex={-1}
+          >
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-deep text-[10px] font-semibold text-accent-bright">
+              {user.name.charAt(0).toUpperCase()}
+            </span>
+          </Button>
+        </Link>
+      </Tooltip>
     );
   }
 
   // Anonymous (or still checking): a plain sign-in entry. Never a nag.
   return (
-    <Link
-      to="/auth"
-      state={{ from: location.pathname }}
-      aria-label="Sign in"
-      title="Sign in"
-    >
-      <Button size="iconSm" variant="ghost" className="glass" tabIndex={-1}>
-        <User size={16} />
-      </Button>
-    </Link>
+    <Tooltip label="Sign in" align="end">
+      <Link
+        to="/auth"
+        state={{ from: location.pathname }}
+        aria-label="Sign in"
+      >
+        <Button size="iconSm" variant="ghost" className="glass" tabIndex={-1}>
+          <User size={16} />
+        </Button>
+      </Link>
+    </Tooltip>
   );
 }
 
@@ -122,6 +133,26 @@ export function TopBar() {
   const welcomeOpen = useWelcomeStore((s) => s.open);
   const setWelcomeOpen = useWelcomeStore((s) => s.setOpen);
 
+  // ---- Warm-up ping ----
+  // The free-tier API server (Render) goes to sleep when idle, and the
+  // first request after a nap can take tens of seconds while it boots.
+  // So the moment the map screen mounts we fire ONE throwaway request at
+  // /health. By the time the user has looked around and drawn a shape,
+  // the server is already awake and their first survey feels fast.
+  // sessionStorage guards it to once per tab session; failures are
+  // ignored on purpose (this is an optimization, never a feature).
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("tm_health_ping") === "1") return;
+      sessionStorage.setItem("tm_health_ping", "1");
+    } catch {
+      // Storage blocked (private mode): ping anyway, just unguarded.
+    }
+    fetch(API_BASE + "/health").catch(() => {
+      // Server still waking or offline; the ping did its job either way.
+    });
+  }, []);
+
   // Show "draw an area" only to a genuine newcomer: nothing drawn yet,
   // no results up, no tool armed, welcome card out of the way, and this
   // browser has never completed a survey (the localStorage counter).
@@ -145,31 +176,42 @@ export function TopBar() {
 
         {/* Row 2 (wraps below on narrow screens): tools */}
         <div className="flex items-center gap-2">
-          {/* Draw tools: pressing again cancels the mode. The relative
-              wrapper anchors the newcomer hint pill right beneath them. */}
-          <div className="relative flex items-center gap-2">
-            <Button
-              size="icon"
-              data-active={drawMode === "polygon"}
-              aria-label="Draw a polygon to survey"
-              title="Draw polygon"
-              onClick={() =>
-                setDrawMode(drawMode === "polygon" ? "none" : "polygon")
-              }
-            >
-              <Pentagon size={18} />
-            </Button>
-            <Button
-              size="icon"
-              data-active={drawMode === "rectangle"}
-              aria-label="Draw a rectangle to survey"
-              title="Draw rectangle"
-              onClick={() =>
-                setDrawMode(drawMode === "rectangle" ? "none" : "rectangle")
-              }
-            >
-              <Square size={18} />
-            </Button>
+          {/* Draw tools: icon PLUS a short text label, so nobody has to
+              guess what a pentagon glyph means. Pressing again cancels
+              the mode. The relative wrapper anchors the newcomer hint
+              pill right beneath them. Desktop only (hidden md:flex):
+              on phones drawing happens through the big Survey button
+              in the bottom bar, never up here. */}
+          <div
+            data-coach="draw"
+            className="relative hidden items-center gap-2 md:flex"
+          >
+            <Tooltip label="Click the map to outline any shape, corner by corner">
+              <Button
+                className="gap-1.5 px-3"
+                data-active={drawMode === "polygon"}
+                aria-label="Draw a polygon to survey"
+                onClick={() =>
+                  setDrawMode(drawMode === "polygon" ? "none" : "polygon")
+                }
+              >
+                <Pentagon size={16} />
+                <span className="text-xs">Polygon</span>
+              </Button>
+            </Tooltip>
+            <Tooltip label="Click two opposite corners to survey a rectangle">
+              <Button
+                className="gap-1.5 px-3"
+                data-active={drawMode === "rectangle"}
+                aria-label="Draw a rectangle to survey"
+                onClick={() =>
+                  setDrawMode(drawMode === "rectangle" ? "none" : "rectangle")
+                }
+              >
+                <Square size={16} />
+                <span className="text-xs">Rectangle</span>
+              </Button>
+            </Tooltip>
 
             {/* First-use nudge, desktop only (max-md:hidden): points a
                 newcomer at these two buttons until their first survey.
@@ -182,8 +224,9 @@ export function TopBar() {
             )}
           </div>
 
-          {/* Basemap switcher: a two-option segmented control */}
-          <div className="glass flex h-11 items-center p-1">
+          {/* Basemap switcher: a two-option segmented control. Desktop
+              only; on phones it lives in the bottom bar (one-thumb rule). */}
+          <div className="glass hidden h-11 items-center p-1 md:flex">
             {(["map", "satellite"] as const).map((b) => (
               <button
                 key={b}
@@ -202,12 +245,14 @@ export function TopBar() {
 
           {/* 3D terrain toggle. Turning 3D on also tilts the camera
               (pitch 60) so the relief is actually visible; turning it
-              off levels the view back to straight-down 2D. */}
+              off levels the view back to straight-down 2D. A mountain
+              icon alone is ambiguous, so it carries a visible "3D" text
+              label on desktop (and stays a 44px icon button on phones). */}
+          <Tooltip label="Tilt the map into 3D terrain view">
           <Button
-            size="icon"
+            className="gap-1.5 px-3 max-md:w-11 max-md:px-0"
             data-active={terrain3d}
             aria-label="Toggle 3D terrain"
-            title="3D terrain"
             onClick={() => {
               // ORDER MATTERS here. MapLibre 6 renders a BLACK SCREEN
               // if an ANIMATED camera move runs while terrain is on,
@@ -229,51 +274,61 @@ export function TopBar() {
               }
             }}
           >
-            <Mountain size={18} />
+            <Mountain size={16} />
+            <span className="text-xs max-md:hidden">3D</span>
           </Button>
+          </Tooltip>
 
-          {/* Layers panel toggle */}
-          <Button
-            size="icon"
-            data-active={layersPanelOpen}
-            aria-label="Toggle overlays panel"
-            title="Overlays"
-            onClick={() => setLayersPanelOpen(!layersPanelOpen)}
-          >
-            <Layers size={18} />
-          </Button>
+          {/* Layers panel toggle. Desktop only (max-md:hidden): the
+              mobile bottom bar has its own Layers button, and two
+              buttons doing the same thing just confuses people. */}
+          <Tooltip label="Overlays: flood, wetlands, parcels, contours">
+            <Button
+              size="icon"
+              className="max-md:hidden"
+              data-coach="layers"
+              data-active={layersPanelOpen}
+              aria-label="Toggle overlays panel"
+              onClick={() => setLayersPanelOpen(!layersPanelOpen)}
+            >
+              <Layers size={18} />
+            </Button>
+          </Tooltip>
 
           {/* Help: reopens the welcome card (with the demo survey) any
               time. Small on purpose; it should be findable, not loud.
               Visible on every screen size, unlike the nav links. */}
-          <Button
-            size="iconSm"
-            variant="ghost"
-            className="glass"
-            aria-label="Help and quick tour"
-            title="Help"
-            data-active={welcomeOpen}
-            onClick={() => setWelcomeOpen(true)}
-          >
-            <HelpCircle size={16} />
-          </Button>
+          <Tooltip label="Help and quick tour">
+            <Button
+              size="iconSm"
+              variant="ghost"
+              className="glass"
+              aria-label="Help and quick tour"
+              data-active={welcomeOpen}
+              onClick={() => setWelcomeOpen(true)}
+            >
+              <HelpCircle size={16} />
+            </Button>
+          </Tooltip>
 
           {/* Nav links to the other screens (hidden on the smallest
               phones; those screens are reachable from any placeholder
               page's links too) */}
           <nav className="hidden items-center gap-1 sm:flex">
             {NAV_LINKS.map(({ to, icon: Icon, label }) => (
-              <Link key={to} to={to} aria-label={label} title={label}>
-                <Button
-                  size="iconSm"
-                  variant="ghost"
-                  className="glass"
-                  data-active={location.pathname === to}
-                  tabIndex={-1}
-                >
-                  <Icon size={16} />
-                </Button>
-              </Link>
+              <Tooltip key={to} label={label} align="end">
+                <Link to={to} aria-label={label}>
+                  <Button
+                    size="iconSm"
+                    variant="ghost"
+                    className="glass"
+                    data-active={location.pathname === to}
+                    tabIndex={-1}
+                  >
+                    <Icon size={16} />
+                  </Button>
+                </Link>
+              </Tooltip>
             ))}
             {/* Account entry: avatar initial when signed in, sign-in
                 link when not */}
@@ -281,6 +336,12 @@ export function TopBar() {
           </nav>
         </div>
       </div>
+
+      {/* The one-time guided tour (spotlight rings). It lives here
+          because the TopBar is always mounted on the map screen, so the
+          tour needs no changes to MapPage itself. It renders nothing
+          once dismissed. */}
+      <CoachMarks />
     </header>
   );
 }

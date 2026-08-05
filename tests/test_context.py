@@ -115,10 +115,15 @@ def test_flat_dry_site_scores_go():
     s = scoring.site_score(flat, {"avg_slope_deg": 1.0,
                                   "buildable_area_pct": 100.0},
                            _dry_context())
-    assert s["value"] >= 80, s
+    # Hand arithmetic on the recalibrated scale:
+    #   baseline 50 + slope<3deg +20 + relief<10m +8
+    #   + buildable (100-50)*0.3 = +15   -> 93
+    assert s["value"] == 93, s
     assert s["verdict"] == "go", s
-    assert s["label"] == "Excellent"
+    assert s["label"] == "Favorable", s   # new one-word verdict vocabulary
     assert any(b["factor"] == "open water" for b in s["breakdown"])
+    # No negative factors on a perfect site, so the headline says so.
+    assert "no significant negative" in s["headline_reason"].lower(), s
 
 
 def test_lake_site_craters_to_no_go():
@@ -145,8 +150,13 @@ def test_wetland_site_is_penalized():
                              _dry_context())
     wet = scoring.site_score(flat, {"avg_slope_deg": 1.0,
                                     "buildable_area_pct": 100.0}, ctx)
-    assert wet["value"] < dry["value"] - 20, (dry["value"], wet["value"])
+    # Hand arithmetic: terrain 93 (see the dry test), wetland penalty
+    # 6 pts per 10% x 70% = 42 -> 51, then 70% >= 60% no-go line applies
+    # the hard cap of 30. So dry = 93 and wet = 30.
+    assert dry["value"] == 93, dry
+    assert wet["value"] == 30, wet
     assert wet["verdict"] == "no-go"    # 70% wetland is past the no-go line
+    assert wet["label"] == "Not recommended", wet
 
 
 def test_flood_zone_forces_caution():
@@ -161,6 +171,122 @@ def test_flood_zone_forces_caution():
     assert s["verdict"] in ("caution", "no-go"), s
     flood_items = [b for b in s["breakdown"] if b["factor"] == "flood zone"]
     assert flood_items and flood_items[0]["effect"].startswith("-")
+
+
+def test_wetlands_below_threshold_still_named_in_breakdown():
+    # The CEO's contradiction: risk flags said "8% wetland coverage" while
+    # the breakdown said "no significant mapped wetlands". One source of
+    # truth now: below-threshold coverage is NAMED, with the threshold.
+    flat = FakeDEM(np.full((20, 20), 100.0))
+    ctx = _dry_context()
+    ctx["wetlands"]["coverage_fraction"] = 0.04    # 4%: below the 5% line
+    s = scoring.site_score(flat, {"avg_slope_deg": 1.0,
+                                  "buildable_area_pct": 100.0}, ctx)
+    wet_line = [b for b in s["breakdown"] if b["factor"] == "wetlands"][0]
+    assert wet_line["effect"] == "0", wet_line
+    assert "4%" in wet_line["note"], wet_line
+    assert "below" in wet_line["note"].lower(), wet_line
+    assert "threshold" in wet_line["note"].lower(), wet_line
+
+
+def test_wetlands_above_5pct_always_cost_points():
+    # Weight-table coherence: 8% wetland coverage must cost points even
+    # when part of it overlaps open water (the old veg-only subtraction
+    # let 8% wetlands score 0 while 7% open water scored -6).
+    flat = FakeDEM(np.full((20, 20), 100.0))
+    ctx = _dry_context()
+    ctx["wetlands"]["coverage_fraction"] = 0.08
+    ctx["open_water_fraction"] = 0.06
+    ctx["water"]["coverage_fraction"] = 0.06
+    s = scoring.site_score(flat, {"avg_slope_deg": 1.0,
+                                  "buildable_area_pct": 100.0}, ctx)
+    wet_line = [b for b in s["breakdown"] if b["factor"] == "wetlands"][0]
+    # 6 pts per 10% x 8% = 4.8 -> rounds to -5.
+    assert wet_line["effect"] == "-5", wet_line
+    water_line = [b for b in s["breakdown"] if b["factor"] == "open water"][0]
+    # 8 pts per 10% x 6% = 4.8 -> rounds to -5. Coherent with wetlands.
+    assert water_line["effect"] == "-5", water_line
+
+
+def test_verdict_vocabulary_and_spread():
+    # Bad terrain must actually score BADLY now (the old 72 baseline
+    # squeezed everything into 70-90). Hand arithmetic:
+    #   50 - 30 (slope > 25 deg) - 20 (relief > 100 m)
+    #      - 14 (buildable 5%: round((5-50)*0.3) = -14)  = -14 -> clamps to 0
+    steep = FakeDEM(np.array([[0.0, 150.0], [0.0, 150.0]]))
+    s = scoring.site_score(steep, {"avg_slope_deg": 30.0,
+                                   "buildable_area_pct": 5.0},
+                           _dry_context())
+    assert s["value"] == 0, s
+    assert s["verdict"] == "no-go", s
+    assert s["label"] == "Not recommended", s
+    # The headline reason is the single worst factor (slope, -30).
+    assert "slope" in s["headline_reason"].lower(), s
+
+
+def test_headline_reason_names_worst_factor():
+    # A flood-hit site: the flood line is the biggest negative, so the
+    # headline sentence must come from it.
+    flat = FakeDEM(np.full((20, 20), 10.0))
+    ctx = _dry_context()
+    ctx["flood"] = {"status": "ok", "in_high_risk_zone": True,
+                    "high_risk_fraction": 0.8,
+                    "zones": [{"zone": "AE", "subtype": None,
+                               "high_risk": True}]}
+    s = scoring.site_score(flat, {"avg_slope_deg": 1.0,
+                                  "buildable_area_pct": 100.0}, ctx)
+    assert "flood" in s["headline_reason"].lower(), s
+    # One sentence, headline-sized.
+    assert s["headline_reason"].count(".") <= 1, s["headline_reason"]
+
+
+def test_flood_zones_deduped_and_sorted_high_risk_first():
+    # check_flood must collapse duplicate (zone, subtype) pairs, treating
+    # "" and null subtypes as the same, and list high-risk zones first.
+    # We fake the server response, so this runs offline.
+    real = C.arcgis_query
+
+    def fake_query(url, polygon_latlon=None, **kw):
+        feats = [
+            # Zone X twice: once with subtype "", once with null. Same zone.
+            {"attributes": {"FLD_ZONE": "X", "ZONE_SUBTY": "",
+                            "SFHA_TF": "F"}, "geometry": {}},
+            {"attributes": {"FLD_ZONE": "X", "ZONE_SUBTY": None,
+                            "SFHA_TF": "F"}, "geometry": {}},
+            # Zone AE twice as well, listed AFTER X on purpose.
+            {"attributes": {"FLD_ZONE": "AE", "ZONE_SUBTY": None,
+                            "SFHA_TF": "T"}, "geometry": {}},
+            {"attributes": {"FLD_ZONE": "AE", "ZONE_SUBTY": "",
+                            "SFHA_TF": "T"}, "geometry": {}},
+        ]
+        return {"ok": True, "features": feats}
+
+    C.arcgis_query = fake_query
+    try:
+        r = C.check_flood(_square_latlon())
+    finally:
+        C.arcgis_query = real
+    assert r["status"] == "ok", r
+    # Two zones survive (deduped), high-risk AE sorted ahead of X.
+    assert [z["zone"] for z in r["zones"]] == ["AE", "X"], r["zones"]
+    assert r["zones"][0]["high_risk"] is True
+    # Every context source now states its data vintage honestly.
+    assert "data_vintage" in r and r["data_vintage"], r
+
+
+def test_context_results_carry_data_vintage_when_unavailable():
+    # Even when a source is down, the vintage note rides along so the UI
+    # can always show it.
+    real_urls = (C.WETLANDS_URL, C.WATER_URL, C.FLOOD_URL)
+    dead = "http://127.0.0.1:9/query"
+    C.WETLANDS_URL = C.WATER_URL = C.FLOOD_URL = dead
+    try:
+        poly = _square_latlon()
+        for check in (C.check_wetlands, C.check_water, C.check_flood):
+            r = check(poly)
+            assert "data_vintage" in r and r["data_vintage"], check.__name__
+    finally:
+        C.WETLANDS_URL, C.WATER_URL, C.FLOOD_URL = real_urls
 
 
 def test_unavailable_context_is_noted_not_penalized():
@@ -186,23 +312,63 @@ def test_unavailable_context_is_noted_not_penalized():
 
 
 def test_score_has_verdict_label_and_breakdown():
-    # The response contract the UI depends on.
+    # The response contract the UI depends on (now including the
+    # headline_reason sentence and the not_checked scope strip).
     flat = FakeDEM(np.full((5, 5), 100.0))
     s = scoring.site_score(flat, {"avg_slope_deg": 5.0,
                                   "buildable_area_pct": 80.0}, None)
     assert set(s) >= {"value", "verdict", "label", "breakdown",
-                      "buildable_area_pct", "note"}
+                      "buildable_area_pct", "note",
+                      "headline_reason", "not_checked"}
     assert s["verdict"] in ("go", "caution", "no-go")
+    # Labels are the one-word verdict vocabulary, nothing else.
+    assert s["label"] in ("Favorable", "Proceed with conditions",
+                          "Not recommended"), s
+    assert isinstance(s["headline_reason"], str) and s["headline_reason"]
+    # The scope strip: four named things this score does NOT evaluate.
+    assert len(s["not_checked"]) == 4, s["not_checked"]
+    assert "Zoning and land-use restrictions" in s["not_checked"]
     for item in s["breakdown"]:
         assert set(item) >= {"factor", "effect", "note"}
 
 
 def test_earthwork_cost_is_a_range_with_caveat():
     c = scoring.earthwork_cost(cut_m3=1000, fill_m3=500)
-    # base = 1000*18 + 500*14 = 25000
-    assert c["base_usd"] == 25000
+    # Hand arithmetic for the fixed no-double-count model:
+    #   balanced = min(1000, 500) = 500 m3, priced ONCE at $13/m3 = 6500
+    #   net imbalance = |1000 - 500| = 500 m3 at $16/m3 haul     = 8000
+    #   base = 6500 + 8000 = 14500
+    # (The old model charged 1000*18 + 500*14 = 25000, pricing the same
+    # balanced dirt twice.)
+    assert c["base_usd"] == 14500, c
+    assert c["balanced_m3"] == 500 and c["net_m3"] == 500, c
+    assert c["scope"] == "theoretical full-site balance", c
     assert c["low_usd"] < c["base_usd"] < c["high_usd"]
+    # low/high = 0.75x / 1.6x, i.e. the stated -25%/+60% spread.
+    assert c["low_usd"] == round(14500 * 0.75)
+    assert c["high_usd"] == round(14500 * 1.6)
     assert "rough" in c["note"].lower()
+    assert "-25%/+60%" in c["note"]
+
+
+def test_earthwork_pad_cost_is_realistic_slice():
+    # A 30-acre parcel (~121,406 m2), fully balanced dirt.
+    # Pad area = max(2000, 5% of 121406 = 6070.3) = 6070.3 m2.
+    # Pad share = 6070.3 / 121406 = exactly 0.05, so the pad base is
+    # 5% of the full-site base: 20000*13 = 260000 -> pad 13000.
+    c = scoring.earthwork_cost(cut_m3=20000, fill_m3=20000,
+                               site_area_m2=121406)
+    assert c["base_usd"] == 260000, c
+    pad = c["pad_cost"]
+    assert pad["base_usd"] == 13000, pad
+    assert pad["pad_area_m2"] == 6070, pad
+    assert pad["base_usd"] < c["base_usd"]
+    # On a tiny site the pad is capped at the site itself:
+    # pad_area = min(1500, max(2000, 75)) = 1500 -> pad == full site cost.
+    small = scoring.earthwork_cost(cut_m3=100, fill_m3=100,
+                                   site_area_m2=1500)
+    assert small["pad_cost"]["pad_area_m2"] == 1500, small
+    assert small["pad_cost"]["base_usd"] == small["base_usd"], small
 
 
 def test_buildable_pct_masked_excludes_water():

@@ -14,9 +14,20 @@
 import { create } from "zustand";
 import type { ParcelResponse, SurveyResponse } from "@/lib/api";
 import type { LatLon } from "@/lib/geo";
+import {
+  loadUnitSystem,
+  saveUnitSystem,
+  type UnitSystem,
+} from "@/lib/units";
 
 export type Basemap = "map" | "satellite";
 export type DrawMode = "none" | "polygon" | "rectangle";
+
+// What image is draped over the surveyed ground while in Site 3D mode.
+// "satellite" means no extra image: the satellite basemap itself is
+// already stretched over the terrain, and its live tiles are sharper
+// than any snapshot we could pin on top.
+export type Site3dDrape = "satellite" | "slope" | "contours";
 
 // The togglable data overlays in the Layers panel.
 export type LayerKey =
@@ -99,6 +110,32 @@ interface AppState {
   // share-report flow would have no way to include the parcel facts.
   surveyParcel: ParcelResponse | null;
   setSurveyParcel: (p: ParcelResponse | null) => void;
+
+  // ---- Units preference (imperial ft/acres/yd³ vs metric) ----
+  // Defaults to imperial for the US audience; persisted in localStorage
+  // (key "terrameasure_units") so the choice survives reloads. Every
+  // user-facing number reads this one value so the whole app flips at once.
+  units: UnitSystem;
+  setUnits: (u: UnitSystem) => void;
+
+  // ---- Site 3D mode (the "View site in 3D" experience) ----
+  // True while the main map is showing the surveyed area as a tilted,
+  // orbiting 3D scene. All the entering/leaving choreography (saving the
+  // 2D camera, enabling terrain safely, framing the site) lives in
+  // lib/site3d.ts; the store only holds the flags the UI reads.
+  site3d: boolean;
+  setSite3d: (on: boolean) => void;
+  // Which image is stretched over the surveyed ground (see Site3dDrape).
+  site3dDrape: Site3dDrape;
+  setSite3dDrape: (d: Site3dDrape) => void;
+  // How much to stretch heights vertically. 1 = true scale; a little
+  // more makes gentle terrain readable at a glance.
+  site3dExaggeration: number;
+  setSite3dExaggeration: (x: number) => void;
+  // Is the camera slowly circling the site right now? Any manual map
+  // gesture pauses it; the control card can resume it.
+  site3dOrbiting: boolean;
+  setSite3dOrbiting: (b: boolean) => void;
 
   // ---- Tiny toast (small transient message pill) ----
   toast: string | null;
@@ -214,6 +251,22 @@ export const useAppStore = create<AppState>((set) => ({
 
   surveyParcel: null,
   setSurveyParcel: (p) => set({ surveyParcel: p }),
+
+  units: loadUnitSystem(),
+  setUnits: (u) => {
+    saveUnitSystem(u); // remember for next visit
+    set({ units: u });
+  },
+
+  // ---- Site 3D mode ----
+  site3d: false,
+  setSite3d: (on) => set({ site3d: on }),
+  site3dDrape: "satellite",
+  setSite3dDrape: (d) => set({ site3dDrape: d }),
+  site3dExaggeration: 1.4, // a touch above true scale reads best
+  setSite3dExaggeration: (x) => set({ site3dExaggeration: x }),
+  site3dOrbiting: false,
+  setSite3dOrbiting: (b) => set({ site3dOrbiting: b }),
 
   toast: null,
   setToast: (msg) => set({ toast: msg }),

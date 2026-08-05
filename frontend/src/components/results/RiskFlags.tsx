@@ -1,4 +1,4 @@
-// components/results/RiskFlags.tsx
+﻿// components/results/RiskFlags.tsx
 // Risk flags: what the federal context layers found on this site.
 // Extracted into its own file because two screens render it: the live
 // results panel (ResultsContent) and the public shared-report page.
@@ -19,16 +19,21 @@ function fmtPct(fraction: number | null): string {
   return `${Math.round(fraction * 100)}%`;
 }
 
-/** One risk row: a title line, a detail line, and the source name. */
+/** One risk row: a title line, a detail line, and the source name.
+    `vintage` is the data's publication/effective info when the backend
+    knows it; we never invent a date, so when it is absent the row just
+    names the source. */
 function RiskRow({
   title,
   detail,
   source,
+  vintage,
   tone,
 }: {
   title: string;
   detail: string;
   source: string;
+  vintage?: string;
   tone: "ok" | "warn" | "danger" | "unknown";
 }) {
   const toneClass =
@@ -56,7 +61,10 @@ function RiskRow({
         {title}
       </div>
       <div className="text-[11px] leading-snug text-muted">{detail}</div>
-      <div className="mt-0.5 text-[10px] text-muted/80">Source: {source}</div>
+      <div className="mt-0.5 text-[10px] text-muted/80">
+        Source: {source}
+        {vintage ? ` · ${vintage}` : ""}
+      </div>
     </li>
   );
 }
@@ -64,6 +72,13 @@ function RiskRow({
 export function RiskFlags({ context }: { context: SurveyContext }) {
   const { water, wetlands, flood } = context;
   const rows: ReactNode[] = [];
+
+  // Data vintage per source: prefer that source's own effective info,
+  // fall back to the context-wide currency note, else show nothing.
+  // Rule: never fabricate a date the backend did not send.
+  const waterVintage = water.data_vintage ?? context.data_currency_note;
+  const wetlandsVintage = wetlands.data_vintage ?? context.data_currency_note;
+  const floodVintage = flood.data_vintage ?? context.data_currency_note;
 
   // ---- Open water ----
   if (water.status === "unavailable") {
@@ -73,6 +88,7 @@ export function RiskFlags({ context }: { context: SurveyContext }) {
         title="Open water: could not check (source unavailable)"
         detail="The waterbody service did not answer. Unknown, not clear."
         source={water.source}
+        vintage={waterVintage}
         tone="unknown"
       />,
     );
@@ -92,6 +108,7 @@ export function RiskFlags({ context }: { context: SurveyContext }) {
           title={`Open water covers about ${fmtPct(frac)} of this site`}
           detail={names ? `Waterbodies: ${names}.` : "Mapped open water."}
           source={water.source}
+          vintage={waterVintage}
           tone="danger"
         />,
       );
@@ -102,6 +119,7 @@ export function RiskFlags({ context }: { context: SurveyContext }) {
           title={`Open water: about ${fmtPct(frac)} of the site`}
           detail={names ? `Waterbodies: ${names}.` : "Minor mapped water."}
           source={water.source}
+          vintage={waterVintage}
           tone="warn"
         />,
       );
@@ -112,6 +130,7 @@ export function RiskFlags({ context }: { context: SurveyContext }) {
           title="Open water: none mapped on this site"
           detail="No significant waterbodies intersect the outline."
           source={water.source}
+          vintage={waterVintage}
           tone="ok"
         />,
       );
@@ -126,6 +145,7 @@ export function RiskFlags({ context }: { context: SurveyContext }) {
         title="Wetlands: could not check (source unavailable)"
         detail="The wetlands inventory did not answer. Unknown, not clear."
         source={wetlands.source}
+        vintage={wetlandsVintage}
         tone="unknown"
       />,
     );
@@ -136,6 +156,7 @@ export function RiskFlags({ context }: { context: SurveyContext }) {
         title={`Wetlands: about ${fmtPct(wetlands.coverage_fraction)} of the site`}
         detail={`Types: ${wetlands.wetland_types.join(", ")}. Wetlands often need permits to disturb.`}
         source={wetlands.source}
+        vintage={wetlandsVintage}
         tone="warn"
       />,
     );
@@ -146,6 +167,7 @@ export function RiskFlags({ context }: { context: SurveyContext }) {
         title="Wetlands: none mapped on this site"
         detail="No inventoried wetlands intersect the outline."
         source={wetlands.source}
+        vintage={wetlandsVintage}
         tone="ok"
       />,
     );
@@ -159,6 +181,7 @@ export function RiskFlags({ context }: { context: SurveyContext }) {
         title="Flood zones: could not check (source unavailable)"
         detail="The flood hazard service did not answer. Unknown, not clear."
         source={flood.source}
+        vintage={floodVintage}
         tone="unknown"
       />,
     );
@@ -181,6 +204,7 @@ export function RiskFlags({ context }: { context: SurveyContext }) {
             : ""
         }`}
         source={flood.source}
+        vintage={floodVintage}
         tone={high ? "danger" : "ok"}
       />,
     );
@@ -191,6 +215,7 @@ export function RiskFlags({ context }: { context: SurveyContext }) {
         title="Flood zones: none mapped on this site"
         detail="No FEMA flood zones intersect the outline."
         source={flood.source}
+        vintage={floodVintage}
         tone="ok"
       />,
     );

@@ -27,8 +27,9 @@ import { Button } from "@/components/ui/button";
  * Put text on the clipboard, with a fallback for older browsers.
  * navigator.clipboard needs a secure context (https or localhost);
  * the fallback uses the ancient hidden-textarea + execCommand trick.
+ * Exported so the report page's sticky header can share the same trick.
  */
-async function copyText(text: string): Promise<boolean> {
+export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
     return true;
@@ -61,6 +62,25 @@ export function ShareReport({ survey, vertices }: ShareReportProps) {
   // "Copied!" feedback flag, reset after a moment.
   const [copied, setCopied] = useState(false);
 
+  // The optional report name the sharer types. A named report reads
+  // like a document ("Smith property, Travis County") instead of a
+  // bare coordinate pair on the public page.
+  const [title, setTitle] = useState("");
+
+  // Placeholder suggestion built from the site's centroid, so even the
+  // default hints at a real place. Falls back to plain copy when the
+  // survey somehow has no vertices.
+  const centroid =
+    vertices && vertices.length > 0
+      ? {
+          lat: vertices.reduce((s, v) => s + v.lat, 0) / vertices.length,
+          lon: vertices.reduce((s, v) => s + v.lon, 0) / vertices.length,
+        }
+      : null;
+  const titlePlaceholder = centroid
+    ? `Site near ${centroid.lat.toFixed(5)}, ${centroid.lon.toFixed(5)}`
+    : "Name this report (optional)";
+
   // Elapsed seconds while the POST is in flight (drives the cold-start
   // messaging, same pattern as useSurvey).
   const [elapsed, setElapsed] = useState(0);
@@ -72,9 +92,10 @@ export function ShareReport({ survey, vertices }: ShareReportProps) {
         survey,
         parcel: surveyParcel,
         vertices,
-        // A human-friendly title when we know the address; the backend
-        // stores it and the report page can show it later.
-        title: surveyParcel?.address ?? undefined,
+        // Best available name, in order: what the user typed, then the
+        // parcel's street address. The backend stores it and the report
+        // page shows it as the site title.
+        title: title.trim() || (surveyParcel?.address ?? undefined),
       }),
   });
 
@@ -163,9 +184,23 @@ export function ShareReport({ survey, vertices }: ShareReportProps) {
     );
   }
 
-  // ---- State 1: the button (plus an error line if the last try failed) ----
+  // ---- State 1: name it (optional) + the button ----
   return (
     <div className="flex flex-col gap-2">
+      {/* Small optional name so the public page has a real title */}
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] uppercase tracking-widest text-muted">
+          Name this report (optional)
+        </span>
+        <input
+          type="text"
+          value={title}
+          maxLength={120}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder={titlePlaceholder}
+          className="rounded-lg border border-line bg-surface-2/60 px-3 py-1.5 text-xs text-foreground placeholder:text-muted/70 focus:border-accent/60 focus:outline-none"
+        />
+      </label>
       <Button variant="primary" size="sm" onClick={() => mutation.mutate()}>
         <Share2 size={14} />
         Share report

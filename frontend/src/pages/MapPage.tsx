@@ -20,6 +20,7 @@ import {
 } from "@/components/LayersPanel";
 import { Sheet } from "@/components/ui/sheet";
 import { MobileBottomBar } from "@/components/MobileBottomBar";
+import { Site3DControls } from "@/components/site3d/Site3DControls";
 import { ReticleOverlay } from "@/components/ReticleOverlay";
 import { ReticleTray } from "@/components/ReticleTray";
 import { WelcomeOverlay } from "@/components/WelcomeOverlay";
@@ -45,6 +46,7 @@ export function MapPage() {
   const clearSurvey = useAppStore((s) => s.clearSurvey);
   const drawMode = useAppStore((s) => s.drawMode);
   const reticleActive = useAppStore((s) => s.reticleActive);
+  const site3d = useAppStore((s) => s.site3d);
 
   const { runSurvey, isLoading, error, reset, elapsed } = useSurvey();
   const { lookupParcel } = useParcel();
@@ -124,6 +126,7 @@ export function MapPage() {
     // a finished drawing gesture.
     const s = useAppStore.getState();
     if (!s.layers.parcels) return;
+    if (s.site3d) return; // in 3D mode taps are for orbiting, not lookups
     if (s.drawMode !== "none") return;
     if (s.reticleActive) return; // taps select vertices in reticle mode
     if (s.parcelLoading || isLoading) return;
@@ -152,7 +155,14 @@ export function MapPage() {
       {/* Phone action bar (hidden while a sheet is up or while the
           reticle tray has taken its place, to keep one clear focus per
           moment on a small screen) */}
-      {isMobile && !showResults && !reticleActive && <MobileBottomBar />}
+      {isMobile && !showResults && !reticleActive && !site3d && (
+        <MobileBottomBar />
+      )}
+
+      {/* Site 3D mode: the floating orbit/drape/exit control card.
+          Everything else about the mode (terrain, camera, drape) is
+          driven through the store and MapView. */}
+      {site3d && <Site3DControls />}
 
       {/* Reticle draw mode: the crosshair overlay plus its button tray */}
       {isMobile && reticleActive && (
