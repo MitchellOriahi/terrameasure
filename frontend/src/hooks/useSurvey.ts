@@ -65,12 +65,21 @@ export function useSurvey() {
   };
 }
 
-/** Pick the loading message based on how long we have been waiting. */
+/** Pick the loading message based on how long we have been waiting.
+ *
+ * Three honest stages, tuned for trust rather than cuteness:
+ *   1. Say WHY the wait exists (free hosting sleeps between uses) and
+ *      calm the one fear that matters: the drawn boundary is not lost.
+ *   2. Say WHAT is actually happening (real government elevation data
+ *      is being fetched, this is not a stuck spinner).
+ *   3. Set the finish-line expectation so nobody bails at second 50.
+ * The thresholds roughly track reality: a cold Render dyno takes up to
+ * ~50s to wake, then the DEM download and the math take the rest.
+ */
 export function loadingMessage(elapsed: number): string {
-  if (elapsed < 6) return "Contacting the survey engine...";
-  if (elapsed < 15)
-    return "Waking up the survey engine (the free tier naps when idle)...";
-  if (elapsed < 35)
-    return "Still waking up. Cold starts can take up to 50 seconds, hang tight...";
-  return "Almost there. Fetching elevation data and running measurements...";
+  if (elapsed < 20)
+    return "Waking the survey engine (free tier sleeps between uses). Your boundary is safe.";
+  if (elapsed < 45)
+    return "Downloading USGS lidar elevation for your site...";
+  return "Crunching slope, water, and flood checks: nearly there.";
 }

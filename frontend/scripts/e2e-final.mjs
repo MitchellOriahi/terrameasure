@@ -227,7 +227,7 @@ async function desktopPass(browser) {
       // Loading card with a staged message
       const loadingSeen = await bodyHasText(
         page,
-        /Contacting the survey engine|Waking up the survey engine|Almost there/,
+        /Contacting the survey engine|Waking the survey engine|Downloading USGS lidar|Crunching slope|Almost there/,
       );
       const captionSeen = await bodyHasText(page, /Running a real survey on sample terrain/);
       await shot(page, "d02-demo-loading");

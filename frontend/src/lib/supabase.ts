@@ -52,3 +52,21 @@ export interface SurveyRow {
   source: string | null;
   surveyed_at: string; // ISO timestamp
 }
+
+/** A row of the "ground_truth" table: one real on-site measurement a
+    surveyor logged against our prediction (see docs/ground_truth_table.sql).
+    Every field the surveyor fills is optional; the honest minimum is
+    "I stood on this spot". */
+export interface GroundTruthRow {
+  id: string; // uuid
+  user_id: string;
+  survey_id: number | null; // the saved survey it corrects, if any
+  lat: number | null;
+  lon: number | null;
+  measured_slope_deg: number | null;
+  measured_elev_range_ft: number | null;
+  field_verdict: string | null; // "go" | "caution" | "no-go"
+  notes: string | null;
+  visited_on: string | null; // "2026-08-05" (date only)
+  created_at: string; // ISO timestamp
+}

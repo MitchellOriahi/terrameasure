@@ -13,6 +13,7 @@ import { AlertTriangle, Loader2 } from "lucide-react";
 import { restoreDraftOnce } from "@/lib/mapState";
 import { MapView } from "@/components/map/MapView";
 import { ParcelCard } from "@/components/ParcelCard";
+import { NoCoverageCard } from "@/components/NoCoverageCard";
 import { TopBar } from "@/components/TopBar";
 import {
   LayersPanelDesktop,
@@ -49,7 +50,7 @@ export function MapPage() {
   const site3d = useAppStore((s) => s.site3d);
 
   const { runSurvey, isLoading, error, reset, elapsed } = useSurvey();
-  const { lookupParcel } = useParcel();
+  const { lookupParcel, noCoverage, dismissNoCoverage } = useParcel();
   const parcel = useAppStore((s) => s.parcel);
   const toast = useAppStore((s) => s.toast);
 
@@ -134,6 +135,21 @@ export function MapPage() {
     lookupParcel(lat, lon);
   }
 
+  // "Draw boundary" on the no-coverage card: close the card, then arm
+  // the draw mode that fits the device. On desktop that is the normal
+  // polygon tool (tap corners); on a phone it is the reticle flow
+  // (pan the map under a crosshair), because fingers are too imprecise
+  // for corner taps.
+  function handleDrawFromNoCoverage() {
+    dismissNoCoverage();
+    const s = useAppStore.getState();
+    if (isMobile) {
+      s.startReticle();
+    } else {
+      s.setDrawMode("polygon");
+    }
+  }
+
   const showResults = survey !== null && resultsOpen && !isLoading;
 
   return (
@@ -210,11 +226,22 @@ export function MapPage() {
           <div className="glass flex flex-col gap-3 p-5">
             <div className="flex items-center gap-2 text-nogo">
               <AlertTriangle size={18} />
-              <span className="text-sm font-semibold">Survey failed</span>
+              <span className="text-sm font-semibold">
+                That took longer than it should have
+              </span>
             </div>
             <p className="text-xs leading-relaxed text-muted">
               {error.message}
             </p>
+            {/* Reassurance beats apology: the failed attempt woke the
+                engine, and the drawn shape is still in the store, so a
+                retry reuses the exact same boundary. */}
+            {drawnVertices && (
+              <p className="text-xs leading-relaxed text-muted">
+                The engine is awake now, so the next attempt is usually
+                fast. Your boundary is untouched.
+              </p>
+            )}
             <div className="flex gap-2">
               {drawnVertices && (
                 <Button
@@ -222,7 +249,7 @@ export function MapPage() {
                   size="sm"
                   onClick={() => runSurvey(drawnVertices)}
                 >
-                  Try again
+                  Retry with the same boundary
                 </Button>
               )}
               <Button
@@ -285,6 +312,20 @@ export function MapPage() {
           }}
         />
       )}
+
+      {/* ---- No parcel coverage here: persistent, dismissible card with
+              the draw-it-yourself path. Hidden while drawing, surveying,
+              or reading results, so it never competes for attention. ---- */}
+      {noCoverage &&
+        !showResults &&
+        !isLoading &&
+        drawMode === "none" &&
+        !reticleActive && (
+          <NoCoverageCard
+            onDismiss={dismissNoCoverage}
+            onDraw={handleDrawFromNoCoverage}
+          />
+        )}
 
       {/* ---- First-run welcome card + demo survey (auto-opens once;
               the "?" button in the TopBar reopens it any time) ---- */}

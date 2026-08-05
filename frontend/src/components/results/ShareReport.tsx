@@ -20,6 +20,8 @@ import { Check, Copy, Share2, Loader2, AlertTriangle } from "lucide-react";
 import { createReport, type SurveyResponse } from "@/lib/api";
 import type { LatLon } from "@/lib/geo";
 import { loadingMessage } from "@/hooks/useSurvey";
+import { addMyReport } from "@/lib/myReports";
+import { assessSite } from "@/lib/verdict";
 import { useAppStore } from "@/store/appStore";
 import { Button } from "@/components/ui/button";
 
@@ -97,6 +99,21 @@ export function ShareReport({ survey, vertices }: ShareReportProps) {
         // page shows it as the site title.
         title: title.trim() || (surveyParcel?.address ?? undefined),
       }),
+    // The link was created: jot it down in localStorage so the /reports
+    // page can list "your reports on this device". addMyReport swallows
+    // its own storage errors, so this can never break the share flow.
+    onSuccess: (data) => {
+      const assessment = assessSite(survey);
+      addMyReport({
+        slug: data.slug,
+        title: title.trim() || (surveyParcel?.address ?? null),
+        createdAt: data.created_at,
+        verdict: assessment.verdict,
+        score: assessment.score,
+        lat: centroid?.lat ?? null,
+        lon: centroid?.lon ?? null,
+      });
+    },
   });
 
   const { isPending } = mutation;

@@ -375,7 +375,7 @@ export default function LandingPage() {
           <Step
             num={1}
             title="Pick a spot or parcel"
-            body="Search an address, tap a parcel to load its real boundary, or draw any shape by hand. Anywhere in the US."
+            body="Search an address and draw any shape by hand, anywhere in the US. In our 5 pilot counties, tap a parcel to load its official recorded boundary."
           />
           <Step
             num={2}
@@ -411,8 +411,8 @@ export default function LandingPage() {
           />
           <FeatureCard
             icon={MapIcon}
-            title="Real parcel data"
-            body="Tap a parcel for its true boundary and acreage in pilot counties, or draw your own boundary anywhere on the map."
+            title="Real parcel records"
+            body="Official boundaries, acreage, and ownership live in 5 pilot counties today (Maricopa AZ, Travis TX, King WA, Mecklenburg NC, Miami-Dade FL), with nationwide rollout next. Everywhere else, draw the boundary and get the full analysis."
           />
           <FeatureCard
             icon={Waves}
@@ -448,9 +448,10 @@ export default function LandingPage() {
               Preliminary and uncertified
             </h3>
             <p className="text-xs leading-relaxed text-muted">
-              This is a pre-screen, not a survey. A licensed Professional
-              Land Surveyor seals the real thing; we get you to that
-              conversation faster.
+              A terrain and water pre-screen, not a survey, and we would
+              not want it any other way. Use it to decide whether the land
+              is worth a licensed surveyor's fee; if it is, bring them the
+              report and you both start two weeks ahead.
             </p>
           </div>
           <div className="lp-reveal flex flex-col gap-2">
@@ -485,8 +486,8 @@ export default function LandingPage() {
             Check your first site now.
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm text-muted">
-            No sign-up. Open the map, tap a parcel or draw a boundary, and
-            read your verdict.
+            No sign-up. Open the map, draw a boundary (or tap a parcel in
+            a pilot county), and read your verdict.
           </p>
           <Link
             to="/map"

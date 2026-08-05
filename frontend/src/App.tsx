@@ -11,9 +11,8 @@ import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MapProvider } from "@vis.gl/react-maplibre";
-import { FileText, Crosshair, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { MapPage } from "@/pages/MapPage";
-import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import { initAuth } from "@/store/authStore";
 
 // The public shared-report page is lazy-loaded: React only downloads its
@@ -28,6 +27,11 @@ const LandingPage = lazy(() => import("@/pages/LandingPage"));
 const NewsPage = lazy(() => import("@/pages/NewsPage"));
 const AuthPage = lazy(() => import("@/pages/AuthPage"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
+// "Your reports" (the share links this device created) and Ground
+// Truth (surveyors log real on-site measurements). Both lazy for the
+// same reason as the pages above: most sessions stay on the map.
+const ReportsPage = lazy(() => import("@/pages/ReportsPage"));
+const GroundTruthPage = lazy(() => import("@/pages/GroundTruthPage"));
 
 // A shared full-screen spinner for the lazy routes above.
 function PageSpinner() {
@@ -81,24 +85,24 @@ export default function App() {
                 </Suspense>
               }
             />
+            {/* Your reports: the share links this device has created */}
             <Route
               path="/reports"
               element={
-                <PlaceholderPage
-                  title="Reports"
-                  blurb="Shareable PDF site reports built from your surveys: verdict, measurements with error bounds, maps and contours."
-                  icon={FileText}
-                />
+                <Suspense fallback={<PageSpinner />}>
+                  <ReportsPage />
+                </Suspense>
               }
             />
+            {/* Ground Truth: log real on-site measurements against our
+                predictions. The path stays /photo so old links and the
+                nav keep working. */}
             <Route
               path="/photo"
               element={
-                <PlaceholderPage
-                  title="Ground Truth"
-                  blurb="Log real on-site measurements against TerraMeasure predictions. Coming soon."
-                  icon={Crosshair}
-                />
+                <Suspense fallback={<PageSpinner />}>
+                  <GroundTruthPage />
+                </Suspense>
               }
             />
             {/* TerraIntel: land-relevant news (ReliefWeb + USGS feeds) */}
