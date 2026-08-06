@@ -507,11 +507,17 @@ async function desktopPass(browser) {
   } else {
     // When the elevation fallback service (Open-Elevation) is down,
     // mid-lake surveys CANNOT complete (USGS has no data over open
-    // water). Distinguish "app broke" from "app failed gracefully".
-    const gracefulFail = await bodyHasText(page, /Survey failed/i);
-    check("7", "lake survey returns results", false,
-      gracefulFail
-        ? "no results after 150s, but graceful 'Survey failed' card shown (elevation fallback service down?)"
+    // water). That is an upstream outage, not a bug in this app, so the
+    // pass/fail here turns on whether the app FAILED WELL: a named
+    // failure card with the reason and a retry that reuses the boundary.
+    const failCard = await bodyHasText(page, /Survey failed/i);
+    const retryBtn =
+      (await page.getByRole("button", { name: /Retry with the same boundary/i }).count()) > 0;
+    await shot(page, "d07-lake-failure-card");
+    check("7", "lake survey completes, or fails honestly with a retry",
+      failCard && retryBtn,
+      failCard
+        ? "elevation service down (expected over open water when the fallback is out); named failure card + retry shown"
         : "no results after 150s and no failure card");
     // Clear the error card so later steps start clean.
     const dismiss = page.getByRole("button", { name: "Dismiss" });

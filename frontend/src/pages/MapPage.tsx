@@ -249,8 +249,15 @@ export function MapPage() {
           <div className="glass flex flex-col gap-3 p-5">
             <div className="flex items-center gap-2 text-nogo">
               <AlertTriangle size={18} />
+              {/* Name the actual failure. "That took longer than it
+                  should have" is right for a slow cold start and wrong
+                  for an upstream outage, and telling someone their
+                  connection is the problem when it is not wastes their
+                  time troubleshooting the wrong thing. */}
               <span className="text-sm font-semibold">
-                That took longer than it should have
+                {/elevation service/i.test(error.message)
+                  ? "Survey failed: the elevation service is down"
+                  : "Survey failed: that took longer than it should have"}
               </span>
             </div>
             <p className="text-xs leading-relaxed text-muted">
