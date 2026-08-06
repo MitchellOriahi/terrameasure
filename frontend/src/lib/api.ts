@@ -321,13 +321,45 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+// How long any one call may hang before we give up and say so.
+//
+// Why a cap at all: without one, a request that never answers leaves a
+// spinner on screen forever, and "forever" is the single worst thing an
+// app can show. The backend's own worst case is bounded (it waits about
+// 35 seconds on USGS, then about 45 on the fallback, then answers with
+// an honest 503), so a ceiling comfortably above that turns a hung
+// network into a readable message instead of a dead screen.
+const DEFAULT_TIMEOUT_MS = 60_000;
+const SURVEY_TIMEOUT_MS = 180_000; // cold start plus both elevation tries
+
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<T> {
   let res: Response;
+  // AbortSignal.timeout is the browser's own "cancel this after N ms".
+  // Older browsers may not have it, hence the guard: there, the request
+  // simply behaves as it always did.
+  const signal =
+    typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+      ? AbortSignal.timeout(timeoutMs)
+      : undefined;
   try {
-    res = await fetch(`${API_BASE}${path}`, init);
-  } catch {
-    // fetch() itself only throws when the network is down or the server
-    // is unreachable (common during backend cold starts).
+    res = await fetch(`${API_BASE}${path}`, { ...init, signal });
+  } catch (e) {
+    // Two different failures land here. A timeout deserves its own
+    // sentence, because "check your connection" is wrong and unhelpful
+    // when the connection is fine and the far end is simply stuck.
+    if (e instanceof DOMException && e.name === "TimeoutError") {
+      throw new Error(
+        `The survey engine did not answer within ${Math.round(
+          timeoutMs / 1000,
+        )} seconds. The public elevation service it depends on may be down. Your boundary is safe: try again in a minute.`,
+      );
+    }
+    // fetch() otherwise only throws when the network is down or the
+    // server is unreachable (common during backend cold starts).
     throw new Error(
       "Could not reach the survey engine. Check your connection, or the free-tier server may still be waking up.",
     );
@@ -354,11 +386,15 @@ export function surveyPolygon(
   vertices: { lat: number; lon: number }[],
   resolutionM = 10,
 ): Promise<SurveyResponse> {
-  return request<SurveyResponse>("/survey/polygon", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ vertices, resolution_m: resolutionM }),
-  });
+  return request<SurveyResponse>(
+    "/survey/polygon",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vertices, resolution_m: resolutionM }),
+    },
+    SURVEY_TIMEOUT_MS,
+  );
 }
 
 /** Address / place search (backend proxies to OpenStreetMap Nominatim). */
@@ -366,9 +402,11 @@ export function geocode(q: string): Promise<GeocodeResult[]> {
   return request<GeocodeResult[]>(`/geocode?q=${encodeURIComponent(q)}`);
 }
 
-/** Name the place a point sits in (county and state for the report). */
+/** Name the place a point sits in (county and state for the report).
+    Short leash: this runs in the background after results are already on
+    screen, so a slow answer must never linger. */
 export function reverseGeocode(lat: number, lon: number): Promise<PlaceInfo> {
-  return request<PlaceInfo>(`/reverse?lat=${lat}&lon=${lon}`);
+  return request<PlaceInfo>(`/reverse?lat=${lat}&lon=${lon}`, undefined, 20_000);
 }
 
 /** Look up the tax parcel under a tapped point (pilot counties only). */

@@ -108,7 +108,14 @@ class USGS3DEPFetcher(DEMFetcher):
         }
 
         try:
-            resp = requests.get(self.WCS_URL, params=params, timeout=60)
+            # 35 seconds, not 60. This request is the FIRST of two tries
+            # (the API falls back to Open-Elevation when it fails), so
+            # every second spent waiting here is added to every second
+            # spent waiting on the fallback, and the user watches the
+            # whole chain. A healthy 3DEP answer takes about a second, so
+            # anything past 35 is a sick server, and waiting longer only
+            # delays the honest "try again" message.
+            resp = requests.get(self.WCS_URL, params=params, timeout=35)
             resp.raise_for_status()
         except requests.RequestException as e:
             raise RuntimeError(

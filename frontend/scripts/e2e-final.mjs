@@ -936,6 +936,20 @@ async function reportPass(browser) {
   check("5b", "report map fills its card width and renders imagery",
     fills && repCv.ok, JSON.stringify({ ...sizes, canvas: repCv }));
   await shot(page, "d05-report-map-fill");
+
+  // 5c: a shared report must say WHERE the land is and carry the same 3D
+  // model as the app. A reader who did not run the survey has only this
+  // page to go on.
+  const identityOk = /County|Near \d|acres/i.test(txt);
+  const meshOk = (await page
+    .getByRole("img", { name: /3D model of the surveyed ground/i })
+    .count()) > 0;
+  // A fresh context holds no edit key, so the reader must NOT see Edit.
+  const noEditForReaders = (await page.getByRole("button", { name: /^Edit$/ }).count()) === 0;
+  check("5c", "report names the place, shows the 3D model, hides Edit from readers",
+    identityOk && meshOk && noEditForReaders,
+    `identity=${identityOk} mesh=${meshOk} noEdit=${noEditForReaders}`);
+  await shot(page, "d05-report-3d");
   await ctx.close();
 }
 

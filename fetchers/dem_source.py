@@ -106,7 +106,12 @@ class OpenElevationFetcher(DEMFetcher):
                 locations.append({"latitude": plat, "longitude": plon})
 
         # Ask the API for all those heights in one POST request.
-        resp = requests.post(self.API, json={"locations": locations}, timeout=60)
+        # 45 seconds. This is the LAST chance to get any ground heights,
+        # so it gets more patience than the USGS attempt before it, but
+        # not unlimited: past this the honest answer to the user is "the
+        # public elevation services are down, try again", which they can
+        # act on, rather than a spinner that never resolves.
+        resp = requests.post(self.API, json={"locations": locations}, timeout=45)
         resp.raise_for_status()
         results = resp.json()["results"]
 
