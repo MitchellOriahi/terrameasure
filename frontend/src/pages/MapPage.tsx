@@ -69,6 +69,29 @@ export function MapPage() {
   const flyTarget = (
     location.state as { flyTo?: { lat: number; lon: number } } | null
   )?.flyTo;
+
+  // Tapping Reopen on the Saved page arrives here with the outline that
+  // was saved. We redraw that exact shape and MEASURE IT AGAIN rather
+  // than showing frozen numbers: elevation sources and federal layers get
+  // updated, so a reopened survey should reflect today's data.
+  const reopenTarget = (
+    location.state as { reopen?: { vertices: LatLon[] } } | null
+  )?.reopen;
+  useEffect(() => {
+    if (!map || !reopenTarget?.vertices || reopenTarget.vertices.length < 3) {
+      return;
+    }
+    const v = reopenTarget.vertices;
+    const lat = v.reduce((s, p) => s + p.lat, 0) / v.length;
+    const lon = v.reduce((s, p) => s + p.lon, 0) / v.length;
+    safeFlyTo(map, { center: [lon, lat], zoom: 16, duration: 1200, essential: true });
+    useAppStore.getState().setDrawnVertices(v);
+    runSurvey(v);
+    // Clear the router state so a refresh does not run the survey twice.
+    navigate(location.pathname, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, reopenTarget]);
+
   useEffect(() => {
     if (!map || !flyTarget) return;
     // safeFlyTo animates on a flat map but jumps instantly when 3D

@@ -20,7 +20,7 @@ import { Check, Copy, Share2, Loader2, AlertTriangle } from "lucide-react";
 import { createReport, type SurveyResponse } from "@/lib/api";
 import type { LatLon } from "@/lib/geo";
 import { loadingMessage } from "@/hooks/useSurvey";
-import { addMyReport } from "@/lib/myReports";
+import { addMyReport, rememberEditToken } from "@/lib/myReports";
 import { assessSite } from "@/lib/verdict";
 import { useAppStore } from "@/store/appStore";
 import { Button } from "@/components/ui/button";
@@ -60,13 +60,17 @@ interface ShareReportProps {
 export function ShareReport({ survey, vertices }: ShareReportProps) {
   // The parcel this survey was started from (null for hand-drawn shapes).
   const surveyParcel = useAppStore((s) => s.surveyParcel);
+  // The site's identity: the place we looked up, plus whatever the user
+  // named it and wrote about it in the header block above.
+  const place = useAppStore((s) => s.place);
+  const siteName = useAppStore((s) => s.siteName);
+  const siteNotes = useAppStore((s) => s.siteNotes);
 
   // "Copied!" feedback flag, reset after a moment.
   const [copied, setCopied] = useState(false);
 
-  // The optional report name the sharer types. A named report reads
-  // like a document ("Smith property, Travis County") instead of a
-  // bare coordinate pair on the public page.
+  // The optional report name the sharer types. Starts from whatever the
+  // site is already called in the header, so nobody types it twice.
   const [title, setTitle] = useState("");
 
   // Placeholder suggestion built from the site's centroid, so even the
@@ -79,9 +83,18 @@ export function ShareReport({ survey, vertices }: ShareReportProps) {
           lon: vertices.reduce((s, v) => s + v.lon, 0) / vertices.length,
         }
       : null;
-  const titlePlaceholder = centroid
-    ? `Site near ${centroid.lat.toFixed(5)}, ${centroid.lon.toFixed(5)}`
-    : "Name this report (optional)";
+  // The best name we already have, in order: what the user typed in the
+  // identity header, the parcel's address, the place we looked up.
+  const knownName =
+    siteName.trim() || surveyParcel?.address || place?.label || "";
+  const titlePlaceholder =
+    knownName ||
+    (centroid
+      ? `Site near ${centroid.lat.toFixed(5)}, ${centroid.lon.toFixed(5)}`
+      : "Name this report (optional)");
+
+  /** The report's final title: what was typed here, else the site name. */
+  const finalTitle = title.trim() || knownName || null;
 
   // Elapsed seconds while the POST is in flight (drives the cold-start
   // messaging, same pattern as useSurvey).
@@ -94,25 +107,40 @@ export function ShareReport({ survey, vertices }: ShareReportProps) {
         survey,
         parcel: surveyParcel,
         vertices,
-        // Best available name, in order: what the user typed, then the
-        // parcel's street address. The backend stores it and the report
-        // page shows it as the site title.
-        title: title.trim() || (surveyParcel?.address ?? undefined),
+        title: finalTitle ?? undefined,
+        // The human half of the report: the site's name, the user's own
+        // notes, and the county and state we looked up. Without this the
+        // shared page cannot say where the land is.
+        site: {
+          name: finalTitle ?? undefined,
+          notes: siteNotes.trim() || undefined,
+          place: place
+            ? {
+                place: place.place ?? undefined,
+                county: place.county ?? undefined,
+                state: place.state ?? undefined,
+                country: place.country ?? undefined,
+                label: place.label || undefined,
+              }
+            : undefined,
+        },
       }),
-    // The link was created: jot it down in localStorage so the /reports
-    // page can list "your reports on this device". addMyReport swallows
-    // its own storage errors, so this can never break the share flow.
+    // The link was created: jot it down in localStorage so the Saved
+    // page can list "your reports on this device", along with the edit
+    // key that lets this browser rewrite the wording later. addMyReport
+    // swallows its own storage errors, so this can never break sharing.
     onSuccess: (data) => {
       const assessment = assessSite(survey);
       addMyReport({
         slug: data.slug,
-        title: title.trim() || (surveyParcel?.address ?? null),
+        title: finalTitle,
         createdAt: data.created_at,
         verdict: assessment.verdict,
         score: assessment.score,
         lat: centroid?.lat ?? null,
         lon: centroid?.lon ?? null,
       });
+      if (data.edit_token) rememberEditToken(data.slug, data.edit_token);
     },
   });
 

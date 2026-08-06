@@ -1,22 +1,33 @@
 // pages/ReportsPage.tsx
-// "Your reports": every share link this device has created, newest
-// first, with Open / Copy / Remove actions.
+// "Saved": everything this device is holding on to, in two sections.
 //
-// Where does the list come from? localStorage (see lib/myReports.ts).
-// ShareReport.tsx writes an entry there each time a share link is
-// created. Shared reports are anonymous server-side, so the device is
-// the only place that knows which ones are "yours". The page says this
-// honestly; signed-in sync across devices is a later upgrade.
+//   1. Saved surveys    - sites you tapped Save on. Tapping one reopens
+//                         it: the map flies there, redraws your exact
+//                         outline and runs the survey again, so you get
+//                         the whole results panel back, not a screenshot.
+//   2. Shared reports   - the public /r/{slug} links you created.
+//
+// Why both live on ONE page: from the outside they are the same idea
+// ("my stuff"), and a phone bottom bar has room for one Saved button,
+// not two. Reached at /saved and at /reports (the older link).
+//
+// Where the data comes from: localStorage on this device
+// (lib/savedSurveys.ts and lib/myReports.ts). Nothing here needs an
+// account. Signed-in people also get a cloud copy of saved surveys, but
+// the device list is always the one shown here so the page works
+// offline, instantly, for everyone.
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
+  Bookmark,
   Check,
   Copy,
   ExternalLink,
   FileText,
   MapPin,
+  RotateCw,
   X,
 } from "lucide-react";
 import { Wordmark } from "@/components/TopBar";
@@ -27,9 +38,14 @@ import {
   removeMyReport,
   type MyReportEntry,
 } from "@/lib/myReports";
+import {
+  loadSavedSurveys,
+  removeSavedSurvey,
+  type SavedSurveyEntry,
+} from "@/lib/savedSurveys";
+import { fmt } from "@/lib/geo";
 
-/** "2026-08-03T18:22:00Z" -> "Aug 3, 2026" (same helper style as the
-    profile page; blank when the timestamp is unreadable). */
+/** "2026-08-03T18:22:00Z" -> "Aug 3, 2026" (blank when unreadable). */
 function fmtDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -69,13 +85,18 @@ function VerdictChip({ verdict }: { verdict: string | null }) {
 }
 
 export default function ReportsPage() {
+  const navigate = useNavigate();
+
   // Read localStorage ONCE on first render (the lazy useState form).
-  // After that, state is the source of truth; remove updates both.
+  // After that, state is the source of truth; removing updates both.
+  const [surveys, setSurveys] = useState<SavedSurveyEntry[]>(() =>
+    loadSavedSurveys(),
+  );
   const [reports, setReports] = useState<MyReportEntry[]>(() =>
     loadMyReports(),
   );
 
-  // Which row just had its link copied (slug), for the brief checkmark.
+  // Which report row just had its link copied (slug), for the checkmark.
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
 
   async function handleCopy(slug: string) {
@@ -86,14 +107,27 @@ export default function ReportsPage() {
     }
   }
 
-  function handleRemove(slug: string) {
-    // Removes the row from THIS device's list only. The public link
-    // itself keeps working; the row text below the button says so.
-    setReports(removeMyReport(slug));
+  /**
+   * Reopen a saved survey. When we kept the outline, hand the vertices to
+   * the map so it redraws the shape and re-runs the measurement (fresh
+   * numbers, full results panel). Older entries with no outline can still
+   * fly the map to the spot.
+   */
+  function handleReopen(s: SavedSurveyEntry) {
+    if (s.vertices && s.vertices.length >= 3) {
+      navigate("/map", { state: { reopen: { vertices: s.vertices } } });
+    } else {
+      navigate("/map", { state: { flyTo: { lat: s.lat, lon: s.lon } } });
+    }
   }
 
-  /** Best display name for a row: the user's title, else coordinates,
-      else a plain fallback. */
+  /** Best display name for a saved survey row. */
+  function surveyTitle(s: SavedSurveyEntry): string {
+    if (s.title) return s.title;
+    return `Site at ${s.lat.toFixed(4)}, ${s.lon.toFixed(4)}`;
+  }
+
+  /** Best display name for a shared-report row. */
   function rowTitle(r: MyReportEntry): string {
     if (r.title) return r.title;
     if (r.lat !== null && r.lon !== null) {
@@ -120,44 +154,127 @@ export default function ReportsPage() {
           <div className="glass p-6">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-deep">
-                <FileText className="text-accent-bright" size={20} />
+                <Bookmark className="text-accent-bright" size={20} />
               </div>
               <div>
-                <h1 className="text-lg font-semibold text-foreground">
-                  Your reports
-                </h1>
+                <h1 className="text-lg font-semibold text-foreground">Saved</h1>
                 <p className="text-xs text-muted">
-                  Share links you have created
+                  Your surveys and share links
                 </p>
               </div>
             </div>
             {/* Honest scope note: v1 is device-local on purpose */}
             <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
-              Reports are listed on this device. Sign-in sync coming later.
+              This list lives on this device, so it works with no account
+              and no signal. Signing in also keeps a cloud copy of saved
+              surveys.
             </p>
           </div>
 
-          {/* ---- Empty state ---- */}
-          {reports.length === 0 && (
-            <div className="glass p-6 text-center">
-              <p className="text-sm leading-relaxed text-muted">
-                Nothing here yet. Run a survey on the map, then tap
-                <span className="text-foreground"> Share report</span> in the
-                results. Every link you create shows up on this list.
-              </p>
-              <div className="mt-5">
-                <Link to="/map">
-                  <Button variant="primary" size="sm" tabIndex={-1}>
-                    Run a survey
-                  </Button>
-                </Link>
-              </div>
+          {/* ================= Saved surveys ================= */}
+          <div className="glass p-4">
+            <div className="mb-2 flex items-center gap-2 px-2">
+              <Bookmark className="text-accent-bright" size={15} />
+              <h2 className="text-sm font-semibold text-foreground">
+                Saved surveys
+              </h2>
+              <span className="num ml-auto text-[11px] text-muted">
+                {surveys.length}
+              </span>
             </div>
-          )}
 
-          {/* ---- The list, newest first (stored in that order) ---- */}
-          {reports.length > 0 && (
-            <div className="glass p-4">
+            {surveys.length === 0 ? (
+              <p className="px-2 py-2 text-xs leading-relaxed text-muted">
+                Nothing saved yet. Run a survey on the map and tap
+                <span className="text-foreground"> Save</span> in the results
+                to keep it here.
+              </p>
+            ) : (
+              <ul className="flex flex-col">
+                {surveys.map((s) => (
+                  <li
+                    key={s.id}
+                    className="border-b border-line px-2 py-3 last:border-b-0"
+                  >
+                    <div className="flex items-start gap-2">
+                      <MapPin
+                        className="mt-0.5 shrink-0 text-accent"
+                        size={14}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-sm text-foreground">
+                            {surveyTitle(s)}
+                          </span>
+                          <VerdictChip verdict={s.verdict} />
+                          {s.score !== null && (
+                            <span className="num text-[11px] text-accent-bright">
+                              {Math.round(s.score)}/100
+                            </span>
+                          )}
+                        </div>
+                        <span className="num mt-0.5 block text-[11px] text-muted">
+                          {fmtDate(s.savedAt)}
+                          {s.areaAcres !== null
+                            ? ` · ${fmt(s.areaAcres, 2)} ac`
+                            : ""}
+                          {s.synced ? " · synced" : " · this device"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex items-center gap-2 pl-6">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="whitespace-nowrap"
+                        onClick={() => handleReopen(s)}
+                      >
+                        <RotateCw size={13} />
+                        Reopen
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-auto"
+                        aria-label={`Delete ${surveyTitle(s)}`}
+                        onClick={() => setSurveys(removeSavedSurvey(s.id))}
+                      >
+                        <X size={13} />
+                        Delete
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {surveys.length > 0 && (
+              <p className="mt-2 px-2 text-[10px] leading-relaxed text-muted">
+                Reopen redraws your outline and measures it again with
+                today's data, so the numbers are never stale.
+              </p>
+            )}
+          </div>
+
+          {/* ================= Shared report links ================= */}
+          <div className="glass p-4">
+            <div className="mb-2 flex items-center gap-2 px-2">
+              <FileText className="text-accent-bright" size={15} />
+              <h2 className="text-sm font-semibold text-foreground">
+                Shared reports
+              </h2>
+              <span className="num ml-auto text-[11px] text-muted">
+                {reports.length}
+              </span>
+            </div>
+
+            {reports.length === 0 ? (
+              <p className="px-2 py-2 text-xs leading-relaxed text-muted">
+                No share links yet. In the results, tap
+                <span className="text-foreground"> Share report</span> to
+                create a public link anyone can open without signing in.
+              </p>
+            ) : (
               <ul className="flex flex-col">
                 {reports.map((r) => (
                   <li
@@ -166,7 +283,10 @@ export default function ReportsPage() {
                   >
                     {/* Row top: name + verdict + score */}
                     <div className="flex items-start gap-2">
-                      <MapPin className="mt-0.5 shrink-0 text-accent" size={14} />
+                      <MapPin
+                        className="mt-0.5 shrink-0 text-accent"
+                        size={14}
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="truncate text-sm text-foreground">
@@ -214,7 +334,7 @@ export default function ReportsPage() {
                         size="sm"
                         className="ml-auto"
                         aria-label={`Remove ${rowTitle(r)} from this list`}
-                        onClick={() => handleRemove(r.slug)}
+                        onClick={() => setReports(removeMyReport(r.slug))}
                       >
                         <X size={13} />
                         Remove
@@ -223,11 +343,23 @@ export default function ReportsPage() {
                   </li>
                 ))}
               </ul>
-              {/* What Remove actually does: local list only */}
-              <p className="mt-3 px-2 text-[10px] leading-relaxed text-muted">
+            )}
+            {reports.length > 0 && (
+              <p className="mt-2 px-2 text-[10px] leading-relaxed text-muted">
                 Remove only takes a report off this list. The shared link
                 itself keeps working for anyone who has it.
               </p>
+            )}
+          </div>
+
+          {/* One way back to work from an empty page */}
+          {surveys.length === 0 && reports.length === 0 && (
+            <div className="text-center">
+              <Link to="/map">
+                <Button variant="primary" size="sm" tabIndex={-1}>
+                  Run a survey
+                </Button>
+              </Link>
             </div>
           )}
         </div>

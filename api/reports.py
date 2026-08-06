@@ -102,6 +102,10 @@ class ReportStore:
         """
         raise NotImplementedError
 
+    def update(self, slug: str, title: Optional[str], snapshot: dict) -> None:
+        """Overwrite the title and snapshot of an existing report."""
+        raise NotImplementedError
+
 
 class MemoryReportStore(ReportStore):
     """
@@ -124,6 +128,13 @@ class MemoryReportStore(ReportStore):
 
     def get(self, slug: str) -> Optional[dict]:
         return self._reports.get(slug)
+
+    def update(self, slug: str, title: Optional[str], snapshot: dict) -> None:
+        row = self._reports.get(slug)
+        if row is None:
+            raise KeyError(slug)
+        row["title"] = title
+        row["snapshot"] = snapshot
 
 
 class SupabaseReportStore(ReportStore):
@@ -178,6 +189,19 @@ class SupabaseReportStore(ReportStore):
                 f"Supabase read failed ({resp.status_code}): {resp.text[:200]}")
         rows = resp.json()
         return rows[0] if rows else None
+
+    def update(self, slug: str, title: Optional[str], snapshot: dict) -> None:
+        # PATCH with the same filter syntax: update the row WHERE slug = value.
+        resp = http_requests.patch(
+            self._endpoint,
+            headers=self._headers,
+            params={"slug": f"eq.{slug}"},
+            json={"title": title, "snapshot": snapshot},
+            timeout=15,
+        )
+        if resp.status_code not in (200, 204):
+            raise RuntimeError(
+                f"Supabase update failed ({resp.status_code}): {resp.text[:200]}")
 
 
 def _make_store() -> ReportStore:
@@ -282,6 +306,57 @@ class CreateReportRequest(BaseModel):
     parcel: Optional[dict] = None
     vertices: Optional[list] = None       # the drawn polygon, [{lat, lon}, ...]
     title: Optional[str] = None
+    # Everything the person writing the report chose to say about the
+    # site: the name they gave it, their own notes, and the place we
+    # reverse-geocoded (county and state). Opaque dict on purpose, same
+    # reasoning as `survey` above.
+    site: Optional[dict] = None
+
+
+class UpdateReportRequest(BaseModel):
+    """
+    An edit to a report that already exists.
+
+    Only the human-written parts can change: the title, the site name,
+    and the notes. The measurements are never editable, because a report
+    whose numbers can be rewritten by hand is not evidence of anything.
+    """
+    edit_token: str
+    title: Optional[str] = None
+    site: Optional[dict] = None
+
+
+# How long a report's own text may be. Generous enough for a real set of
+# site notes, small enough that nobody can use a report as free storage.
+MAX_SITE_NAME_CHARS = 160
+MAX_SITE_NOTES_CHARS = 4000
+
+
+def _clean_site(site: Optional[dict]) -> dict:
+    """
+    Keep only the fields we understand, and cut them to length.
+
+    Why whitelist instead of storing whatever arrives: this dict is
+    written by anyone on the internet and read back by anyone with the
+    link, so the smaller and more predictable it is, the better.
+    """
+    if not isinstance(site, dict):
+        return {}
+    out: dict = {}
+    name = site.get("name")
+    if isinstance(name, str) and name.strip():
+        out["name"] = name.strip()[:MAX_SITE_NAME_CHARS]
+    notes = site.get("notes")
+    if isinstance(notes, str) and notes.strip():
+        out["notes"] = notes.strip()[:MAX_SITE_NOTES_CHARS]
+    place = site.get("place")
+    if isinstance(place, dict):
+        out["place"] = {
+            k: str(place[k])[:120]
+            for k in ("place", "county", "state", "country", "label")
+            if isinstance(place.get(k), str) and place[k]
+        }
+    return out
 
 
 @router.post("/reports")
@@ -310,12 +385,20 @@ def create_report(req: CreateReportRequest, request: Request):
         "survey": req.survey,
         "parcel": req.parcel,
         "vertices": req.vertices,
+        "site": _clean_site(req.site),
     })
 
     # 8 URL-safe characters. token_urlsafe(6) encodes 6 random bytes as
     # exactly 8 characters of [A-Za-z0-9_-], about 2.8e14 possibilities,
     # so guessing a slug is hopeless and collisions are vanishingly rare.
     slug = secrets.token_urlsafe(6)
+
+    # The edit key. Whoever creates a report gets this once; their browser
+    # keeps it, and it is the proof that lets them come back and fix the
+    # wording later. It is stored INSIDE the snapshot and stripped from
+    # every public read, so having the link never means having the key.
+    edit_token = secrets.token_urlsafe(16)
+    snapshot["edit_token"] = edit_token
 
     try:
         created_at = _store.save(slug, req.title, snapshot)
@@ -327,7 +410,62 @@ def create_report(req: CreateReportRequest, request: Request):
 
     return {"slug": slug,
             "url_path": f"/r/{slug}",
-            "created_at": created_at}
+            "created_at": created_at,
+            "edit_token": edit_token}
+
+
+@router.patch("/reports/{slug}")
+def update_report(slug: str, req: UpdateReportRequest):
+    """
+    Edit the WORDS of a report you created: its title, the site name, and
+    your notes. Requires the edit token handed out when the report was
+    created, which lives in the creator's browser.
+
+    The survey numbers, the parcel facts and the outline are never
+    touched here. A shared report has to stay a record of what the engine
+    measured, not a document anyone can rewrite.
+    """
+    try:
+        row = _store.get(slug)
+    except Exception as e:
+        log.error("Reports: read failed during edit: %s", e)
+        raise HTTPException(status_code=502,
+                            detail="Could not load the report right now. "
+                                   "Please try again in a moment.")
+    if row is None:
+        raise HTTPException(status_code=404, detail="No report found for this link.")
+
+    snapshot = dict(row.get("snapshot") or {})
+    stored_token = snapshot.get("edit_token")
+    # secrets.compare_digest compares in constant time, so a wrong token
+    # cannot be discovered one character at a time by timing the replies.
+    if not stored_token or not secrets.compare_digest(
+        str(stored_token), req.edit_token
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="This report can only be edited from the device that "
+                   "created it.")
+
+    # Merge the new words over the old ones, keeping the reverse-geocoded
+    # place (which the editor never sends and should not lose).
+    old_site = snapshot.get("site") if isinstance(snapshot.get("site"), dict) else {}
+    new_site = _clean_site(req.site)
+    if "place" not in new_site and isinstance(old_site.get("place"), dict):
+        new_site["place"] = old_site["place"]
+    snapshot["site"] = new_site
+
+    title = req.title.strip()[:MAX_SITE_NAME_CHARS] if req.title else None
+
+    try:
+        _store.update(slug, title, snapshot)
+    except Exception as e:
+        log.error("Reports: update failed: %s", e)
+        raise HTTPException(status_code=502,
+                            detail="Could not save your changes right now. "
+                                   "Please try again in a moment.")
+
+    return {"slug": slug, "title": title, "site": new_site}
 
 
 @router.get("/reports/{slug}")
@@ -349,9 +487,15 @@ def get_report(slug: str):
                             detail="No report found for this link. It may "
                                    "have been mistyped or never existed.")
 
+    # Never hand the edit key to a reader. It lives in the stored
+    # snapshot; a public read gets a copy without it.
+    snapshot = row["snapshot"]
+    if isinstance(snapshot, dict) and "edit_token" in snapshot:
+        snapshot = {k: v for k, v in snapshot.items() if k != "edit_token"}
+
     return {"slug": row["slug"],
             "title": row.get("title"),
-            "snapshot": row["snapshot"],
+            "snapshot": snapshot,
             "created_at": row["created_at"],
             # Every public artifact carries the honesty banner.
             "disclaimer": scoring.DISCLAIMER}

@@ -240,11 +240,29 @@ def _fetch_dem(lat: float, lon: float, width_m: float, height_m: float,
                                                resolution_m)
         return dem_result, ""
     except Exception as e:
+        usgs_error = f"{type(e).__name__}: {e}"
         note = (f"USGS 3DEP unavailable for this location "
-                f"({type(e).__name__}: {e}). Fell back to Open-Elevation "
+                f"({usgs_error}). Fell back to Open-Elevation "
                 "(lower accuracy, ~5 m vertical error).")
-    dem_result = OpenElevationFetcher().get_dem(lat, lon, width_m, height_m,
-                                                resolution_m)
+
+    # Second and last chance. When this one fails too we have NO ground
+    # heights, so there is no survey to run. Raising a clean 503 here is
+    # the honest answer: it tells the user the outage is upstream and
+    # worth retrying, instead of the bare 500 that a raw requests error
+    # used to produce ("Request failed (500)" tells nobody anything).
+    try:
+        dem_result = OpenElevationFetcher().get_dem(lat, lon, width_m,
+                                                    height_m, resolution_m)
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=("The public elevation services are not answering right "
+                    "now, so this site cannot be measured yet. This is an "
+                    "outage on their side, not a problem with your boundary. "
+                    "Please try again in a minute. "
+                    f"(USGS 3DEP: {usgs_error}. Open-Elevation: "
+                    f"{type(e).__name__}: {e}.)"),
+        ) from e
     return dem_result, note
 
 
@@ -577,6 +595,83 @@ def context_check(req: ContextRequest):
 # ---------------------------------------------------------------------------
 # Geocoding proxy
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Reverse geocoding: "what place is this point in?"
+#
+# Why the backend does it instead of the browser: OpenStreetMap's
+# Nominatim asks every caller for a User-Agent identifying the app and
+# rate-limits by IP. Going through our server means one identified
+# caller instead of thousands of anonymous browsers, which is the
+# neighbourly way to use a free public service.
+#
+# What the app does with it: every survey report has to say WHERE the
+# site is (a shared link with no place name is useless to whoever opens
+# it), and county plus state is the way land is actually described in
+# the US. This also gives the report a sensible default title.
+#
+# A failure here is never fatal. The report simply falls back to
+# coordinates, which are always available.
+# ---------------------------------------------------------------------------
+@app.get("/reverse")
+def reverse_geocode(lat: float = Query(...), lon: float = Query(...)):
+    try:
+        r = http_requests.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            params={
+                "lat": lat,
+                "lon": lon,
+                "format": "json",
+                "zoom": 14,          # neighbourhood level: town + county
+                "addressdetails": 1,
+            },
+            headers={"User-Agent": "TerraMeasure/0.4 (land survey pre-screen)"},
+            timeout=10,
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    addr = data.get("address") or {}
+
+    # Nominatim names the "county" field differently around the world
+    # (county, state_district, region). Take the first one that exists.
+    county = (
+        addr.get("county")
+        or addr.get("state_district")
+        or addr.get("region")
+        or None
+    )
+    state = addr.get("state") or addr.get("province") or None
+    # The most specific populated place we can name.
+    place = (
+        addr.get("city")
+        or addr.get("town")
+        or addr.get("village")
+        or addr.get("hamlet")
+        or addr.get("suburb")
+        or addr.get("neighbourhood")
+        or None
+    )
+
+    # A human label for the site, best available: "Golden, Jefferson
+    # County, Colorado" down to just "Colorado" or nothing at all.
+    parts = [p for p in (place, county, state) if p]
+    label = ", ".join(parts)
+
+    return {
+        "place": place,
+        "county": county,
+        "state": state,
+        "country": addr.get("country"),
+        "postcode": addr.get("postcode"),
+        # The full one-line address Nominatim itself composed, handy as a
+        # default site name when the site sits on a named road.
+        "display_name": data.get("display_name"),
+        "label": label,
+    }
+
+
 @app.get("/geocode")
 def geocode(q: str = Query(...)):
     try:
@@ -610,6 +705,15 @@ _WETLANDS_EXPORT_URL = (
 )
 
 
+# A 1x1 fully transparent PNG, used when the wetlands server is having a
+# bad day (see the handler below). Written out as bytes so there is no
+# file to ship and nothing to load at startup.
+_TRANSPARENT_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk"
+    "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+)
+
+
 @app.get("/tiles/wetlands")
 def wetlands_tile(bbox: str = Query(...)):
     # MapLibre fills in bbox as "minX,minY,maxX,maxY" (EPSG:3857 meters).
@@ -638,8 +742,19 @@ def wetlands_tile(bbox: str = Query(...)):
             timeout=15,
         )
         r.raise_for_status()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
+    except Exception:
+        # The wetlands server is down or slow. A tile is DECORATION: the
+        # wetland numbers in the survey come from a separate query that
+        # reports its own status honestly. So instead of erroring (which
+        # makes MapLibre shout in the console once per tile, dozens of
+        # times a pan), hand back a transparent square. The overlay
+        # simply shows nothing, which is the truth: we have no picture
+        # right now. Short cache so it recovers as soon as they do.
+        return Response(
+            content=_TRANSPARENT_PNG,
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=60"},
+        )
 
     # Tiles never change day to day; let the browser keep them for a day
     # so panning back and forth does not re-download the same squares.

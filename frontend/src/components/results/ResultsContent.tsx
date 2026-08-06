@@ -31,6 +31,8 @@ import { ElevationChart } from "./ElevationChart";
 import { RiskFlags } from "./RiskFlags";
 import { ShareReport } from "./ShareReport";
 import { SaveSurvey } from "./SaveSurvey";
+import { SiteMesh3D } from "./SiteMesh3D";
+import { SiteIdentity } from "./SiteIdentity";
 import { Site3DEntryButton } from "@/components/site3d/Site3DEntryButton";
 import { ScopeStrip } from "./ScopeStrip";
 import { UnitsToggle } from "./UnitsToggle";
@@ -138,6 +140,16 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* ---- Site identity: WHAT land is this ----
+           Above the verdict on purpose. A number about land nobody can
+           identify is not worth reading, and this is also where the user
+           names the site and writes their own notes. */}
+      <SiteIdentity
+        vertices={vertices}
+        centerLat={survey.dem_center_lat}
+        centerLon={survey.dem_center_lon}
+      />
+
       {/* ---- Verdict banner: the headline answer ---- */}
       <div
         className={`rounded-xl border px-4 py-3 ${meta.className}`}
@@ -221,6 +233,11 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
           </>
         )}
       </div>
+
+      {/* ---- The 3D model of the ground, cut to the drawn outline ----
+           Sits high in the panel on purpose: the shape of the land is
+           the fastest way to understand a verdict about the land. */}
+      <SiteMesh3D survey={survey} vertices={vertices} />
 
       {/* ---- Score dial: supports the verdict ---- */}
       <div className="flex justify-center py-1">

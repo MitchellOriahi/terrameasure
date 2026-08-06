@@ -127,7 +127,11 @@ export default function GroundTruthPage() {
         .eq("user_id", user!.id)
         .order("surveyed_at", { ascending: false })
         .limit(50);
-      if (error) throw new Error(error.message);
+      // No cloud surveys table yet (see docs/supabase_setup.sql)? Then
+      // there is simply nothing to pick from, and the form falls back to
+      // typing coordinates by hand. That is a missing convenience, not
+      // an error worth showing.
+      if (error) return [];
       return (data ?? []) as SurveyRow[];
     },
   });

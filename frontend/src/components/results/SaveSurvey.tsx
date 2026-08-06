@@ -1,23 +1,33 @@
 // components/results/SaveSurvey.tsx
 // The "Save" action in the results view, next to Share report.
 //
-// Signed in: one tap inserts a small summary row into the Supabase
-// "surveys" table (RLS makes sure it lands under this user only), and
-// the button flips to a "Saved" confirmation.
+// THE RULE HERE: saving always works, for everyone, immediately.
 //
-// Anonymous: tapping Save opens a bottom action sheet offering to sign
-// in first (with a way back to this exact survey). We never auto-save
-// and never block; skipping the sheet costs the user nothing.
+// It used to require two invisible things at once: being signed in, and
+// the cloud database having a "surveys" table. When either was missing
+// the button just said "could not save", which from the outside looks
+// exactly like a broken button. So the order is now inverted:
+//
+//   1. Write the survey to THIS DEVICE (lib/savedSurveys.ts). Instant,
+//      no account, no server, works offline. This is the real save.
+//   2. THEN, only if the person is signed in, try to push a copy to the
+//      cloud so it follows them to their other devices. If that fails
+//      for any reason (table not created yet, no signal), the survey is
+//      still saved and we say plainly where it lives.
+//
+// The user is never blocked and never lied to about where their work is.
 
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Bookmark, Check, Loader2, AlertTriangle } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Bookmark, Check, Loader2, CloudOff } from "lucide-react";
 import type { SurveyResponse } from "@/lib/api";
 import { polygonAreaM2, type LatLon } from "@/lib/geo";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/authStore";
+import { useAppStore } from "@/store/appStore";
+import { assessSite } from "@/lib/verdict";
+import { addSavedSurvey, markSynced } from "@/lib/savedSurveys";
 import { Button } from "@/components/ui/button";
-import { ActionSheet } from "@/components/ui/actionSheet";
 
 const M2_PER_ACRE = 4046.86;
 
@@ -26,7 +36,10 @@ interface SaveSurveyProps {
   vertices: LatLon[] | null;
 }
 
-type SaveState = "idle" | "saving" | "saved" | "error";
+// idle -> saving -> saved. There is no "error" state any more, because a
+// device save cannot really fail; the cloud half reports itself through
+// the `synced` flag instead.
+type SaveState = "idle" | "saving" | "saved";
 
 export function SaveSurvey({ survey, vertices }: SaveSurveyProps) {
   const status = useAuthStore((s) => s.status);
@@ -35,14 +48,10 @@ export function SaveSurvey({ survey, vertices }: SaveSurveyProps) {
   const location = useLocation();
 
   const [state, setState] = useState<SaveState>("idle");
-  const [askSignIn, setAskSignIn] = useState(false);
+  // Did a copy make it to the cloud? Only meaningful once state = saved.
+  const [synced, setSynced] = useState(false);
 
   async function handleSave() {
-    // Not signed in? Offer sign-in, never force it.
-    if (status !== "signed-in" || !user) {
-      setAskSignIn(true);
-      return;
-    }
     setState("saving");
 
     // Where is this survey? The centroid (average corner) of the drawn
@@ -59,69 +68,109 @@ export function SaveSurvey({ survey, vertices }: SaveSurveyProps) {
         ? polygonAreaM2(vertices) / M2_PER_ACRE
         : null;
 
-    const { error } = await supabase.from("surveys").insert({
-      user_id: user.id,
+    // The same verdict the panel is showing, frozen at save time.
+    const assessment = assessSite(survey);
+
+    // ---- Step 1: the real save, on this device ----
+    // The saved row keeps whatever the site is already called: the name
+    // the user typed in the identity header, else the place we looked
+    // up, so the Saved list reads like places rather than coordinates.
+    const store = useAppStore.getState();
+    const name =
+      store.siteName.trim() ||
+      store.surveyParcel?.address ||
+      store.place?.label ||
+      null;
+
+    const entry = addSavedSurvey({
+      title: name,
       lat,
       lon,
-      score: survey.score?.value ?? null,
-      area_acres: areaAcres,
+      score: assessment.score,
+      verdict: assessment.verdict,
+      areaAcres,
       source: survey.source,
-      surveyed_at: new Date().toISOString(),
+      synced: false,
+      vertices: vertices ? vertices.map((v) => ({ lat: v.lat, lon: v.lon })) : null,
     });
+    setState("saved");
 
-    setState(error ? "error" : "saved");
+    // ---- Step 2: the optional cloud copy ----
+    if (status === "signed-in" && user) {
+      try {
+        const { error } = await supabase.from("surveys").insert({
+          user_id: user.id,
+          lat,
+          lon,
+          score: survey.score?.value ?? null,
+          area_acres: areaAcres,
+          source: survey.source,
+          surveyed_at: entry.savedAt,
+        });
+        if (!error) {
+          markSynced(entry.id);
+          setSynced(true);
+        }
+        // An error here means the cloud table is not set up yet (see
+        // docs/supabase_setup.sql) or the network dropped. Either way the
+        // survey is already saved locally, so there is nothing to fix and
+        // nothing to alarm the user about; the caption says "on this
+        // device" and that is the truth.
+      } catch {
+        // Same story for a thrown network error.
+      }
+    }
   }
 
-  /** Send the anonymous user to sign in, remembering where they were so
-      they land right back here (survey state lives in the store and the
-      OAuth draft stash, so nothing is lost). */
+  /** Send the user to sign in, remembering where they were so they land
+      right back on this survey. */
   function goSignIn() {
-    setAskSignIn(false);
     navigate("/auth", { state: { from: location.pathname } });
   }
 
-  return (
-    <>
-      {state === "saved" ? (
-        <div className="flex items-center gap-2 rounded-xl border border-go/40 bg-go/10 px-4 py-2.5">
+  if (state === "saved") {
+    return (
+      <div className="rounded-xl border border-go/40 bg-go/10 px-4 py-2.5">
+        <div className="flex items-center gap-2">
           <Check className="shrink-0 text-go" size={16} />
           <span className="text-xs text-foreground">
-            Saved to your profile.
+            {synced ? "Saved to your account." : "Saved on this device."}
           </span>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <Button
-            variant="glass"
-            size="sm"
-            onClick={handleSave}
-            disabled={state === "saving"}
+          <Link
+            to="/saved"
+            className="ml-auto shrink-0 text-xs font-medium text-accent-bright underline-offset-2 hover:underline"
           >
-            {state === "saving" ? (
-              <Loader2 className="animate-spin" size={14} />
-            ) : (
-              <Bookmark size={14} />
-            )}
-            {state === "saving" ? "Saving" : "Save"}
-          </Button>
-          {state === "error" && (
-            <p className="flex items-start gap-1.5 text-[11px] leading-snug text-nogo">
-              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-              Could not save right now. Tap Save to try again.
-            </p>
-          )}
+            View saved
+          </Link>
         </div>
-      )}
+        {/* Anonymous visitors get one quiet nudge, never a blocker */}
+        {status !== "signed-in" && (
+          <button
+            type="button"
+            onClick={goSignIn}
+            className="mt-1.5 flex items-center gap-1.5 text-[11px] leading-snug text-muted hover:text-foreground"
+          >
+            <CloudOff size={11} className="shrink-0" />
+            Sign in to keep your saves across devices
+          </button>
+        )}
+      </div>
+    );
+  }
 
-      {/* The contextual sign-in ask, as a bottom sheet per the UX spec
-          (never a centered modal) */}
-      {askSignIn && (
-        <ActionSheet
-          title="Sign in to save this survey"
-          actions={[{ label: "Sign in", onPress: goSignIn }]}
-          onCancel={() => setAskSignIn(false)}
-        />
+  return (
+    <Button
+      variant="glass"
+      size="sm"
+      onClick={handleSave}
+      disabled={state === "saving"}
+    >
+      {state === "saving" ? (
+        <Loader2 className="animate-spin" size={14} />
+      ) : (
+        <Bookmark size={14} />
       )}
-    </>
+      {state === "saving" ? "Saving" : "Save"}
+    </Button>
   );
 }

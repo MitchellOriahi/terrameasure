@@ -164,7 +164,7 @@ async function desktopPass(browser) {
   // ---------- 1. Landing page ----------
   await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
   await sleep(2500);
-  const heroOk = await bodyHasText(page, /Should you build on that land\?/);
+  const heroOk = await bodyHasText(page, /Know whether the land is/);
   await shot(page, "d01-landing-top");
   await shot(page, "d01-landing-full", true);
   check("1a", "landing hero renders", heroOk);
@@ -181,7 +181,7 @@ async function desktopPass(browser) {
   );
 
   // "See how it works" anchor scroll
-  await page.getByRole("link", { name: "See how it works" }).click();
+  await page.getByRole("link", { name: "See what comes back" }).click();
   await sleep(1600);
   const anchorVisible = await page.evaluate(() => {
     const el = document.getElementById("how-it-works");
@@ -189,7 +189,7 @@ async function desktopPass(browser) {
     const r = el.getBoundingClientRect();
     return r.top >= -50 && r.top < window.innerHeight * 0.6;
   });
-  check("1c", "See how it works scrolls to section", anchorVisible);
+  check("1c", "See what comes back scrolls to how-it-works", anchorVisible);
   await shot(page, "d01-landing-how");
 
   // "Open the map" goes to /map
@@ -247,6 +247,63 @@ async function desktopPass(browser) {
         check("2e", "demo results complete (verdict/score/cost/breakdown/risk)",
           verdict && cost && why && risk,
           `verdict=${verdict} cost=${cost} why=${why} risk=${risk} score=${score}`);
+        // ---- 2f. Site identity: the report must say WHERE it is ----
+        // County and state come from the reverse-geocode lookup that
+        // fires right after a survey lands, so give it a moment.
+        await sleep(3500);
+        const identity = await bodyHasText(page, /County|Centre/i);
+        const nameEditable =
+          (await page.getByRole("button", { name: /Edit the site name/i }).count()) > 0;
+        check("2f", "site identity block with county and editable name",
+          identity && nameEditable,
+          `identity=${identity} editable=${nameEditable}`);
+
+        // ---- 2g. The embedded 3D model of the ground ----
+        const meshTitle = await bodyHasText(page, /3D site model/i);
+        const meshCanvas = await page
+          .getByRole("img", { name: /3D model of the surveyed ground/i })
+          .count();
+        check("2g", "3D site model renders in the results panel",
+          meshTitle && meshCanvas > 0,
+          `title=${meshTitle} canvas=${meshCanvas}`);
+        await shot(page, "d02-3d-site-model");
+
+        // ---- 2h. Notes box exists (the user's own words) ----
+        const notesBtn = await page
+          .getByRole("button", { name: /Add your own notes/i })
+          .count();
+        check("2h", "site notes can be added", notesBtn > 0);
+
+        // ---- 2i. SAVE WORKS WITH NO ACCOUNT ----
+        // This is the bug the whole pass started from: Save used to need
+        // a sign-in AND a database table, and did nothing without both.
+        await page.getByRole("button", { name: "Save", exact: true }).click();
+        await sleep(1500);
+        const savedMsg = await bodyHasText(page, /Saved on this device|Saved to your account/i);
+        const savedRows = await page.evaluate(() => {
+          try {
+            return JSON.parse(
+              localStorage.getItem("terrameasure_saved_surveys") ?? "[]",
+            ).length;
+          } catch {
+            return -1;
+          }
+        });
+        check("2i", "Save works signed out and persists locally",
+          savedMsg && savedRows > 0,
+          `message=${savedMsg} rows=${savedRows}`);
+        await shot(page, "d02-saved");
+
+        // ---- 2j. The saved survey shows up on /saved ----
+        await page.goto(BASE + "/saved", { waitUntil: "domcontentloaded" });
+        await sleep(1500);
+        const listed = await bodyHasText(page, /Saved surveys/i);
+        const hasRow = (await page.getByRole("button", { name: /^Reopen$/ }).count()) > 0;
+        check("2j", "/saved lists the saved survey with Reopen",
+          listed && hasRow, `heading=${listed} reopen=${hasRow}`);
+        await shot(page, "d02-saved-page");
+        await page.goto(BASE + "/map", { waitUntil: "domcontentloaded" });
+        await sleep(3000);
       } else {
         check("2e", "demo survey returns results", false, "no results after 150s");
       }
@@ -354,16 +411,16 @@ async function desktopPass(browser) {
     const all = Object.values(parts).every(Boolean);
     check("4b", "manual survey results panel complete", all, JSON.stringify(parts));
 
-    // Save prompts sign-in for anonymous users
+    // Save must WORK for anonymous users, not ask them to sign in first.
+    // (It used to open a sign-in sheet and then fail against a database
+    // table that did not exist, which read as a dead button.)
     await page.getByRole("button", { name: "Save", exact: true }).click();
-    await sleep(700);
-    const askSignIn = await bodyHasText(page, /Sign in to save this survey/);
-    await shot(page, "d04-save-signin-ask");
-    check("4c", "Save prompts sign-in when anonymous", askSignIn);
-    if (askSignIn) {
-      await page.getByRole("button", { name: "Cancel" }).last().click();
-      await sleep(400);
-    }
+    await sleep(1200);
+    const savedHere = await bodyHasText(page, /Saved on this device|Saved to your account/i);
+    const noWall = !(await bodyHasText(page, /Sign in to save this survey/));
+    await shot(page, "d04-save-anonymous");
+    check("4c", "Save works anonymously with no sign-in wall",
+      savedHere && noWall, `saved=${savedHere} noWall=${noWall}`);
 
     // Share report
     await page.getByRole("button", { name: "Share report" }).click();
@@ -436,7 +493,11 @@ async function desktopPass(browser) {
     // line renders as "Buildable Area" (CSS capitalize), and shows the
     // slope-only number, so the case here is deliberate: we want the
     // water-adjusted metric, not the slope-only breakdown percentage.
-    const buildMatch = txt.match(/Buildable area\s*\n?\s*([\d.]+)\s*\n?\s*%/);
+    // The row renders as "Buildable area", then the number, then "%",
+    // with a qualifier line that may sit between them. Allow a little
+    // text in the gap so the extraction does not silently give up (it
+    // used to report NaN, which made this check lean on the score alone).
+    const buildMatch = txt.match(/Buildable area[\s\S]{0,60}?([\d.]+)\s*%/);
     const buildablePct = buildMatch ? parseFloat(buildMatch[1]) : NaN;
     const scoreLow = /\b(10|[0-9])\s*\n?\s*SITE SCORE/i.test(txt);
     check("7", "lake polygon verdict NO-GO, water flagged, buildable ~0",
@@ -504,7 +565,7 @@ async function desktopPass(browser) {
   const backMapOk = page.url().endsWith("/map") && (await canvasOk(page)).ok;
   await page.goBack(); // -> /
   await sleep(2000);
-  const backLandOk = await bodyHasText(page, /Should you build on that land\?/);
+  const backLandOk = await bodyHasText(page, /Know whether the land is/);
   await page.goForward(); // -> /map
   await sleep(3500);
   const fwdMapOk = page.url().endsWith("/map") && (await canvasOk(page)).ok;

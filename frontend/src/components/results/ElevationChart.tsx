@@ -282,8 +282,8 @@ export function ElevationChart({ profile, verticalError }: ElevationChartProps) 
       {/* What this line is and is not: the diagonal is a sample, so the
           site's true extremes can sit off to either side of it. */}
       <p className="mt-1 text-[10px] leading-snug text-muted">
-        Elevation along the site diagonal; site min/max may occur off this
-        line.
+        Tap or drag the line for exact values. Elevation along the site
+        diagonal; site min/max may occur off this line.
       </p>
       <div className="num mt-0.5 text-[10px] text-muted">
         heights {errText} (source data limit)

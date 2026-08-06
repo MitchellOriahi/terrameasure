@@ -6,7 +6,7 @@
 // bounced to /auth (and sent back here after signing in). Everything
 // else in the app stays open to everyone.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -19,6 +19,7 @@ import {
   Bookmark,
 } from "lucide-react";
 import { supabase, type SurveyRow } from "@/lib/supabase";
+import { loadSavedSurveys } from "@/lib/savedSurveys";
 import { useAuthStore } from "@/store/authStore";
 import { Wordmark } from "@/components/TopBar";
 import { Button } from "@/components/ui/button";
@@ -58,22 +59,77 @@ export default function ProfilePage() {
   }, [status, navigate]);
 
   // ---- Saved surveys, newest first ----
-  // RLS on the surveys table means this query can only ever see the
-  // signed-in user's own rows; the user_id filter is belt and braces.
+  // Two sources, merged: this DEVICE's saves (always available, no
+  // account needed) and the CLOUD copy of saves made while signed in.
+  //
+  // The cloud half never throws. If the surveys table has not been
+  // created in the database yet (see docs/supabase_setup.sql) Supabase
+  // answers with an error, and the honest response to that is "show the
+  // device list, mention sync is off" rather than a red failure message
+  // over work the user can plainly see they saved.
   const surveysQuery = useQuery({
     queryKey: ["surveys", user?.id],
     enabled: status === "signed-in" && !!user,
-    queryFn: async (): Promise<SurveyRow[]> => {
+    queryFn: async (): Promise<{ rows: SurveyRow[]; cloudOk: boolean }> => {
       const { data, error } = await supabase
         .from("surveys")
         .select("*")
         .eq("user_id", user!.id)
         .order("surveyed_at", { ascending: false })
         .limit(50);
-      if (error) throw new Error(error.message);
-      return (data ?? []) as SurveyRow[];
+      if (error) return { rows: [], cloudOk: false };
+      return { rows: (data ?? []) as SurveyRow[], cloudOk: true };
     },
   });
+
+  // The device list is read once per visit; it needs no network at all.
+  const deviceSurveys = useMemo(() => loadSavedSurveys(), []);
+
+  /** One row of the merged list, whatever it came from. */
+  interface DisplaySurvey {
+    key: string;
+    lat: number;
+    lon: number;
+    score: number | null;
+    areaAcres: number | null;
+    when: string; // ISO
+    vertices: { lat: number; lon: number }[] | null;
+  }
+
+  const surveys: DisplaySurvey[] = useMemo(() => {
+    const rows: DisplaySurvey[] = deviceSurveys.map((s) => ({
+      key: s.id,
+      lat: s.lat,
+      lon: s.lon,
+      score: s.score,
+      areaAcres: s.areaAcres,
+      when: s.savedAt,
+      vertices: s.vertices,
+    }));
+    // Add cloud rows this device does not already have. "Already have"
+    // means within about 25 metres of a device row, which is the same
+    // near-duplicate rule lib/savedSurveys.ts uses when saving.
+    for (const r of surveysQuery.data?.rows ?? []) {
+      const dup = rows.some((d) => {
+        const dLat = Math.abs(d.lat - r.lat) * 111_320;
+        const dLon =
+          Math.abs(d.lon - r.lon) * 111_320 * Math.cos((r.lat * Math.PI) / 180);
+        return Math.hypot(dLat, dLon) < 25;
+      });
+      if (!dup) {
+        rows.push({
+          key: `cloud-${r.id}`,
+          lat: r.lat,
+          lon: r.lon,
+          score: r.score,
+          areaAcres: r.area_acres,
+          when: r.surveyed_at,
+          vertices: null, // cloud rows keep only the summary, not the outline
+        });
+      }
+    }
+    return rows.sort((a, b) => (a.when < b.when ? 1 : -1));
+  }, [deviceSurveys, surveysQuery.data]);
 
   async function handleSaveName() {
     if (!user) return;
@@ -84,16 +140,23 @@ export default function ProfilePage() {
     }
     setSavingName(true);
     try {
-      // upsert: update the profile row if it exists, create it if the
-      // handle_new_user trigger somehow missed this account.
-      const { error } = await supabase
-        .from("profiles")
-        .upsert({ id: user.id, name: clean });
-      if (!error) {
-        await refreshName();
-        setNameSaved(true);
-        window.setTimeout(() => setNameSaved(false), 2000);
-      }
+      // Write the name in TWO places, because either one alone can be
+      // unavailable:
+      //   1. the profiles table (upsert: update the row if it exists,
+      //      create it if the new-account trigger missed this account).
+      //      This is the nice, queryable home for it.
+      //   2. the account's own metadata, which always exists as part of
+      //      the auth service, no table required.
+      // The auth store reads the table first and falls back to metadata,
+      // so the name sticks even on a database with no profiles table.
+      await supabase.from("profiles").upsert({ id: user.id, name: clean });
+      await supabase.auth.updateUser({ data: { name: clean } });
+      await refreshName();
+      setNameSaved(true);
+      window.setTimeout(() => setNameSaved(false), 2000);
+    } catch {
+      // Nothing here is worth an error banner: the name is cosmetic and
+      // the next attempt costs one tap.
     } finally {
       setSavingName(false);
       setEditing(false);
@@ -105,10 +168,15 @@ export default function ProfilePage() {
     navigate("/map", { replace: true });
   }
 
-  /** Tapping a saved survey flies the map to it: we navigate to the map
-      screen and hand MapPage the coordinates through router state. */
-  function flyToSurvey(row: SurveyRow) {
-    navigate("/map", { state: { flyTo: { lat: row.lat, lon: row.lon } } });
+  /** Tapping a saved survey reopens it. When we still have the drawn
+      outline (device saves keep it) the map redraws that shape and
+      measures it again; otherwise we simply fly there. */
+  function flyToSurvey(row: DisplaySurvey) {
+    if (row.vertices && row.vertices.length >= 3) {
+      navigate("/map", { state: { reopen: { vertices: row.vertices } } });
+    } else {
+      navigate("/map", { state: { flyTo: { lat: row.lat, lon: row.lon } } });
+    }
   }
 
   // Still checking the stored session, or mid-bounce to /auth
@@ -119,8 +187,6 @@ export default function ProfilePage() {
       </div>
     );
   }
-
-  const surveys = surveysQuery.data ?? [];
 
   return (
     <div className="flex h-dvh flex-col bg-background">
@@ -211,28 +277,12 @@ export default function ProfilePage() {
               <h2 className="text-sm font-semibold text-foreground">
                 Saved surveys
               </h2>
-              {surveysQuery.isSuccess && (
-                <span className="ml-auto text-[11px] text-muted">
-                  {surveys.length}
-                </span>
-              )}
+              <span className="num ml-auto text-[11px] text-muted">
+                {surveys.length}
+              </span>
             </div>
 
-            {surveysQuery.isPending && (
-              <div className="flex items-center gap-2 py-4 text-xs text-muted">
-                <Loader2 className="animate-spin" size={14} />
-                Loading your surveys
-              </div>
-            )}
-
-            {surveysQuery.isError && (
-              <p className="py-2 text-xs text-nogo">
-                Could not load your surveys. Pull up the map and try again in
-                a moment.
-              </p>
-            )}
-
-            {surveysQuery.isSuccess && surveys.length === 0 && (
+            {surveys.length === 0 && (
               <p className="py-2 text-xs leading-relaxed text-muted">
                 Nothing saved yet. Run a survey on the map and tap Save to
                 keep it here.
@@ -241,7 +291,7 @@ export default function ProfilePage() {
 
             <ul className="flex flex-col">
               {surveys.map((row) => (
-                <li key={row.id}>
+                <li key={row.key}>
                   <button
                     type="button"
                     onClick={() => flyToSurvey(row)}
@@ -250,7 +300,7 @@ export default function ProfilePage() {
                     <MapPin className="shrink-0 text-accent" size={16} />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm text-foreground">
-                        {fmtDate(row.surveyed_at)}
+                        {fmtDate(row.when)}
                         {row.score !== null && (
                           <span className="ml-2 text-xs text-accent-bright">
                             score {fmt(row.score, 0)}
@@ -258,8 +308,8 @@ export default function ProfilePage() {
                         )}
                       </span>
                       <span className="num block text-[11px] text-muted">
-                        {row.area_acres !== null
-                          ? `${fmt(row.area_acres, 2)} ac · `
+                        {row.areaAcres !== null
+                          ? `${fmt(row.areaAcres, 2)} ac · `
                           : ""}
                         {row.lat.toFixed(4)}, {row.lon.toFixed(4)}
                       </span>
@@ -268,6 +318,18 @@ export default function ProfilePage() {
                 </li>
               ))}
             </ul>
+
+            {/* Honest note about where these live. Cloud sync is a bonus
+                on top of the device list, so we say which one is active
+                instead of pretending everything is in the account. */}
+            <p className="mt-3 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
+              {surveysQuery.data?.cloudOk
+                ? "Saved on this device and synced to your account."
+                : "Saved on this device. Account sync is not switched on yet, so these stay in this browser."}{" "}
+              <Link to="/saved" className="text-accent-bright hover:underline">
+                Manage saved
+              </Link>
+            </p>
           </div>
         </div>
       </main>

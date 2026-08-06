@@ -12,7 +12,7 @@
 // is mirrored here so every panel can read it.
 
 import { create } from "zustand";
-import type { ParcelResponse, SurveyResponse } from "@/lib/api";
+import type { ParcelResponse, PlaceInfo, SurveyResponse } from "@/lib/api";
 import type { LatLon } from "@/lib/geo";
 import {
   loadUnitSystem,
@@ -95,6 +95,21 @@ interface AppState {
   // ---- Survey results ----
   survey: SurveyResponse | null;
   setSurvey: (s: SurveyResponse | null) => void;
+
+  // ---- Who and where: the site's identity ----
+  // The place the survey's centre sits in, looked up from OpenStreetMap
+  // right after a survey lands. A report with no county and state on it
+  // is not much use to whoever opens the link.
+  place: PlaceInfo | null;
+  setPlace: (p: PlaceInfo | null) => void;
+  // What the user calls this site, and any notes they typed. Both are
+  // free text the user owns: they travel into the shared report and can
+  // be edited afterwards. Empty string means "not written yet", and the
+  // UI falls back to the looked-up place name.
+  siteName: string;
+  setSiteName: (name: string) => void;
+  siteNotes: string;
+  setSiteNotes: (notes: string) => void;
 
   // ---- Parcel lookup (tap the map when not drawing) ----
   // The parcel found under the user's tap; non-null shows the Parcel Card
@@ -239,10 +254,27 @@ export const useAppStore = create<AppState>((set) => ({
 
   survey: null,
   // A fresh survey takes center stage, so the parcel card steps aside.
+  // It also wipes the PREVIOUS site's identity: the name, the notes and
+  // the looked-up place all belonged to the old shape, and carrying them
+  // onto new ground would put the wrong county on a report.
   setSurvey: (s) =>
     set(s !== null
-      ? { survey: s, resultsOpen: true, parcel: null }
+      ? {
+          survey: s,
+          resultsOpen: true,
+          parcel: null,
+          place: null,
+          siteName: "",
+          siteNotes: "",
+        }
       : { survey: s, resultsOpen: false }),
+
+  place: null,
+  setPlace: (p) => set({ place: p }),
+  siteName: "",
+  setSiteName: (name) => set({ siteName: name }),
+  siteNotes: "",
+  setSiteNotes: (notes) => set({ siteNotes: notes }),
 
   parcel: null,
   setParcel: (p) => set({ parcel: p }),
@@ -285,5 +317,8 @@ export const useAppStore = create<AppState>((set) => ({
       drawMode: "none",
       parcel: null,
       surveyParcel: null,
+      place: null,
+      siteName: "",
+      siteNotes: "",
     }),
 }));

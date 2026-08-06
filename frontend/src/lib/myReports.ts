@@ -69,6 +69,45 @@ export function addMyReport(entry: MyReportEntry): void {
   }
 }
 
+// ------------------------------------------------------------------
+// Edit keys
+// ------------------------------------------------------------------
+// When this browser creates a report, the server hands back a one-off
+// key that proves authorship. Keeping it here is what lets the report
+// page offer an Edit button to the person who wrote the report, and to
+// nobody else. It is not a password and it protects nothing valuable:
+// the worst a stolen key allows is rewriting the words on one public
+// report, which is why a plain localStorage entry is the right weight
+// of protection for it.
+
+const TOKEN_KEY = "terrameasure_report_edit_tokens";
+
+/** Remember the edit key for a report this device just created. */
+export function rememberEditToken(slug: string, token: string): void {
+  try {
+    const raw = localStorage.getItem(TOKEN_KEY);
+    const map: Record<string, string> =
+      raw && typeof JSON.parse(raw) === "object" ? JSON.parse(raw) : {};
+    map[slug] = token;
+    localStorage.setItem(TOKEN_KEY, JSON.stringify(map));
+  } catch {
+    // No storage means no Edit button later. The report still works.
+  }
+}
+
+/** The edit key for a report, or null when this device did not make it. */
+export function getEditToken(slug: string): string | null {
+  try {
+    const raw = localStorage.getItem(TOKEN_KEY);
+    if (!raw) return null;
+    const map = JSON.parse(raw) as Record<string, string>;
+    const token = map?.[slug];
+    return typeof token === "string" && token ? token : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Forget one report ON THIS DEVICE. The public /r/{slug} page itself is
  * untouched; anyone with the link can still open it. Returns the updated

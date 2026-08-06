@@ -38,14 +38,18 @@ import {
   AlertTriangle,
   Share2,
   Check,
+  Pencil,
+  StickyNote,
 } from "lucide-react";
 import {
   fetchReport,
+  updateReport,
   ApiError,
   type ReportResponse,
   type ParcelResponse,
   type SurveyResponse,
 } from "@/lib/api";
+import { getEditToken } from "@/lib/myReports";
 import {
   demImageCorners,
   polygonAreaM2,
@@ -72,6 +76,7 @@ import { ScoreDial } from "@/components/results/ScoreDial";
 import { ScopeStrip } from "@/components/results/ScopeStrip";
 import { UnitsToggle } from "@/components/results/UnitsToggle";
 import { copyText } from "@/components/results/ShareReport";
+import { SiteMesh3D } from "@/components/results/SiteMesh3D";
 import { Wordmark } from "@/components/TopBar";
 import { Button } from "@/components/ui/button";
 import { loadingMessage } from "@/hooks/useSurvey";
@@ -172,23 +177,28 @@ function IdentityHeader({
   center,
   acreage,
   acreageSource,
+  countyLine,
 }: {
   title: string;
   parcel: ParcelResponse | null;
   center: LatLon | null;
   acreage: number | null;
   acreageSource: "recorded" | "outline" | null;
+  /** "Jefferson County, Colorado", from the reverse lookup done when
+      the survey ran, or from parcel data. Empty when neither knew. */
+  countyLine: string;
 }) {
   return (
     <header className="rounded-xl border border-line bg-surface-2/40 px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold leading-tight text-foreground">
+          <h1 className="text-lg font-semibold leading-tight text-foreground">
             {title}
           </h1>
-          {/* County line only when parcel data told us one */}
-          {parcel?.county && (
-            <p className="mt-0.5 text-xs text-muted">{parcel.county}</p>
+          {/* Where on earth this is. County and state is how land is
+              described in the US, so it leads. */}
+          {countyLine && (
+            <p className="mt-0.5 text-xs text-muted">{countyLine}</p>
           )}
         </div>
         {/* The compact ft/m switch lives up here so a reader can flip
@@ -217,6 +227,160 @@ function IdentityHeader({
         )}
       </div>
     </header>
+  );
+}
+
+// ------------------------------------------------------------------
+// The author's own words, and the editor for them.
+//
+// Two audiences, one component:
+//   * A READER sees the notes as a quoted block, or nothing at all when
+//     the author wrote none.
+//   * The AUTHOR (meaning: this browser holds the edit key handed out
+//     when the report was created) also gets an Edit button that lets
+//     them fix the site name and rewrite the notes afterwards.
+//
+// What can never be edited: the measurements. A report whose numbers can
+// be typed over by hand would not be evidence of anything, so the server
+// only accepts changes to these two text fields.
+// ------------------------------------------------------------------
+function AuthorNotes({
+  slug,
+  name,
+  notes,
+  onSaved,
+}: {
+  slug: string;
+  name: string;
+  notes: string;
+  onSaved: (name: string, notes: string) => void;
+}) {
+  // Read the key once. Present means "this device made this report".
+  const [token] = useState(() => getEditToken(slug));
+  const [editing, setEditing] = useState(false);
+  const [nameDraft, setNameDraft] = useState(name);
+  const [notesDraft, setNotesDraft] = useState(notes);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      await updateReport(slug, token!, {
+        title: nameDraft.trim() || null,
+        site: {
+          name: nameDraft.trim() || undefined,
+          notes: notesDraft.trim() || undefined,
+        },
+      });
+      onSaved(nameDraft.trim(), notesDraft.trim());
+      setEditing(false);
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Could not save your changes. Please try again.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // A reader with nothing to read: render nothing at all.
+  if (!token && !notes) return null;
+
+  if (editing) {
+    return (
+      <section className="rounded-xl border border-accent/40 bg-surface-2/40 px-4 py-3">
+        <div className="text-[11px] uppercase tracking-widest text-muted">
+          Edit this report
+        </div>
+        <label className="mt-2 flex flex-col gap-1">
+          <span className="text-[10px] uppercase tracking-widest text-muted">
+            Site name
+          </span>
+          <input
+            value={nameDraft}
+            maxLength={160}
+            onChange={(e) => setNameDraft(e.target.value)}
+            className="rounded-lg border border-line bg-surface-2/60 px-3 py-1.5 text-sm text-foreground focus:border-accent/60 focus:outline-none"
+          />
+        </label>
+        <label className="mt-2 flex flex-col gap-1">
+          <span className="text-[10px] uppercase tracking-widest text-muted">
+            Notes
+          </span>
+          <textarea
+            value={notesDraft}
+            maxLength={4000}
+            rows={5}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            placeholder="What a reader should know: access, utilities, what you saw on site, what you still need to check."
+            className="panel-scroll resize-y rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-xs leading-relaxed text-foreground placeholder:text-muted/70 focus:border-accent/60 focus:outline-none"
+          />
+        </label>
+        {error && (
+          <p className="mt-2 text-[11px] leading-snug text-nogo">{error}</p>
+        )}
+        <div className="mt-3 flex gap-2">
+          <Button variant="primary" size="sm" onClick={save} disabled={saving}>
+            {saving ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />}
+            {saving ? "Saving" : "Save changes"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setNameDraft(name);
+              setNotesDraft(notes);
+              setEditing(false);
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-muted">
+          Only the words change. The measurements, the verdict and the
+          outline stay exactly as they were surveyed.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-line bg-surface-2/40 px-4 py-3">
+      <div className="flex items-center gap-2">
+        <StickyNote size={13} className="text-accent" />
+        <span className="text-[11px] uppercase tracking-widest text-muted">
+          Notes
+        </span>
+        {token && (
+          <button
+            type="button"
+            onClick={() => {
+              setNameDraft(name);
+              setNotesDraft(notes);
+              setEditing(true);
+            }}
+            className="ml-auto flex items-center gap-1 text-[11px] text-accent-bright hover:underline"
+          >
+            <Pencil size={11} />
+            Edit
+          </button>
+        )}
+      </div>
+      {notes ? (
+        <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-foreground/90">
+          {notes}
+        </p>
+      ) : (
+        <p className="mt-1.5 text-xs leading-relaxed text-muted">
+          No notes yet. Tap Edit to add context for whoever opens this link:
+          access, utilities, what you saw on site.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -506,13 +670,37 @@ function ReportBody({ report }: { report: ReportResponse }) {
     return null;
   }, [vertices, survey]);
 
-  // Best available site name, in order: sharer's title (or the parcel
-  // address the share flow filled in), else plain coordinates. The
-  // geocoder has no reverse mode, so we never pretend to know a name.
+  // ---- The human half of the report: name, notes, place ----
+  // Written by whoever created the report. Older reports have none of
+  // this, so every read is guarded.
+  const site = report.snapshot.site ?? null;
+
+  // Edits made on this page live here until a reload, so the author sees
+  // their change immediately without us re-fetching the whole report.
+  const [edits, setEdits] = useState<{ name?: string; notes?: string } | null>(
+    null,
+  );
+
+  // Best available site name, in order: an edit just made here, the
+  // name the author gave the site, the report title, the parcel address,
+  // then plain coordinates. We never invent a name we do not have.
   const siteTitle =
-    report.title ??
-    parcel?.address ??
-    (center ? `Near ${center.lat.toFixed(5)}, ${center.lon.toFixed(5)}` : "Surveyed site");
+    edits?.name?.trim() ||
+    site?.name ||
+    report.title ||
+    parcel?.address ||
+    (center
+      ? `Near ${center.lat.toFixed(5)}, ${center.lon.toFixed(5)}`
+      : "Surveyed site");
+
+  // County and state: from the reverse lookup stored with the report,
+  // falling back to whatever the county parcel record said.
+  const countyLine =
+    [site?.place?.county, site?.place?.state].filter(Boolean).join(", ") ||
+    parcel?.county ||
+    "";
+
+  const notes = edits?.notes ?? site?.notes ?? "";
 
   // Outline area, same 2D geometry + honesty math as the live panel.
   const outline = useMemo(() => {
@@ -609,6 +797,17 @@ function ReportBody({ report }: { report: ReportResponse }) {
         center={center}
         acreage={acreage}
         acreageSource={acreageSource}
+        countyLine={countyLine}
+      />
+
+      {/* ---- 0b. The author's own words ----
+           Shown to every reader when there are notes; the author (this
+           browser holds the report's edit key) also gets an editor. */}
+      <AuthorNotes
+        slug={report.slug}
+        name={siteTitle}
+        notes={notes}
+        onSaved={(name, newNotes) => setEdits({ name, notes: newNotes })}
       />
 
       {/* ---- 1. Verdict banner ---- */}
@@ -714,6 +913,11 @@ function ReportBody({ report }: { report: ReportResponse }) {
 
       {/* ---- 4. The map that argues the verdict ---- */}
       <ReportMap survey={survey} vertices={vertices} />
+
+      {/* ---- 4b. The same ground as a 3D model you can spin ----
+           Drawn in the browser from the report's own elevation grid, so
+           it needs no tiles and works even when the map does not. */}
+      <SiteMesh3D survey={survey} vertices={vertices} compact />
 
       {/* ---- 5. Earthwork cost range ---- */}
       {hasPadCost ? (

@@ -232,6 +232,22 @@ export interface ParcelResponse {
   disclaimer?: string;
 }
 
+// ------------------------------------------------------------------
+// Reverse geocoding: "what place is this point in?"
+// The backend asks OpenStreetMap and hands back only the fields a land
+// report needs. Every one can be null: plenty of land sits outside any
+// named town, and we would rather show nothing than invent a place.
+// ------------------------------------------------------------------
+export interface PlaceInfo {
+  place: string | null; // nearest town, city or neighbourhood
+  county: string | null;
+  state: string | null;
+  country: string | null;
+  postcode: string | null;
+  display_name: string | null; // the full one-line address
+  label: string; // "Golden, Jefferson County, Colorado"
+}
+
 // One result row from the backend's /geocode proxy (Nominatim format)
 export interface GeocodeResult {
   place_id: number;
@@ -247,11 +263,30 @@ export interface GeocodeResult {
 // anyone can GET that slug later with no login. Mirrors api/reports.py.
 // ------------------------------------------------------------------
 
+// The human-written part of a report: what the site is called, the
+// notes the author typed, and the place we looked up. Everything here is
+// editable by the person who created the report; the measurements never
+// are.
+export interface ReportSite {
+  name?: string;
+  notes?: string;
+  place?: {
+    place?: string;
+    county?: string;
+    state?: string;
+    country?: string;
+    label?: string;
+  };
+}
+
 // What POST /reports answers with.
 export interface ReportCreateResponse {
   slug: string;
   url_path: string; // "/r/{slug}", ready to append to the site origin
   created_at: string; // ISO timestamp
+  // The key that proves this browser made the report, so it can edit the
+  // wording later. Kept on the device, never shown to readers.
+  edit_token?: string;
 }
 
 // What GET /reports/{slug} answers with. The snapshot is exactly what
@@ -264,6 +299,8 @@ export interface ReportResponse {
     survey: SurveyResponse;
     parcel?: ParcelResponse | null;
     vertices?: { lat: number; lon: number }[] | null;
+    // Written by the report's author (older reports have none).
+    site?: ReportSite | null;
   };
   created_at: string;
   disclaimer: string;
@@ -329,6 +366,11 @@ export function geocode(q: string): Promise<GeocodeResult[]> {
   return request<GeocodeResult[]>(`/geocode?q=${encodeURIComponent(q)}`);
 }
 
+/** Name the place a point sits in (county and state for the report). */
+export function reverseGeocode(lat: number, lon: number): Promise<PlaceInfo> {
+  return request<PlaceInfo>(`/reverse?lat=${lat}&lon=${lon}`);
+}
+
 /** Look up the tax parcel under a tapped point (pilot counties only). */
 export function fetchParcel(lat: number, lon: number): Promise<ParcelResponse> {
   return request<ParcelResponse>(`/parcel?lat=${lat}&lon=${lon}`);
@@ -348,6 +390,7 @@ export function createReport(input: {
   parcel?: ParcelResponse | null;
   vertices?: { lat: number; lon: number }[] | null;
   title?: string;
+  site?: ReportSite | null;
 }): Promise<ReportCreateResponse> {
   const slimSurvey: Record<string, unknown> = { ...input.survey };
   delete slimSurvey.slope_map_png_b64;
@@ -362,6 +405,7 @@ export function createReport(input: {
       parcel: input.parcel ?? null,
       vertices: input.vertices ?? null,
       title: input.title ?? null,
+      site: input.site ?? null,
     }),
   });
 }
@@ -369,4 +413,25 @@ export function createReport(input: {
 /** Fetch a shared report by its slug. Public, no login. 404s throw ApiError. */
 export function fetchReport(slug: string): Promise<ReportResponse> {
   return request<ReportResponse>(`/reports/${encodeURIComponent(slug)}`);
+}
+
+/**
+ * Rewrite the WORDS of a report you created: its title, the site name
+ * and your notes. Needs the edit token this browser was handed when the
+ * report was made. The measurements are not editable by anyone, ever.
+ */
+export function updateReport(
+  slug: string,
+  editToken: string,
+  input: { title?: string | null; site?: ReportSite | null },
+): Promise<{ slug: string; title: string | null; site: ReportSite }> {
+  return request(`/reports/${encodeURIComponent(slug)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      edit_token: editToken,
+      title: input.title ?? null,
+      site: input.site ?? null,
+    }),
+  });
 }

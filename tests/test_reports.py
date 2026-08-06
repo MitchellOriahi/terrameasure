@@ -72,8 +72,9 @@ def test_create_and_fetch_roundtrip():
     assert r.status_code == 200, r.text
     made = r.json()
 
-    # The response promises exactly these three things.
-    assert set(made) == {"slug", "url_path", "created_at"}
+    # The response promises exactly these four things. edit_token is the
+    # key that lets the creator come back and fix the wording later.
+    assert set(made) == {"slug", "url_path", "created_at", "edit_token"}
     assert len(made["slug"]) == 8, made["slug"]
     assert made["url_path"] == f"/r/{made['slug']}"
 
@@ -91,6 +92,46 @@ def test_create_and_fetch_roundtrip():
     assert len(got["snapshot"]["vertices"]) == 3
     # And the numbers did too.
     assert got["snapshot"]["survey"]["avg_slope"]["value"] == 3.2
+
+
+def test_edit_token_is_never_public_but_lets_the_creator_edit():
+    """The words are editable by the creator; the numbers never are."""
+    c = _client()
+    made = c.post("/reports", json={
+        "survey": _tiny_survey(),
+        "title": "First name",
+        "site": {"name": "First name", "notes": "first notes",
+                 "place": {"county": "Jefferson County", "state": "Colorado"}},
+    }).json()
+    slug = made["slug"]
+
+    # A reader must never see the edit key.
+    public = c.get(f"/reports/{slug}").json()
+    assert "edit_token" not in public["snapshot"]
+    assert public["snapshot"]["site"]["notes"] == "first notes"
+    assert public["snapshot"]["site"]["place"]["state"] == "Colorado"
+
+    # A wrong key is refused.
+    bad = c.patch(f"/reports/{slug}", json={"edit_token": "not-the-key",
+                                            "title": "Hijacked"})
+    assert bad.status_code == 403, bad.text
+
+    # The real key rewrites the words...
+    ok = c.patch(f"/reports/{slug}", json={
+        "edit_token": made["edit_token"],
+        "title": "Second name",
+        "site": {"name": "Second name", "notes": "walked it, gate on the north side"},
+    })
+    assert ok.status_code == 200, ok.text
+
+    after = c.get(f"/reports/{slug}").json()
+    assert after["title"] == "Second name"
+    assert after["snapshot"]["site"]["notes"].startswith("walked it")
+    # ...keeps the reverse-geocoded place the editor never sent...
+    assert after["snapshot"]["site"]["place"]["state"] == "Colorado"
+    # ...and leaves the measurements exactly as measured.
+    assert after["snapshot"]["survey"]["avg_slope"]["value"] == 3.2
+    assert "edit_token" not in after["snapshot"]
 
 
 def test_image_rule_strips_big_keeps_clean_overlays():

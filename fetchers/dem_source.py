@@ -91,10 +91,17 @@ class OpenElevationFetcher(DEMFetcher):
         lat_step = resolution_m / m_per_deg_lat
         lon_step = resolution_m / m_per_deg_lon
 
+        # ROW ORDER MATTERS. Everything downstream (the polygon mask in
+        # engine/measurements.py, the slope and contour PNGs, the map
+        # overlays, the 3D mesh) assumes ROW 0 IS THE NORTHERNMOST ROW,
+        # exactly like a GeoTIFF from USGS 3DEP. So row 0 must be the
+        # HIGHEST latitude and the last row the lowest. Getting this
+        # backwards silently mirrors the site north-south: the mask then
+        # keeps the wrong cells and the overlays sit upside down.
         locations = []
         for r in range(n_rows):
             for c in range(n_cols):
-                plat = lat + (r - n_rows / 2) * lat_step
+                plat = lat + (n_rows / 2 - r) * lat_step
                 plon = lon + (c - n_cols / 2) * lon_step
                 locations.append({"latitude": plat, "longitude": plon})
 

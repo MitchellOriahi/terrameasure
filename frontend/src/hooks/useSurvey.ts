@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { surveyPolygon } from "@/lib/api";
+import { reverseGeocode, surveyPolygon } from "@/lib/api";
 import type { LatLon } from "@/lib/geo";
 import { useAppStore } from "@/store/appStore";
 
@@ -26,7 +26,25 @@ export function useSurvey() {
 
   const mutation = useMutation({
     mutationFn: (vertices: LatLon[]) => surveyPolygon(vertices),
-    onSuccess: (data) => setSurvey(data),
+    onSuccess: (data) => {
+      setSurvey(data);
+      // Name the place, in the background. A report has to say WHERE the
+      // land is (county and state is how land is described in the US),
+      // and the survey response only knows coordinates. This runs after
+      // the results are already on screen, so a slow or failed lookup
+      // never delays the answer the user is waiting for.
+      reverseGeocode(data.dem_center_lat, data.dem_center_lon)
+        .then((place) => {
+          // Guard against a stale answer: if the user has already run
+          // another survey, this place belongs to the old one.
+          const current = useAppStore.getState().survey;
+          if (current === data) useAppStore.getState().setPlace(place);
+        })
+        .catch(() => {
+          // No place name available. The report falls back to
+          // coordinates, which we always have.
+        });
+    },
   });
 
   // Start/stop the elapsed-seconds ticker with the request lifecycle.

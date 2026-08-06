@@ -27,7 +27,7 @@ const LandingPage = lazy(() => import("@/pages/LandingPage"));
 const NewsPage = lazy(() => import("@/pages/NewsPage"));
 const AuthPage = lazy(() => import("@/pages/AuthPage"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
-// "Your reports" (the share links this device created) and Ground
+// "Saved" (this device's saved surveys and share links) and Ground
 // Truth (surveyors log real on-site measurements). Both lazy for the
 // same reason as the pages above: most sessions stay on the map.
 const ReportsPage = lazy(() => import("@/pages/ReportsPage"));
@@ -85,7 +85,17 @@ export default function App() {
                 </Suspense>
               }
             />
-            {/* Your reports: the share links this device has created */}
+            {/* Saved: this device's saved surveys and share links. Two
+                paths, one page: /saved is the name in the UI, /reports is
+                the older link that people may have bookmarked. */}
+            <Route
+              path="/saved"
+              element={
+                <Suspense fallback={<PageSpinner />}>
+                  <ReportsPage />
+                </Suspense>
+              }
+            />
             <Route
               path="/reports"
               element={

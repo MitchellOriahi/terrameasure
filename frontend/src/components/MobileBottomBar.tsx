@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAppStore } from "@/store/appStore";
-import { useAuthStore } from "@/store/authStore";
 
 /** One small labeled side button: icon on top, tiny label underneath.
     48px tall and 56px wide, comfortably past the 44px touch minimum. */
@@ -68,16 +67,13 @@ export function MobileBottomBar() {
   const setLayersPanelOpen = useAppStore((s) => s.setLayersPanelOpen);
   const basemap = useAppStore((s) => s.basemap);
   const setBasemap = useAppStore((s) => s.setBasemap);
-  const authStatus = useAuthStore((s) => s.status);
 
-  // Saved surveys live on the profile page; anonymous users go to the
-  // sign-in page first (and come right back here after).
+  // Saved surveys live on the /saved page, which needs no account: the
+  // list is kept on the device. (It used to bounce anonymous people to a
+  // sign-in wall, which made saving look broken to anyone who had not
+  // made an account.)
   function openSaved() {
-    if (authStatus === "signed-in") {
-      navigate("/profile");
-    } else {
-      navigate("/auth", { state: { from: "/profile" } });
-    }
+    navigate("/saved");
   }
 
   // The basemap chip shows the CURRENT view and tapping flips to the
@@ -122,7 +118,7 @@ export function MobileBottomBar() {
           Survey
         </button>
 
-        {/* Saved surveys (profile page; sign-in first when anonymous) */}
+        {/* Saved surveys and share links (no account needed) */}
         <SideButton
           icon={Bookmark}
           label="Saved"
