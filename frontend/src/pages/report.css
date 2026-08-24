@@ -47,3 +47,75 @@
   background-color: rgba(0, 0, 0, 0.45) !important;
   filter: invert(0.9);
 }
+
+/* ==================================================================
+   PRINT
+   ==================================================================
+   Land deals still run on paper. An agent prints the report for a
+   buyer, a surveyor drops it in a file, a lender wants a copy in the
+   packet. Printing the dark app as-is wastes a cartridge on a black
+   background and cuts cards in half across pages, so print gets its
+   own treatment: white paper, black text, nothing interactive, and
+   sections that refuse to break across a page.
+
+   This is CSS only. There is no separate print page to keep in sync,
+   which is the whole reason it will still be right in six months. */
+@media print {
+  /* Ink is expensive and dark backgrounds look broken on paper. */
+  :root {
+    --background: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #ffffff;
+    --foreground: #111111;
+    --muted: #555555;
+    --line: #cccccc;
+  }
+
+  html, body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  /* The app is a fixed-height scroller on screen; on paper it has to
+     be a normal, flowing document or only the first screen prints. */
+  .report-scroll,
+  .panel-scroll,
+  body > div {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Anything that only makes sense with a pointer. */
+  .no-print,
+  button,
+  .maplibregl-ctrl-group,
+  .maplibregl-ctrl-attrib-button {
+    display: none !important;
+  }
+
+  /* Keep a card whole: a verdict split across a page break reads as a
+     printing error and undermines the document. */
+  section,
+  header,
+  .glass {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    background: #fff !important;
+    border-color: #ccc !important;
+  }
+
+  /* Keep the colour meaning of the verdict, on paper too. */
+  .text-go { color: #0a7d3f !important; }
+  .text-caution { color: #8a6100 !important; }
+  .text-nogo { color: #a51c1c !important; }
+
+  /* Show link targets, since a printed link is useless otherwise. */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 9px;
+    color: #555;
+  }
+}

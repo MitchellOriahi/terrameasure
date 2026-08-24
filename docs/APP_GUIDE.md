@@ -213,6 +213,12 @@ drawn on it, the 3D model, cost, risk flags, measurements with error
 bounds, and a sticky mini-header carrying the site name, score and a
 Share button once you scroll.
 
+Two actions sit under the header, because they are what people actually
+do with a report: **Copy as text** puts the whole thing (verdict, numbers
+with their bounds, notes, link) on the clipboard for an email or a text
+message, and **Print or save as PDF** renders it on white paper with the
+interactive parts removed and no card split across a page break.
+
 **If your browser created the report**, an Edit button appears on the
 notes block: you can rewrite the site name and notes afterwards. The
 measurements can never be edited, by anyone, ever. That is enforced on
@@ -365,6 +371,46 @@ the profile name still sticks (it falls back to account metadata), and
 Ground Truth explains that storage is not set up yet.
 
 ---
+
+## 10b. When the outside world breaks
+
+The product depends on services nobody here controls: federal elevation
+and hazard servers, a place-name service, and Supabase for accounts and
+share links. The rule is that an outage is explained, never disguised.
+
+| What breaks | What the user sees | Where |
+| --- | --- | --- |
+| Both elevation sources down | "Survey failed: the elevation service is down", with a retry that reuses the same boundary | `api/server.py` `_fetch_dem`, `MapPage` |
+| Lidar covers only part of a site | The uncovered cells are left OUT of the maths (never filled in), and the source note says what percentage was covered | `fetchers/usgs_fetcher.py` |
+| Wetlands tile server down | The overlay quietly draws nothing rather than erroring per tile | `/tiles/wetlands` |
+| Sign-in service unreachable | The sign-in page says so before you type a password, and the Google button refuses to redirect you to a dead host | `lib/authHealth.ts`, `AuthPage` |
+| Report storage unreachable | Sharing fails with a plain explanation AND the survey is saved to your device so nothing is lost | `api/reports.py`, `ShareReport` |
+| Someone hammers the API | 429 with a plain sentence saying the limit and when to retry | `api/ratelimit.py` |
+
+`GET /health` answers with the version AND the state of report storage
+(`kind`, `durable`, `last_error`), so one request tells you whether share
+links actually work, not just whether the process is alive.
+
+**Rate limits, per address, per five minutes:** 15 surveys, 150 lookups
+(parcel, context, geocode, reverse). Set in `api/server.py`. They are far
+above human use; they exist to stop a runaway script taking down a free
+tier and to keep us welcome on the free government services.
+
+## 10c. Moving to a different Supabase project
+
+If the database project is ever replaced (it happened on 2026-08-07 when
+the old project disappeared), three things point at it:
+
+1. `frontend/src/lib/supabase.ts`: the URL and the anon key. Override at
+   build time with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON`, then
+   rebuild `frontend/dist` and commit it.
+2. Render environment variables `SUPABASE_URL` and
+   `SUPABASE_SERVICE_ROLE` (the secret one, never in the repo).
+3. Run `docs/supabase_setup.sql` and `docs/reports_table.sql` in the new
+   project's SQL editor.
+
+Check it worked with `GET /health`: `report_storage.durable` must be
+true, and `last_error` must be null after a share.
 
 ## 11. Rules the codebase holds itself to
 

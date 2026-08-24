@@ -95,11 +95,26 @@ export function initAuth(): void {
   if (initialized) return; // React StrictMode mounts twice in dev
   initialized = true;
 
+  // A hard deadline on the very first session check. getSession() reads
+  // localStorage and then may go to the network to refresh an expired
+  // token; if the auth host is unreachable that call can sit there, and
+  // the whole app would stay stuck on status "loading" (a permanent
+  // spinner on the profile screen, a top bar that never settles). After
+  // this long we simply call it anonymous, which is the truth: we have
+  // no confirmed session. A later success still overwrites it, because
+  // the listener in step 2 keeps running.
+  const settleAnonymously = setTimeout(() => {
+    if (useAuthStore.getState().status === "loading") {
+      useAuthStore.setState({ status: "anonymous", user: null });
+    }
+  }, 6000);
+
   // 1) The stored session (localStorage), refreshed silently by
   //    supabase-js. If this fails for ANY reason: anonymous, no fuss.
   supabase.auth
     .getSession()
     .then(async ({ data }) => {
+      clearTimeout(settleAnonymously);
       const raw = data.session?.user;
       if (raw) {
         useAuthStore.setState({
@@ -111,6 +126,7 @@ export function initAuth(): void {
       }
     })
     .catch(() => {
+      clearTimeout(settleAnonymously);
       useAuthStore.setState({ status: "anonymous", user: null });
     });
 

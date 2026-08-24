@@ -37,6 +37,7 @@ import math
 import requests
 from shapely.geometry import Polygon as ShapelyPolygon
 from shapely.ops import unary_union
+from concurrent.futures import ThreadPoolExecutor
 
 # How many meters one degree of latitude covers (roughly constant worldwide).
 M_PER_DEG_LAT = 111_320.0
@@ -512,9 +513,24 @@ def check_context(polygon_latlon: list) -> dict:
         "note": short human summary
       }
     """
-    wetlands = check_wetlands(polygon_latlon)
-    water = check_water(polygon_latlon)
-    flood = check_flood(polygon_latlon)
+    # Run the three checks AT THE SAME TIME rather than one after
+    # another. They are three independent HTTP calls to three different
+    # government servers, each allowed up to 15 seconds, so doing them in
+    # a row costs up to 45 seconds of a user staring at a spinner while
+    # the machine sits idle waiting on sockets. Side by side, the wait is
+    # whichever single server is slowest.
+    #
+    # A thread pool (not async) because these calls use `requests`, which
+    # is blocking; threads are exactly the right tool for waiting on a
+    # network. Each check already swallows its own failures and returns a
+    # status of "unavailable", so a thread cannot take the survey down.
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_wetlands = pool.submit(check_wetlands, polygon_latlon)
+        f_water = pool.submit(check_water, polygon_latlon)
+        f_flood = pool.submit(check_flood, polygon_latlon)
+        wetlands = f_wetlands.result()
+        water = f_water.result()
+        flood = f_flood.result()
     wf = water_fraction(polygon_latlon, water_result=water,
                         wetlands_result=wetlands)
 

@@ -36,10 +36,11 @@ Run:
 import base64
 import math
 import os
+import re
 from typing import Optional, List
 
 import numpy as np
-from fastapi import FastAPI, HTTPException, Query, UploadFile, File
+from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import RedirectResponse, Response
@@ -57,10 +58,22 @@ from engine import scoring
 # and plug in below via an APIRouter, FastAPI's way of splitting an app
 # across files without changing how anything is served.
 from api.reports import router as reports_router
+from api import reports
+from api import ratelimit
 
 
 # ---------------------------------------------------------------------------
-app = FastAPI(title="TerraMeasure API", version="0.4.0")
+# How many calls one address may make, per five minutes.
+#
+# A survey can hold a worker thread for a minute or more, so it gets a
+# tight budget; the lookups are cheap and get a loose one. These are set
+# well above what a person clicking around could ever reach: the point is
+# to stop a runaway script, not to ration normal use.
+SURVEY_LIMIT = 15          # per 5 minutes, per address
+LOOKUP_LIMIT = 150         # parcel, context, geocode, reverse
+RATE_WINDOW_S = 300.0
+
+app = FastAPI(title="TerraMeasure API", version="0.4.1")
 
 # POST /reports and GET /reports/{slug}: turn a survey into a share link.
 app.include_router(reports_router)
@@ -162,14 +175,18 @@ class VertexIn(BaseModel):
 
 
 class PolygonSurveyRequest(BaseModel):
-    vertices: list[VertexIn]
+    # A drawn boundary is a handful of corners; even a traced property
+    # line is tens, not thousands. Capping it keeps a malformed or
+    # malicious request from turning into a giant geometry that we would
+    # then forward to the free federal services on our shared IP.
+    vertices: list[VertexIn] = Field(..., min_length=3, max_length=500)
     # Same bounds as GET /survey: without them a tiny resolution over a big
     # polygon would ask for a multi-million-cell grid.
     resolution_m: float = Field(10.0, ge=1, le=100)
 
 
 class ContextRequest(BaseModel):
-    vertices: list[VertexIn]
+    vertices: list[VertexIn] = Field(..., min_length=3, max_length=500)
 
 
 # GET /survey caps each side at 5 km; the polygon route must enforce the
@@ -427,6 +444,7 @@ def run_survey(dem_result, context: Optional[dict] = None,
 # ---------------------------------------------------------------------------
 @app.get("/survey", response_model=SurveyResponse)
 def survey(
+    request: Request,
     lat: float = Query(...),
     lon: float = Query(...),
     width_m:  float = Query(300.0, gt=10, le=5000),
@@ -434,6 +452,7 @@ def survey(
     resolution_m: float = Query(10.0, ge=1, le=100),
 ):
     """TerraScan free tier: fetch elevation for any lat/lon rectangle and run measurements."""
+    ratelimit.check(request, "survey", SURVEY_LIMIT, RATE_WINDOW_S, "surveys")
     dem_result, dem_note = _fetch_dem(lat, lon, width_m, height_m, resolution_m)
 
     # Ask the federal layers what is on this land (water, wetlands, flood).
@@ -449,7 +468,7 @@ def survey(
 # TerraScan, drawn polygon survey
 # ---------------------------------------------------------------------------
 @app.post("/survey/polygon", response_model=SurveyResponse)
-def survey_polygon(req: PolygonSurveyRequest):
+def survey_polygon(req: PolygonSurveyRequest, request: Request):
     """
     TerraScan polygon mode: the user draws a custom shape on the map.
 
@@ -459,6 +478,7 @@ def survey_polygon(req: PolygonSurveyRequest):
       3. Mask the DEM to the polygon, cells outside are set to NaN.
       4. Run all measurements only on cells inside the polygon.
     """
+    ratelimit.check(request, "survey", SURVEY_LIMIT, RATE_WINDOW_S, "surveys")
     if len(req.vertices) < 3:
         raise HTTPException(status_code=400,
                             detail="Polygon needs at least 3 vertices.")
@@ -520,7 +540,36 @@ async def photo_survey(
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded.")
 
-    raw_list = [await f.read() for f in files]
+    # Caps BEFORE reading anything into memory. This endpoint reads every
+    # uploaded file at once, so without a ceiling one request can decide
+    # how much memory the whole server uses, and the free tier has very
+    # little of it. These limits are far above a real photo survey.
+    MAX_PHOTOS = 60
+    MAX_PHOTO_BYTES = 12 * 1024 * 1024      # 12 MB per photo
+    MAX_TOTAL_BYTES = 120 * 1024 * 1024     # 120 MB per request
+    if len(files) > MAX_PHOTOS:
+        raise HTTPException(
+            status_code=413,
+            detail=(f"That is {len(files)} photos; the limit is {MAX_PHOTOS} "
+                    "per survey. Send the clearest ones."))
+
+    raw_list = []
+    total = 0
+    for f in files:
+        blob = await f.read()
+        if len(blob) > MAX_PHOTO_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=(f"'{f.filename}' is {len(blob) / 1e6:.0f} MB, over the "
+                        f"{MAX_PHOTO_BYTES // 1024 // 1024} MB per-photo limit."))
+        total += len(blob)
+        if total > MAX_TOTAL_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=("Those photos add up to more than "
+                        f"{MAX_TOTAL_BYTES // 1024 // 1024} MB in one request. "
+                        "Send them in smaller batches."))
+        raw_list.append(blob)
     pf = PhotoFetcher()
     loc = pf.extract_location(raw_list)
 
@@ -554,7 +603,7 @@ async def photo_survey(
 # Parcel lookup, "whose land is this?"
 # ---------------------------------------------------------------------------
 @app.get("/parcel")
-def parcel(lat: float = Query(...), lon: float = Query(...)):
+def parcel(request: Request, lat: float = Query(...), lon: float = Query(...)):
     """
     Look up the tax parcel at a point: id (APN/PIN/folio), owner, acreage,
     zoning, assessed value, and the boundary polygon, where the county
@@ -562,6 +611,7 @@ def parcel(lat: float = Query(...), lon: float = Query(...)):
     honestly says "no_coverage" (see fetchers/parcel_fetcher.py for the
     pilot-vs-Regrid plan).
     """
+    ratelimit.check(request, "lookup", LOOKUP_LIMIT, RATE_WINDOW_S, "parcel lookups")
     try:
         result = fetch_parcel(lat, lon)
     except Exception as e:
@@ -577,12 +627,13 @@ def parcel(lat: float = Query(...), lon: float = Query(...)):
 # Context checks, wetlands / water / flood for an arbitrary polygon
 # ---------------------------------------------------------------------------
 @app.post("/context")
-def context_check(req: ContextRequest):
+def context_check(req: ContextRequest, request: Request):
     """
     Run the wetlands, waterbody, and flood-zone checks for a polygon without
     doing a full survey. The frontend can use this for a fast pre-check
     before the user commits to a survey.
     """
+    ratelimit.check(request, "lookup", LOOKUP_LIMIT, RATE_WINDOW_S, "map data lookups")
     if len(req.vertices) < 3:
         raise HTTPException(status_code=400,
                             detail="Polygon needs at least 3 vertices.")
@@ -613,7 +664,8 @@ def context_check(req: ContextRequest):
 # coordinates, which are always available.
 # ---------------------------------------------------------------------------
 @app.get("/reverse")
-def reverse_geocode(lat: float = Query(...), lon: float = Query(...)):
+def reverse_geocode(request: Request, lat: float = Query(...), lon: float = Query(...)):
+    ratelimit.check(request, "lookup", LOOKUP_LIMIT, RATE_WINDOW_S, "place lookups")
     try:
         r = http_requests.get(
             "https://nominatim.openstreetmap.org/reverse",
@@ -673,7 +725,8 @@ def reverse_geocode(lat: float = Query(...), lon: float = Query(...)):
 
 
 @app.get("/geocode")
-def geocode(q: str = Query(...)):
+def geocode(request: Request, q: str = Query(...)):
+    ratelimit.check(request, "lookup", LOOKUP_LIMIT, RATE_WINDOW_S, "searches")
     try:
         r = http_requests.get(
             "https://nominatim.openstreetmap.org/search",
@@ -770,7 +823,18 @@ def wetlands_tile(bbox: str = Query(...)):
 # ---------------------------------------------------------------------------
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.4.0"}
+    """Liveness, plus the one dependency that fails silently.
+
+    A plain "ok" hides the case that actually bit us: the server running
+    perfectly while every share link 502s because its storage backend is
+    gone. Health now reports what storage is in use and the last error it
+    saw, so a single request tells you whether the product WORKS, not
+    just whether the process is alive."""
+    return {
+        "status": "ok",
+        "version": "0.4.1",
+        "report_storage": reports.storage_status(),
+    }
 
 # ---------------------------------------------------------------------------
 # Static serving: the NEW React app (frontend/dist) is the product now.
@@ -802,6 +866,81 @@ if os.path.isdir(_dist_dir):
 
     from fastapi.responses import FileResponse
 
+    # ---- Link previews for shared reports ----
+    #
+    # A report's whole job is to be sent to someone. Pasted into a text
+    # message, Slack or an email, a bare link shows nothing: no site
+    # name, no verdict, nothing to say why it is worth opening. Those
+    # previews come from Open Graph tags in the HTML <head>, and a
+    # single-page app has none, because the page is empty until
+    # JavaScript runs and the scrapers do not run JavaScript.
+    #
+    # So for /r/{slug} only, the server looks the report up and rewrites
+    # the tags in index.html before sending it. The page itself is
+    # unchanged; React still renders it exactly as before.
+    #
+    # Everything here is best-effort: if the lookup fails, or storage is
+    # down, the plain index.html goes out and the page still works.
+    def _escape(text: str) -> str:
+        """Make a string safe to sit inside an HTML attribute."""
+        return (text.replace("&", "&amp;").replace("<", "&lt;")
+                    .replace(">", "&gt;").replace('"', "&quot;"))
+
+    def _report_preview_html(slug: str) -> Optional[str]:
+        try:
+            row = reports.get_store().get(slug)
+        except Exception:
+            return None
+        if not row:
+            return None
+        snap = row.get("snapshot") or {}
+        survey = snap.get("survey") or {}
+        site = snap.get("site") or {}
+        score = survey.get("score") or {}
+
+        title = (site.get("name") or row.get("title")
+                 or "TerraMeasure site report")
+        place = (site.get("place") or {})
+        where = ", ".join(x for x in (place.get("county"), place.get("state"))
+                          if x)
+
+        verdict = str(score.get("verdict") or "").upper()
+        verdict_word = {"GO": "GO", "CAUTION": "PROCEED WITH CONDITIONS",
+                        "NO-GO": "NOT RECOMMENDED"}.get(verdict, "")
+        value = score.get("value")
+        bits = []
+        if verdict_word and value is not None:
+            bits.append(f"{verdict_word} ({value:.0f}/100)")
+        if where:
+            bits.append(where)
+        headline = score.get("headline_reason")
+        if headline:
+            bits.append(str(headline))
+        description = " . ".join(bits) or (
+            "A preliminary, uncertified terrain and water pre-screen.")
+
+        try:
+            with open(os.path.join(_dist_dir, "index.html"), encoding="utf-8") as f:
+                html = f.read()
+        except OSError:
+            return None
+
+        tags = (
+            f'<title>{_escape(title)} | TerraMeasure</title>'
+            f'<meta name="description" content="{_escape(description)}">'
+            f'<meta property="og:type" content="article">'
+            f'<meta property="og:title" content="{_escape(title)}">'
+            f'<meta property="og:description" content="{_escape(description)}">'
+            f'<meta property="og:site_name" content="TerraMeasure">'
+            f'<meta name="twitter:card" content="summary">'
+            f'<meta name="twitter:title" content="{_escape(title)}">'
+            f'<meta name="twitter:description" content="{_escape(description)}">'
+        )
+        # Replace the existing title if there is one, then inject the rest.
+        html = re.sub(r"<title>.*?</title>", "", html, count=1,
+                      flags=re.IGNORECASE | re.DOTALL)
+        return html.replace("</head>", tags + "</head>", 1)
+
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa(full_path: str):
         # Serve real files from dist when they exist (icons, manifest,
@@ -810,8 +949,17 @@ if os.path.isdir(_dist_dir):
         # are registered above, and FastAPI matches them first.
         candidate = os.path.normpath(os.path.join(_dist_dir, full_path))
         # Safety: never serve anything outside the dist folder.
-        if candidate.startswith(_dist_dir) and os.path.isfile(candidate):
+        if candidate.startswith(_dist_dir + os.sep) and os.path.isfile(candidate):
             return FileResponse(candidate)
+
+        # A shared report gets its own <head> so link previews work.
+        if full_path.startswith("r/"):
+            slug = full_path[2:].strip("/")
+            if slug and "/" not in slug:
+                page = _report_preview_html(slug)
+                if page is not None:
+                    return Response(content=page, media_type="text/html")
+
         return FileResponse(os.path.join(_dist_dir, "index.html"))
 else:
     # Local dev without a built frontend: keep the old behavior.

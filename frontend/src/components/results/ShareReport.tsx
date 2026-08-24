@@ -21,6 +21,8 @@ import { createReport, type SurveyResponse } from "@/lib/api";
 import type { LatLon } from "@/lib/geo";
 import { loadingMessage } from "@/hooks/useSurvey";
 import { addMyReport, rememberEditToken } from "@/lib/myReports";
+import { addSavedSurvey } from "@/lib/savedSurveys";
+import { polygonAreaM2 } from "@/lib/geo";
 import { assessSite } from "@/lib/verdict";
 import { useAppStore } from "@/store/appStore";
 import { Button } from "@/components/ui/button";
@@ -68,6 +70,9 @@ export function ShareReport({ survey, vertices }: ShareReportProps) {
 
   // "Copied!" feedback flag, reset after a moment.
   const [copied, setCopied] = useState(false);
+  // Did a failed share get rescued into a device save? Drives the extra
+  // reassurance line under the error.
+  const [rescued, setRescued] = useState(false);
 
   // The optional report name the sharer types. Starts from whatever the
   // site is already called in the header, so nobody types it twice.
@@ -125,6 +130,35 @@ export function ShareReport({ survey, vertices }: ShareReportProps) {
             : undefined,
         },
       }),
+    // A share link can fail for reasons the user cannot do anything
+    // about (storage outage, no signal). Losing the survey on top of
+    // that would be our fault, so when sharing fails we quietly keep the
+    // survey on the device and say so. The person still has their work.
+    onError: () => {
+      try {
+        const assessment = assessSite(survey);
+        addSavedSurvey({
+          title: finalTitle,
+          lat: centroid?.lat ?? survey.dem_center_lat,
+          lon: centroid?.lon ?? survey.dem_center_lon,
+          score: assessment.score,
+          verdict: assessment.verdict,
+          areaAcres:
+            vertices && vertices.length >= 3
+              ? polygonAreaM2(vertices) / 4046.86
+              : null,
+          source: survey.source,
+          synced: false,
+          vertices: vertices
+            ? vertices.map((v) => ({ lat: v.lat, lon: v.lon }))
+            : null,
+        });
+        setRescued(true);
+      } catch {
+        // Storage blocked too. The results are still on screen; nothing
+        // more we can do, and the message below still tells the truth.
+      }
+    },
     // The link was created: jot it down in localStorage so the Saved
     // page can list "your reports on this device", along with the edit
     // key that lets this browser rewrite the wording later. addMyReport
@@ -251,10 +285,22 @@ export function ShareReport({ survey, vertices }: ShareReportProps) {
         Share report
       </Button>
       {mutation.error && (
-        <p className="flex items-start gap-1.5 text-[11px] leading-snug text-nogo">
-          <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-          {mutation.error.message} Tap Share report to try again.
-        </p>
+        <div className="rounded-lg border border-nogo/30 bg-nogo/5 px-3 py-2">
+          <p className="flex items-start gap-1.5 text-[11px] leading-snug text-nogo">
+            <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+            {mutation.error.message}
+          </p>
+          {rescued && (
+            <p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-muted">
+              <Check size={12} className="mt-0.5 shrink-0 text-go" />
+              Saved to this device so you do not lose it. Reopen it any time
+              from Saved, and share it once the link service is back.
+            </p>
+          )}
+          <p className="mt-1.5 text-[11px] text-muted">
+            Tap Share report to try again.
+          </p>
+        </div>
       )}
     </div>
   );

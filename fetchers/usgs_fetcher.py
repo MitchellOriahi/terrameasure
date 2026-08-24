@@ -134,13 +134,36 @@ class USGS3DEPFetcher(DEMFetcher):
         finally:
             os.unlink(tmp_path)   # clean up the temp file no matter what
 
-        # Sanity check: if the whole grid is a single fill value, the server
-        # returned no-data (common for non-US bounding boxes or ocean tiles).
-        if heights is None or np.all(heights == heights.flat[0]):
+        # Sanity check. Two ways a tile can be useless:
+        #   * every cell is no-data (outside the US, ocean, no coverage)
+        #   * every cell is the same number (a flat fill the server made up)
+        # Either way there is nothing to measure, so fail and let the
+        # caller fall back to the global source instead of returning a
+        # grid that looks like data.
+        if heights is None or np.all(np.isnan(heights)):
             raise RuntimeError(
-                "USGS 3DEP returned a no-data tile. "
+                "USGS 3DEP returned an all-no-data tile. "
                 "This location may be outside the US or lack lidar coverage. "
                 "Try OpenElevationFetcher for non-US locations."
+            )
+        finite = heights[~np.isnan(heights)]
+        if finite.size == 0 or np.all(finite == finite.flat[0]):
+            raise RuntimeError(
+                "USGS 3DEP returned a flat fill value, not real terrain. "
+                "This location may lack lidar coverage."
+            )
+
+        # How much of the requested area actually had a lidar return?
+        # Anything short of complete gets said out loud, because a survey
+        # computed over 80% of a site is a different claim from one
+        # computed over all of it.
+        covered = float(finite.size) / float(heights.size)
+        coverage_note = ""
+        if covered < 0.999:
+            coverage_note = (
+                f" Lidar covered {covered * 100:.0f}% of this area; the rest "
+                "had no return and was left out of the measurements rather "
+                "than filled in."
             )
 
         return DEMResult(
@@ -148,7 +171,8 @@ class USGS3DEPFetcher(DEMFetcher):
             cell_size=resolution_m,
             source="USGS 3DEP (1m lidar)",
             vertical_error=0.2,
-            note="High-accuracy US elevation. Coverage varies by state/year.",
+            note=("High-accuracy US elevation. Coverage varies by "
+                  "state/year." + coverage_note),
             center_lat=lat, center_lon=lon,
             width_m=width_m, height_m=height_m,
         )
@@ -165,14 +189,26 @@ class USGS3DEPFetcher(DEMFetcher):
             # but elevation files always put heights in the first band).
             data = ds.read(1).astype(float)
 
-            # rasterio uses a special no-data sentinel (like -9999 or -32768)
-            # for "no measurement here". Replace those with the grid average
-            # so they don't break slope / volume calculations.
+            # rasterio uses a special no-data sentinel (like -9999 or
+            # -32768) for "there is no measurement here". That happens at
+            # tile edges, over water, and wherever the lidar got no
+            # return, which is exactly the ground this product is
+            # supposed to be honest about.
+            #
+            # This code used to overwrite those cells with the AVERAGE of
+            # the real ones. That is inventing ground: the fake cells are
+            # indistinguishable from measured ones, so slope, cut and
+            # fill, buildable area and the score all quietly treat
+            # made-up flat land as data. It broke the project's own rule
+            # that unavailable data is never reported as a number.
+            #
+            # NaN is the honest marker instead. The whole pipeline
+            # already understands it (the polygon mask uses NaN for the
+            # same purpose, and every statistic downstream is the
+            # nan-aware version), so a gap stays a gap all the way to the
+            # user, and the caller below can say how big the gap was.
             nodata = ds.nodata
             if nodata is not None:
-                mask = data == nodata
-                if mask.any():
-                    valid_mean = float(np.mean(data[~mask])) if (~mask).any() else 0.0
-                    data[mask] = valid_mean
+                data[data == nodata] = np.nan
 
         return data

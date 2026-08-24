@@ -86,8 +86,11 @@ const TOKEN_KEY = "terrameasure_report_edit_tokens";
 export function rememberEditToken(slug: string, token: string): void {
   try {
     const raw = localStorage.getItem(TOKEN_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
     const map: Record<string, string> =
-      raw && typeof JSON.parse(raw) === "object" ? JSON.parse(raw) : {};
+      parsed && typeof parsed === "object"
+        ? (parsed as Record<string, string>)
+        : {};
     map[slug] = token;
     localStorage.setItem(TOKEN_KEY, JSON.stringify(map));
   } catch {

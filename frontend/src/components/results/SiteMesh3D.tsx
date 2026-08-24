@@ -118,7 +118,15 @@ export function SiteMesh3D({ survey, vertices, compact }: SiteMesh3DProps) {
     // Only animate while the panel is actually on screen.
     const io = new IntersectionObserver(
       (entries) => {
-        visible = entries[0]?.isIntersecting ?? true;
+        const nowVisible = entries[0]?.isIntersecting ?? true;
+        const wasVisible = visible;
+        visible = nowVisible;
+        // Coming back into view with the loop stopped: restart it.
+        if (nowVisible && !wasVisible && raf === 0) {
+          last = performance.now();
+          dirtyRef.current = true;
+          raf = requestAnimationFrame(loop);
+        }
       },
       { threshold: 0.05 },
     );
@@ -127,7 +135,16 @@ export function SiteMesh3D({ survey, vertices, compact }: SiteMesh3DProps) {
     const loop = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
-      if (visible) {
+      // Off screen: stop the loop completely rather than waking 60 times
+      // a second to decide there is nothing to draw. The observer below
+      // starts it again when the panel scrolls back into view. This
+      // matters on the landing page, where the model sits far down the
+      // page and most visitors never reach it.
+      if (!visible) {
+        raf = 0;
+        return;
+      }
+      {
         if (spinRef.current) {
           // A slow drift, about one turn every 40 seconds. Enough to
           // read the shape without being a distraction.
@@ -259,10 +276,18 @@ export function SiteMesh3D({ survey, vertices, compact }: SiteMesh3DProps) {
       <div
         ref={boxRef}
         className="relative overflow-hidden rounded-lg border border-line bg-[#05070a]"
-        style={{ height: boxHeight, touchAction: "none" }}
+        style={{ height: boxHeight }}
       >
         <canvas
           ref={canvasRef}
+          // touchAction lives HERE, on the canvas alone, not on the box
+          // around it. The box also holds the compass and the buttons,
+          // and this whole thing sits inside a scrolling panel: a finger
+          // that lands anywhere in a 260px-tall dead zone and cannot
+          // scroll the page reads as a frozen app. Only the drawing
+          // surface swallows gestures, and only because spinning the
+          // model IS the gesture.
+          style={{ touchAction: "none" }}
           className="block h-full w-full cursor-grab active:cursor-grabbing"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -288,7 +313,7 @@ export function SiteMesh3D({ survey, vertices, compact }: SiteMesh3DProps) {
         </div>
 
         {/* Controls, bottom right, out of the way of the model */}
-        <div className="absolute bottom-2 right-2 flex gap-1">
+        <div className="absolute bottom-2 right-2 flex gap-1.5">
           <MeshButton
             label={spinning ? "Pause the spin" : "Spin the model"}
             onClick={() => setSpinning((s) => !s)}
@@ -371,7 +396,7 @@ function MeshButton({
       title={label}
       aria-label={label}
       aria-pressed={active}
-      className={`flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 backdrop-blur-sm transition-colors hover:bg-black/75 ${
+      className={`flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-black/55 backdrop-blur-sm transition-colors hover:bg-black/75 ${
         active ? "text-accent-bright" : "text-white/80"
       }`}
     >

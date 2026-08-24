@@ -32,7 +32,7 @@ export function UnitsToggle() {
           title={title}
           aria-pressed={units === key}
           onClick={() => setUnits(key)}
-          className={`num px-2 py-0.5 text-[11px] font-medium transition-colors ${
+          className={`num min-h-9 px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
             units === key
               ? "bg-accent-deep text-accent-bright"
               : "bg-transparent text-muted hover:text-foreground"

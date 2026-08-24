@@ -201,6 +201,45 @@ def test_rate_limit_triggers_with_honest_message():
     assert "hour" in detail and "free" in detail
 
 
+def test_shared_report_link_has_a_preview():
+    """A shared link must describe itself when pasted somewhere.
+
+    Chat apps and mail clients read Open Graph tags out of the HTML; they
+    do not run JavaScript, so a single-page app shows nothing unless the
+    server fills those tags in. This checks the server does, and that an
+    unknown slug still returns the normal app instead of an error.
+    """
+    from fastapi.testclient import TestClient
+    from api.server import app as real_app
+
+    # This test drives the REAL app (the preview lives in the static
+    # serving layer, not in the router), so give it the same clean slate
+    # _client() gives the others: fresh store, no rate-limit history.
+    R._store = R.MemoryReportStore()
+    R._rate_hits.clear()
+    c = TestClient(real_app)
+    made = c.post("/reports", json={
+        "survey": {"source": "USGS 3DEP",
+                   "score": {"value": 63, "verdict": "caution",
+                             "headline_reason": "Flood zone on part of the site."}},
+        "title": "Smith parcel",
+        "site": {"name": "Smith parcel",
+                 "place": {"county": "Travis County", "state": "Texas"}},
+    }).json()
+
+    html = c.get(f"/r/{made['slug']}").text
+    assert "Smith parcel" in html, "the site name must be in the page head"
+    assert "og:description" in html
+    assert "Travis County, Texas" in html, "a reader should see WHERE it is"
+    assert "63" in html, "the score belongs in the preview"
+    # The edit key must not leak into a public page.
+    assert made["edit_token"] not in html
+
+    # An unknown slug is not an error: the app loads and shows its own
+    # friendly not-found screen.
+    assert c.get("/r/nosuchslug").status_code == 200
+
+
 def test_server_app_includes_report_routes():
     # Wiring check: the real app in api/server.py must expose both routes.
     from api.server import app as real_app

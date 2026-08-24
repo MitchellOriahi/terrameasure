@@ -25,8 +25,11 @@ import {
   Mail,
   AlertTriangle,
   Check,
+  CloudOff,
+  RefreshCw,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isAuthServiceUp, resetAuthHealthCache } from "@/lib/authHealth";
 import { saveDraft } from "@/lib/mapState";
 import { useAuthStore } from "@/store/authStore";
 import { Wordmark } from "@/components/TopBar";
@@ -74,6 +77,30 @@ export default function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resent, setResent] = useState(false);
+  // Is the sign-in service reachable at all? "checking" on first paint,
+  // then up or down. When it is down we say so BEFORE anyone types a
+  // password or gets redirected to a host that will not answer.
+  const [service, setService] = useState<"checking" | "up" | "down">(
+    "checking",
+  );
+
+  useEffect(() => {
+    let alive = true;
+    void isAuthServiceUp().then((ok) => {
+      if (alive) setService(ok ? "up" : "down");
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /** Re-probe when someone taps Try again on the outage notice. */
+  async function recheckService() {
+    setService("checking");
+    resetAuthHealthCache();
+    const ok = await isAuthServiceUp(true);
+    setService(ok ? "up" : "down");
+  }
 
   // The path to go back to after signing in. Router state wins; the
   // sessionStorage copy covers the OAuth reload; the map is the fallback
@@ -116,6 +143,16 @@ export default function AuthPage() {
     }
     setBusy(true);
     try {
+      // One cheap reachability check first. Without it a dead auth host
+      // surfaces as a generic "fetch failed" after a long wait, which
+      // reads like the password was wrong.
+      if (!(await isAuthServiceUp())) {
+        setService("down");
+        setError(
+          "The sign-in service is not reachable right now. Your surveys still work without an account.",
+        );
+        return;
+      }
       if (mode === "signin") {
         const { error: err } = await supabase.auth.signInWithPassword({
           email: cleanEmail,
@@ -147,6 +184,16 @@ export default function AuthPage() {
   // ---- Google (full-page redirect out and back) ----
   async function handleGoogle() {
     setError(null);
+    // NEVER redirect the browser to a host that is not answering: the
+    // user would land on the browser's own error page, outside our app,
+    // with no way back except the back button.
+    if (!(await isAuthServiceUp())) {
+      setService("down");
+      setError(
+        "The sign-in service is not reachable right now, so Google sign-in cannot start. Your surveys still work without an account.",
+      );
+      return;
+    }
     // Stash everything the reload would lose: the drawn shape and where
     // to return to. (The camera is stashed continuously by MapView.)
     saveDraft();
@@ -198,6 +245,41 @@ export default function AuthPage() {
 
       <main className="flex flex-1 items-center justify-center overflow-y-auto p-6">
         <div className="glass w-full max-w-md p-8">
+          {/* ---- Outage notice ----
+               Sign-in leans on an outside service. When that service is
+               down there is nothing the user can do about it, so the
+               honest move is to say so up front, point out that the
+               product still works without an account, and offer one
+               button to try again. Anything else wastes their time on a
+               password that cannot be checked. */}
+          {service === "down" && (
+            <div className="mb-5 rounded-xl border border-caution/40 bg-caution/10 px-4 py-3">
+              <div className="flex items-center gap-2 text-caution">
+                <CloudOff size={16} className="shrink-0" />
+                <span className="text-sm font-semibold">
+                  Sign-in is unavailable right now
+                </span>
+              </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-foreground/80">
+                Accounts are handled by a service we cannot reach at the
+                moment, so neither Google nor email sign-in will work. This
+                does not affect surveying: measuring land, saving to this
+                device and sharing a report all work without an account.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button variant="ghost" size="sm" onClick={recheckService}>
+                  <RefreshCw size={13} />
+                  Try again
+                </Button>
+                <Link to="/map">
+                  <Button variant="primary" size="sm" tabIndex={-1}>
+                    Keep surveying
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+
           {mode === "confirm" ? (
             /* ---- "Check your email" after sign-up ---- */
             <div className="text-center">

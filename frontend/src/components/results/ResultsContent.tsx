@@ -81,6 +81,10 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
   // Which measurement system to display (imperial by default, toggleable).
   const units = useAppStore((s) => s.units);
 
+  // A stable identity for THIS survey: where its ground is, how big the
+  // grid was, and what it scored. Two different surveys cannot share one.
+  const surveyKey = `${survey.dem_center_lat},${survey.dem_center_lon},${survey.grid_shape?.join("x")},${survey.avg_slope?.value}`;
+
   // Score, verdict and cost range. The backend computes these when it
   // can; assessSite falls back to a client heuristic for old backends
   // (see lib/verdict.ts for the whole story).
@@ -186,8 +190,15 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
 
       {/* ---- Share this survey as a public read-only report link,
            and Save it to the signed-in user's profile ---- */}
-      <ShareReport survey={survey} vertices={vertices} />
-      <SaveSurvey survey={survey} vertices={vertices} />
+      {/* THE KEY MATTERS. Both of these hold their own memory of what
+          they did: the share link they created, the "Saved" confirmation
+          they showed. React reuses a component that stays in the same
+          place in the tree, so measuring a SECOND site while the panel
+          is open would leave the FIRST site's share link on screen, and
+          hand out that wrong URL to whoever asked for it. Keying them to
+          the survey forces a fresh component for fresh ground. */}
+      <ShareReport key={surveyKey} survey={survey} vertices={vertices} />
+      <SaveSurvey key={surveyKey} survey={survey} vertices={vertices} />
       {/* Fly into a 3D view of this site (hides itself if unavailable) */}
       <Site3DEntryButton />
 

@@ -18,9 +18,9 @@ import { createClient } from "@supabase/supabase-js";
 //
 // Both can be overridden at build time with env vars, which is handy if
 // the project ever moves.
-const SUPABASE_URL: string =
+export const SUPABASE_URL: string =
   import.meta.env.VITE_SUPABASE_URL ?? "https://onmrarnvanpufmlsshvj.supabase.co";
-const SUPABASE_ANON: string =
+export const SUPABASE_ANON: string =
   import.meta.env.VITE_SUPABASE_ANON ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubXJhcm52YW5wdWZtbHNzaHZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NDIxOTUsImV4cCI6MjA5ODMxODE5NX0.Z1IEDaDrR4DwaVG3JZkFC8roNl8ZU0qsUhJWepuNLDc";
 

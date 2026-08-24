@@ -194,9 +194,15 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
     # part of the compression problem.)
     build_pts = int(round((buildable - 50.0) * 0.3))
     score += build_pts
-    breakdown.append({"factor": "buildable area", "effect": f"{build_pts:+d}",
-                      "note": f"{buildable:.0f}% of the site has slope gentle "
-                              "enough to build on (50% is neutral)."})
+    # Word this carefully. This number is SLOPE ONLY: it says how much of
+    # the ground is gently sloped, and flat water counts as gentle. The
+    # headline buildable figure further down subtracts water and wetland.
+    # Saying "buildable" in both places with two different numbers is how
+    # a report ends up contradicting itself in front of a surveyor.
+    breakdown.append({"factor": "gentle ground", "effect": f"{build_pts:+d}",
+                      "note": f"{buildable:.0f}% of the site is gently sloped "
+                              "(50% is neutral). Slope only; water and "
+                              "wetland come off below."})
 
     # ---- Context portion: the water-aware part that fixes the lake bug ----
     water_frac = None
@@ -347,6 +353,17 @@ def site_score(dem_result, measurements: dict, context: dict | None = None) -> d
     if wetland_frac:
         unusable = min(1.0, unusable + max(0.0, wetland_frac - (water_frac or 0.0)))
     adjusted_buildable = round(buildable * (1.0 - unusable), 1)
+
+    # If taking water and wetland off changed the number materially, add
+    # that to the gentle-ground line so the breakdown and the headline
+    # buildable figure tell the same story rather than two.
+    if abs(adjusted_buildable - buildable) >= 2.0:
+        for item in breakdown:
+            if item["factor"] == "gentle ground":
+                item["note"] += (f" After water and wetland, "
+                                 f"{adjusted_buildable:.0f}% is actually "
+                                 "usable.")
+                break
 
     # ---- Verdict: one voice. ----
     # Score band picks the word; forcing conditions (water, wetland, flood)

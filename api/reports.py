@@ -226,6 +226,28 @@ def _make_store() -> ReportStore:
 # The one store instance the endpoints use. Tests swap this out.
 _store: ReportStore = _make_store()
 
+# The last storage failure, if any, so /health can say whether share
+# links are actually working instead of only whether the server is up.
+# A server that answers every request with 502 is "healthy" by any naive
+# check, which is exactly the kind of blind spot that lets a broken
+# feature sit unnoticed for a day.
+_last_store_error: Optional[str] = None
+
+
+def get_store() -> ReportStore:
+    """The live store, for callers outside this module (the server uses
+    it to build link previews for /r/{slug})."""
+    return _store
+
+
+def storage_status() -> dict:
+    """What kind of report storage is live, and did it last fail?"""
+    return {
+        "kind": type(_store).__name__.replace("ReportStore", "").lower(),
+        "durable": isinstance(_store, SupabaseReportStore),
+        "last_error": _last_store_error,
+    }
+
 
 # ---------------------------------------------------------------------------
 # Minimal per-IP rate limiting for report creation
@@ -403,10 +425,15 @@ def create_report(req: CreateReportRequest, request: Request):
     try:
         created_at = _store.save(slug, req.title, snapshot)
     except Exception as e:
+        global _last_store_error
+        _last_store_error = f"{type(e).__name__}: {e}"
         log.error("Reports: save failed: %s", e)
-        raise HTTPException(status_code=502,
-                            detail="Could not store the report right now. "
-                                   "Please try again in a moment.")
+        raise HTTPException(
+            status_code=503,
+            detail=("Share links are temporarily unavailable: the report "
+                    "storage service is not answering. Nothing you measured "
+                    "is lost. Save the survey to your device instead, and "
+                    "the link will work once storage is back."))
 
     return {"slug": slug,
             "url_path": f"/r/{slug}",

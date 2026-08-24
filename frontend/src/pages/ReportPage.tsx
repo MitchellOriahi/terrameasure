@@ -40,6 +40,8 @@ import {
   Check,
   Pencil,
   StickyNote,
+  ClipboardList,
+  Printer,
 } from "lucide-react";
 import {
   fetchReport,
@@ -244,6 +246,74 @@ function IdentityHeader({
 // be typed over by hand would not be evidence of anything, so the server
 // only accepts changes to these two text fields.
 // ------------------------------------------------------------------
+/**
+ * Build the whole report as plain text.
+ *
+ * Why: most of what happens to a report next is somebody pasting it
+ * into an email, a text message or a CRM note. A link is not always
+ * welcome (some inboxes strip them, some clients will not click one),
+ * and "here are the numbers" beats "click here" when you are trying to
+ * get an answer out of a busy person. Everything here is already on the
+ * page; this just makes it copyable in one tap, error bounds included,
+ * because a summary that drops the bounds would be a different claim
+ * from the report it came from.
+ */
+// A newline, named. Writing the escape inline inside a template
+// literal is easy to mangle when this file is edited by tooling.
+const NEWLINE = String.fromCharCode(10);
+
+function summaryText(args: {
+  title: string;
+  county: string;
+  center: LatLon | null;
+  acreage: number | null;
+  assessment: SiteAssessment;
+  survey: SurveyResponse;
+  notes: string;
+  url: string;
+  disclaimer: string;
+}): string {
+  const { title, county, center, acreage, assessment, survey, notes, url } = args;
+  const lines: string[] = [];
+  lines.push(`${title}`);
+  if (county) lines.push(county);
+  if (center) lines.push(`${center.lat.toFixed(5)}, ${center.lon.toFixed(5)}`);
+  if (acreage !== null) lines.push(`${fmt(acreage, 2)} acres`);
+  lines.push("");
+  lines.push(`VERDICT: ${assessment.verdict} (${assessment.score}/100)`);
+  if (survey.score?.headline_reason) lines.push(survey.score.headline_reason);
+  lines.push("");
+  lines.push(
+    `Average slope: ${fmt(survey.avg_slope.value, 1)} deg ` +
+      `+/- ${fmt(survey.avg_slope.error, 1)}`,
+  );
+  lines.push(`Buildable area: ${fmt(assessment.buildablePct, 0)}%`);
+  lines.push(
+    `Elevation range: ${fmt(survey.min_height, 0)} to ` +
+      `${fmt(survey.max_height, 0)} m`,
+  );
+  const pad = survey.earthwork_cost?.pad_cost;
+  if (pad && Number.isFinite(pad.low_usd)) {
+    lines.push(
+      `Building pad earthwork: ${fmtUsdK(pad.low_usd)} to ${fmtUsdK(pad.high_usd)}`,
+    );
+  }
+  if (survey.context?.flood?.status === "ok") {
+    const zones = survey.context.flood.zones.map((z) => z.zone).join(", ");
+    lines.push(`FEMA flood: ${zones || "no mapped zone"}`);
+  }
+  lines.push(`Elevation source: ${survey.source}`);
+  if (notes) {
+    lines.push("");
+    lines.push("NOTES");
+    lines.push(notes);
+  }
+  lines.push("");
+  lines.push(`Full report: ${url}`);
+  lines.push(args.disclaimer);
+  return lines.join(NEWLINE);
+}
+
 function AuthorNotes({
   slug,
   name,
@@ -680,6 +750,8 @@ function ReportBody({ report }: { report: ReportResponse }) {
   const [edits, setEdits] = useState<{ name?: string; notes?: string } | null>(
     null,
   );
+  // "Summary copied" confirmation on the copy-as-text button.
+  const [summaryCopied, setSummaryCopied] = useState(false);
 
   // Best available site name, in order: an edit just made here, the
   // name the author gave the site, the report title, the parcel address,
@@ -809,6 +881,47 @@ function ReportBody({ report }: { report: ReportResponse }) {
         notes={notes}
         onSaved={(name, newNotes) => setEdits({ name, notes: newNotes })}
       />
+
+      {/* ---- 0c. What a reader actually does next ----
+           Most reports get forwarded, pasted into an email, or printed
+           for a file. Both of those are one tap here instead of a
+           screenshot. Hidden from the printed page itself. */}
+      <div className="no-print flex flex-wrap gap-2">
+        <Button
+          variant="glass"
+          size="sm"
+          onClick={async () => {
+            const ok = await copyText(
+              summaryText({
+                title: siteTitle,
+                county: countyLine,
+                center,
+                acreage,
+                assessment,
+                survey,
+                notes,
+                url: window.location.href,
+                disclaimer: report.disclaimer,
+              }),
+            );
+            if (ok) {
+              setSummaryCopied(true);
+              window.setTimeout(() => setSummaryCopied(false), 2200);
+            }
+          }}
+        >
+          {summaryCopied ? (
+            <Check size={14} className="text-go" />
+          ) : (
+            <ClipboardList size={14} />
+          )}
+          {summaryCopied ? "Summary copied" : "Copy as text"}
+        </Button>
+        <Button variant="glass" size="sm" onClick={() => window.print()}>
+          <Printer size={14} />
+          Print or save as PDF
+        </Button>
+      </div>
 
       {/* ---- 1. Verdict banner ---- */}
       <section

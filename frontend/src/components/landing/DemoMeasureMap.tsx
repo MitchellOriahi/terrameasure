@@ -110,6 +110,14 @@ export function DemoMeasureMap() {
               }}
               mapStyle={SATELLITE_STYLE}
               attributionControl={{ compact: true }}
+              // Page scroll wins by default on touch. Without this, a
+              // thumb swiping down the landing page that happens to land
+              // on this 380px-tall map pans the map instead of scrolling
+              // the page, and the visitor thinks the page is stuck. With
+              // it, one finger scrolls the page and two fingers move the
+              // map, the same rule Google Maps embeds use, and MapLibre
+              // shows the "use two fingers" hint itself.
+              cooperativeGestures
               style={{ width: "100%", height: "100%" }}
             >
               <Source id="demo-shape" type="geojson" data={feature}>
@@ -125,9 +133,11 @@ export function DemoMeasureMap() {
                 />
               </Source>
 
-              {/* One draggable handle per corner. 28px targets: past the
-                  44px guideline once the finger's contact area is counted,
-                  and small enough not to hide the ground underneath. */}
+              {/* One draggable handle per corner. 36px of visible dot
+                  with an invisible 44px pad around it: big enough for a
+                  thumb, small enough not to hide the ground it sits on.
+                  (The comment here used to claim 28px was "past the 44px
+                  guideline", which it plainly is not.) */}
               {vertices.map((v, i) => (
                 <Marker
                   key={i}
@@ -138,9 +148,11 @@ export function DemoMeasureMap() {
                 >
                   <div
                     aria-label={`Corner ${i + 1}, drag to move`}
-                    className="h-7 w-7 cursor-grab rounded-full border-2 border-white bg-accent shadow-lg active:cursor-grabbing"
+                    className="flex h-11 w-11 cursor-grab items-center justify-center active:cursor-grabbing"
                     style={{ touchAction: "none" }}
-                  />
+                  >
+                    <span className="block h-9 w-9 rounded-full border-2 border-white bg-accent shadow-lg" />
+                  </div>
                 </Marker>
               ))}
             </Map>
@@ -168,7 +180,7 @@ export function DemoMeasureMap() {
 
         {/* The instruction, until the visitor works it out themselves */}
         {!touched && (
-          <div className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-[11px] text-white/90">
+          <div className="pointer-events-none absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-[11px] text-white/90">
             <Move size={12} />
             Drag a green corner
           </div>
@@ -180,9 +192,12 @@ export function DemoMeasureMap() {
         <button
           type="button"
           onClick={runRealSurvey}
-          className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-accent px-5 text-sm font-semibold text-black transition-colors hover:bg-accent-bright"
+          // shrink-0 and nowrap: in the side-by-side layout this button
+          // was being squeezed by the paragraph next to it until its
+          // label wrapped onto three lines and overlapped the text.
+          className="group inline-flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-accent px-5 text-sm font-semibold text-black transition-colors hover:bg-accent-bright"
         >
-          Survey this shape for real
+          Survey this shape
           <ArrowRight
             size={15}
             className="transition-transform group-hover:translate-x-0.5"

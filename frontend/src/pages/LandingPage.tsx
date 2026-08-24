@@ -268,17 +268,17 @@ export default function LandingPage() {
           {/* ---- Left: the promise ---- */}
           <div>
             <SectionLabel>Site pre-screen, United States</SectionLabel>
-            <h1 className="mt-5 text-[2.1rem] font-semibold leading-[1.06] tracking-tight sm:text-5xl">
-              Know whether the land is
-              <br className="hidden sm:block" /> worth the drive.
+            {/* No manual line break. A hard <br> at this size stranded
+                the word "is" on a line of its own at 1440px wide; a max
+                width lets the browser break it sensibly at every size. */}
+            <h1 className="mt-5 max-w-[15ch] text-[2.1rem] font-semibold leading-[1.06] tracking-tight sm:text-5xl">
+              Know whether the land is worth the drive.
             </h1>
             <p className="mt-5 max-w-lg text-sm leading-relaxed text-muted sm:text-base">
-              Draw any boundary in the country and TerraMeasure reads
-              federal elevation, wetland and flood data and answers the
-              only question that matters first: build here, or keep
-              looking. Slope, buildable ground, risk flags and an
-              earthwork cost range, with the error bound printed next to
-              every number.
+              Draw any boundary in the country. TerraMeasure reads federal
+              elevation, wetland and flood data and answers the question
+              that comes first: build here, or keep looking. Every number
+              carries its error bound.
             </p>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -300,21 +300,6 @@ export default function LandingPage() {
               </a>
             </div>
 
-            {/* The spec line: what it costs, what it needs, who it is for */}
-            <dl className="num mt-8 grid max-w-lg grid-cols-3 gap-px overflow-hidden rounded-xl border border-line bg-line text-center">
-              {[
-                ["$0", "to run a survey"],
-                ["3", "federal datasets"],
-                ["60s", "typical answer"],
-              ].map(([v, k]) => (
-                <div key={k} className="bg-background px-2 py-3">
-                  <dt className="text-lg font-semibold text-foreground">{v}</dt>
-                  <dd className="mt-0.5 text-[10px] uppercase tracking-wider text-muted">
-                    {k}
-                  </dd>
-                </div>
-              ))}
-            </dl>
           </div>
 
           {/* ---- Right: the live tool ---- */}
@@ -329,6 +314,25 @@ export default function LandingPage() {
             </div>
             <DemoMeasureMap />
           </div>
+
+          {/* The spec line: what it costs, what it runs on, how long it
+              takes. Full width under the hero so that on a phone the
+              live demo comes straight after the buttons, and on desktop
+              it reads as a footer to the whole section. */}
+          <dl className="num grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-line bg-line text-center lg:col-span-2">
+            {[
+              ["$0", "to run a survey"],
+              ["3", "federal datasets"],
+              ["60s", "typical answer"],
+            ].map(([v, k]) => (
+              <div key={k} className="bg-background px-2 py-3">
+                <dt className="text-lg font-semibold text-foreground">{v}</dt>
+                <dd className="mt-0.5 text-[10px] uppercase tracking-wider text-muted">
+                  {k}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 
