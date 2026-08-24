@@ -312,7 +312,12 @@ export function MapPage() {
               </div>
             }
           >
-            <ResultsContent survey={survey} vertices={drawnVertices} />
+            {/* data-survey-open: lib/appUpdate.ts checks for this before
+                auto-refreshing to a new version, so an update never yanks
+                results out from under someone mid-read. */}
+            <div data-survey-open>
+              <ResultsContent survey={survey} vertices={drawnVertices} />
+            </div>
           </Sheet>
         ) : (
           <aside className="absolute bottom-4 right-4 top-20 z-20 w-96">
@@ -323,7 +328,10 @@ export function MapPage() {
                 </h2>
                 <UncertifiedLabel />
               </div>
-              <div className="panel-scroll min-h-0 flex-1 overflow-y-auto pr-1">
+              <div
+                data-survey-open
+                className="panel-scroll min-h-0 flex-1 overflow-y-auto pr-1"
+              >
                 <ResultsContent survey={survey} vertices={drawnVertices} />
               </div>
             </div>

@@ -474,3 +474,31 @@ small-caps headings does not.
 - MapLibre v6 renders black if an animated camera move runs while 3D
   terrain is on. Every camera move in 3D mode is therefore an instant
   jump (`lib/mapCamera.ts` and `lib/site3d.ts` carry the details).
+
+---
+
+## 14. Keeping the marketing page honest
+
+`frontend/scripts/capture-product.mjs` drives the real app in a real
+browser, runs a real survey against the live engine, and screenshots the
+result into `frontend/public/shots/`. The landing page uses those images.
+
+That is deliberate. A mockup is a promise; a screenshot is evidence, and
+this product's entire pitch is that it does not overstate things. Re-run
+the script whenever the UI changes:
+
+```bash
+npm --prefix frontend run build
+venv\Scripts\python.exe -m uvicorn api.server:app --port 8000   # in one shell
+node frontend/scripts/capture-product.mjs                        # in another
+```
+
+Then shrink the PNGs it writes to progressive JPEGs (the script captures
+at 2x and 3x for sharpness; the page wants files, not posters).
+
+Two more scripts live beside it, both read-only:
+
+- `ux-sweep.mjs` photographs every screen at desktop and phone size and
+  reports any control under 44px or any page that scrolls sideways.
+- `width-check.mjs` measures the hero across seven breakpoints and says
+  whether anything overflows the card it belongs to.

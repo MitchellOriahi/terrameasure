@@ -186,10 +186,20 @@ export default function LandingPage() {
   // locked for the map, so the landing page scrolls inside itself).
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // The hero's headline counts up the acres it just measured. Tiny
-  // touch, but it makes the page feel like an instrument rather than a
-  // brochure. Reduced-motion users get the final number immediately.
-  const [demoOpen, setDemoOpen] = useState(false);
+  // Has the reader scrolled past the hero? Drives the sticky phone CTA
+  // at the bottom, which must not exist while the hero's own buttons are
+  // still on screen (two competing calls to action, one of them covering
+  // content, is worse than none).
+  const [pastHero, setPastHero] = useState(false);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const onScroll = () => setPastHero(root.scrollTop > window.innerHeight * 0.9);
+    root.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => root.removeEventListener("scroll", onScroll);
+  }, []);
 
   // Scroll-reveal: elements tagged .lp-reveal fade up the first time
   // they enter the viewport. IntersectionObserver is the browser API for
@@ -364,6 +374,106 @@ export default function LandingPage() {
               </div>
             ))}
           </dl>
+
+          {/* Where the answers come from. A visitor's first silent
+              question about a free tool is "based on what?", and naming
+              the actual federal datasets answers it faster than any
+              paragraph of copy. These are the real sources, which is why
+              we can print them. */}
+          <div className="lg:col-span-2">
+            <p className="font-display text-[10px] uppercase tracking-[0.18em] text-muted">
+              Reading, live
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-foreground/70">
+              <span>USGS 3DEP lidar</span>
+              <span className="text-line">/</span>
+              <span>FEMA National Flood Hazard Layer</span>
+              <span className="text-line">/</span>
+              <span>USFWS National Wetlands Inventory</span>
+              <span className="text-line">/</span>
+              <span>USGS hydrography</span>
+              <span className="text-line">/</span>
+              <span>county parcel records</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================================
+          PROOF: the actual product, photographed
+          ------------------------------------------------------------
+          Not a mockup. scripts/capture-product.mjs drives the real app,
+          runs a real survey and screenshots the result, so this section
+          cannot drift away from what the app actually looks like. Someone
+          deciding whether to spend a minute on a tool they have never
+          heard of wants to see the thing working.
+         ============================================================ */}
+      <section className="border-b border-line bg-surface/30">
+        <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
+          <div className="lp-reveal max-w-2xl">
+            <SectionLabel index="01">The actual screen</SectionLabel>
+            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
+              Draw a boundary. Get an answer with its receipts.
+            </h2>
+            <p className="mt-5 max-w-xl text-[15px] leading-[1.7] text-muted">
+              A real survey of real ground near Firestone, Colorado, run
+              by the live engine: the verdict, the reason behind it, the
+              county it sits in, and what grading a building pad would
+              actually cost.
+            </p>
+          </div>
+
+          <figure className="lp-reveal mt-10">
+            <div className="overflow-hidden rounded-2xl border border-line shadow-2xl shadow-black/60">
+              <img
+                src="/shots/app-desktop.jpg"
+                width={1440}
+                height={900}
+                loading="lazy"
+                alt="The TerraMeasure map with a boundary drawn over farmland and a results panel reading CAUTION, site intersects a FEMA high-risk flood zone, with a building pad earthwork cost of 16 to 35 thousand dollars."
+                className="block w-full"
+              />
+            </div>
+            <figcaption className="mt-3 text-[12px] text-muted">
+              Screenshot of the live app, not a mockup. Verdict, reason,
+              county, acreage and cost, all from public federal data.
+            </figcaption>
+          </figure>
+
+          <div className="mt-14 grid gap-10 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div className="lp-reveal">
+              <h3 className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                Send it to anyone. Nothing to install, no login on their
+                end.
+              </h3>
+              <p className="mt-4 max-w-lg text-[15px] leading-[1.7] text-muted">
+                Every survey can become a link. Whoever opens it sees the
+                same verdict, the same numbers with the same error
+                bounds, the site name and county, and any notes you
+                added, on whatever phone they happen to be holding. They
+                can copy it as text or print it to PDF.
+              </p>
+              <Link
+                to="/map"
+                className="mt-6 inline-flex items-center gap-1.5 font-display text-sm font-medium text-accent-bright hover:underline"
+              >
+                Make one now
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+            <figure className="lp-reveal mx-auto w-[240px] shrink-0">
+              <div className="overflow-hidden rounded-[28px] border-4 border-surface-2 shadow-2xl shadow-black/60">
+                <img
+                  src="/shots/report-phone.jpg"
+                  width={585}
+                  height={1266}
+                  loading="lazy"
+                  alt="A shared TerraMeasure report open on a phone, showing the site name, county, verdict and measurements."
+                  className="block w-full"
+                />
+              </div>
+            </figure>
+          </div>
         </div>
       </section>
 
@@ -376,7 +486,7 @@ export default function LandingPage() {
             <SiteMesh3D survey={SAMPLE_SITE} vertices={SAMPLE_SITE_VERTICES} />
           </div>
           <div className="lp-reveal order-1 lg:order-2">
-            <SectionLabel index="01">What the engine actually sees</SectionLabel>
+            <SectionLabel index="02">What the engine actually sees</SectionLabel>
             <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
               A photo shows you trees. This shows you the ground.
             </h2>
@@ -411,7 +521,7 @@ export default function LandingPage() {
       <section className="border-b border-line">
         <div className="mx-auto grid max-w-6xl gap-10 px-6 py-14 lg:grid-cols-2 lg:py-20">
           <div className="lp-reveal">
-            <SectionLabel index="02">What comes back</SectionLabel>
+            <SectionLabel index="03">What comes back</SectionLabel>
             <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
               One verdict, and the receipts behind it.
             </h2>
@@ -492,7 +602,7 @@ export default function LandingPage() {
       <section id="how-it-works" className="border-b border-line">
         <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
           <div className="lp-reveal max-w-xl">
-            <SectionLabel index="03">How it works</SectionLabel>
+            <SectionLabel index="04">How it works</SectionLabel>
             <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
               Three steps, about a minute, no equipment.
             </h2>
@@ -535,7 +645,7 @@ export default function LandingPage() {
       <section className="border-b border-line">
         <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
           <div className="lp-reveal max-w-xl">
-            <SectionLabel index="04">In the box</SectionLabel>
+            <SectionLabel index="05">In the box</SectionLabel>
             <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
               Built for the decision, not the demo.
             </h2>
@@ -581,7 +691,7 @@ export default function LandingPage() {
       <section className="border-b border-line bg-surface/40">
         <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
           <div className="lp-reveal max-w-xl">
-            <SectionLabel index="05">What this is not</SectionLabel>
+            <SectionLabel index="06">What this is not</SectionLabel>
             <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
               We would rather lose the sale than overstate the number.
             </h2>
@@ -623,7 +733,7 @@ export default function LandingPage() {
       <section id="faq" className="border-b border-line">
         <div className="mx-auto max-w-3xl px-6 py-14 lg:py-20">
           <div className="lp-reveal">
-            <SectionLabel index="06">Questions</SectionLabel>
+            <SectionLabel index="07">Questions</SectionLabel>
             <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
               The things people ask first.
             </h2>
@@ -682,20 +792,41 @@ export default function LandingPage() {
           </p>
           <Link
             to="/map"
-            className="group mt-7 inline-flex h-12 items-center gap-2 rounded-xl bg-accent px-8 font-display text-sm font-semibold text-black transition-colors hover:bg-accent-bright"
-            onClick={() => setDemoOpen(false)}
+            className="group mt-8 inline-flex items-center gap-2 rounded-xl bg-accent px-8 py-4 font-display text-base font-semibold text-black transition-colors hover:bg-accent-bright"
           >
             Open the map
             <ArrowRight
-              size={16}
+              size={17}
               className="transition-transform group-hover:translate-x-0.5"
             />
           </Link>
-          {/* demoOpen exists so the CTA can also close anything the page
-              opened; kept trivial on purpose. */}
-          {demoOpen && <span className="sr-only">demo open</span>}
+          <p className="mt-4 text-[13px] text-muted">
+            No account, no card, no trial timer.
+          </p>
         </div>
       </section>
+
+      {/* ---- Sticky phone CTA ----
+           Appears only after the hero has scrolled away, so it never
+           covers the first screen, and only on phones, where the nav
+           CTA is off screen for most of the page. */}
+      <div
+        className={`pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-3 transition-all duration-300 sm:hidden ${
+          pastHero
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-4 opacity-0"
+        }`}
+      >
+        <Link
+          to="/map"
+          className={`pointer-events-auto flex h-14 items-center justify-center gap-2 rounded-2xl bg-accent font-display text-[15px] font-semibold text-black shadow-lg shadow-black/40 ${
+            pastHero ? "" : "pointer-events-none"
+          }`}
+        >
+          Survey a site free
+          <ArrowRight size={17} />
+        </Link>
+      </div>
 
       {/* ============================================================
           FOOTER
