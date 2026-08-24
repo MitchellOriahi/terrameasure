@@ -10,8 +10,21 @@
 @import "tailwindcss";
 
 /* Self-hosted fonts (no external CDN calls, works offline as a PWA).
-   Inter is the UI font. JetBrains Mono is ONLY for numeric measurement
-   values, so numbers line up like a proper instrument readout. */
+   Three typefaces, each with one job, which is what keeps a technical
+   product from looking like a template:
+
+     Space Grotesk : headlines and section labels. A geometric grotesque
+                     with real character (look at the a, the g, the
+                     numerals). It reads like drafting-table lettering,
+                     which is exactly the trade we are in, and it stops
+                     the page looking like every other Inter-only SaaS
+                     landing page.
+     Inter         : body copy and UI. Boring on purpose. It is the most
+                     legible thing available at 13 to 16px, and body
+                     copy is for reading, not for personality.
+     JetBrains Mono: numbers only, so measurements line up like an
+                     instrument readout. */
+@import "@fontsource-variable/space-grotesk";
 @import "@fontsource-variable/inter";
 @import "@fontsource/jetbrains-mono/400.css";
 @import "@fontsource/jetbrains-mono/600.css";
@@ -64,6 +77,7 @@
   --color-nogo: var(--nogo);
 
   --font-sans: "Inter Variable", system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk Variable", "Inter Variable", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
@@ -240,4 +254,40 @@ body {
 .panel-scroll::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 3px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Compact map attribution                                             */
+/* ------------------------------------------------------------------ */
+/* Esri's credit line is long ("Powered by Esri | Source: Esri, Maxar,
+   Earthstar Geographics, and the GIS User Community"). At phone width
+   MapLibre wraps it onto two lines and paints it across the middle of
+   the imagery, over the very ground the map exists to show. Attribution
+   is required and stays: it is pinned to one line at the bottom edge,
+   truncated with an ellipsis, with the (i) button carrying the full
+   text. Same treatment the shared report map already uses. */
+.compact-attrib .maplibregl-ctrl-bottom-right,
+.compact-attrib .maplibregl-ctrl-bottom-left {
+  bottom: 0;
+}
+
+.compact-attrib .maplibregl-ctrl-attrib {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1.5;
+  background: rgba(0, 0, 0, 0.5) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  max-width: min(100%, 340px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compact-attrib .maplibregl-ctrl-attrib a {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.compact-attrib .maplibregl-ctrl-attrib-button {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  filter: invert(0.9);
 }

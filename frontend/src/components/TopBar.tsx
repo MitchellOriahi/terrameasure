@@ -83,7 +83,7 @@ export function Wordmark() {
   return (
     <Link
       to="/"
-      className="flex select-none items-center gap-0.5 text-[15px] font-semibold tracking-tight text-foreground"
+      className="flex select-none items-center gap-0.5 font-display text-[15px] font-bold tracking-tight text-foreground"
       aria-label="TerraMeasure home"
     >
       Terra

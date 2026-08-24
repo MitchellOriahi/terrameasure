@@ -99,8 +99,8 @@ export function DemoMeasureMap() {
 
   return (
     <div ref={boxRef} className="w-full">
-      <div className="relative overflow-hidden rounded-2xl border border-line bg-surface-2">
-        <div className="h-[300px] w-full sm:h-[380px]">
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface-2">
+        <div className="compact-attrib relative h-[300px] w-full sm:h-[380px]">
           {mounted ? (
             <Map
               initialViewState={{
@@ -162,52 +162,64 @@ export function DemoMeasureMap() {
               Loading the live map
             </div>
           )}
+          {/* Live readout, pinned over the map so the numbers move with
+              the shape in one glance. It lives INSIDE the map box, which
+              is the thing it is positioned against; as a sibling it
+              would drift the moment the card grew a footer. */}
+          <div className="pointer-events-none absolute left-3 top-3 rounded-xl border border-line bg-background/85 px-3 py-2 backdrop-blur-sm">
+            <div className="font-display text-[10px] uppercase tracking-[0.16em] text-muted">
+              Live measurement
+            </div>
+            <div className="num text-2xl font-semibold leading-tight text-foreground">
+              {fmt(acres, 2)}{" "}
+              <span className="font-sans text-xs font-normal text-muted">
+                acres
+              </span>
+            </div>
+            <div className="num text-[11px] text-muted">
+              {fmt(perimM * FT_PER_M, 0)} ft around
+            </div>
+          </div>
+
+          {/* The instruction, until the visitor works it out themselves */}
+          {!touched && (
+            <div className="pointer-events-none absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-[11px] text-white/90">
+              <Move size={12} />
+              Drag a green corner
+            </div>
+          )}
         </div>
 
-        {/* Live readout, pinned over the map so the numbers move with
-            the shape in one glance. */}
-        <div className="pointer-events-none absolute left-3 top-3 rounded-xl border border-line bg-background/85 px-3 py-2 backdrop-blur-sm">
-          <div className="text-[10px] uppercase tracking-widest text-muted">
-            Live measurement
+        {/* ---- The card's own footer ----
+           This used to be a button floating BELOW the card with the
+           caption crammed in beside it, so the most important control on
+           the page looked like it had fallen out of the box it belongs
+           to. It is now part of the card: one bar across the bottom,
+           inside the same border, with the caption underneath where it
+           has room to be a sentence instead of a squeeze. */}
+        <div className="border-t border-line bg-surface/60 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[13px] font-medium text-foreground">
+              Like the look of it?
+            </p>
+            <button
+              type="button"
+              onClick={runRealSurvey}
+              className="group inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-accent px-5 font-display text-sm font-semibold text-black transition-colors hover:bg-accent-bright"
+            >
+              Survey this shape
+              <ArrowRight
+                size={15}
+                className="transition-transform group-hover:translate-x-0.5"
+              />
+            </button>
           </div>
-          <div className="num text-xl font-semibold text-foreground">
-            {fmt(acres, 2)} <span className="text-xs text-muted">acres</span>
-          </div>
-          <div className="num text-[11px] text-muted">
-            {fmt(perimM * FT_PER_M, 0)} ft around
-          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            Acreage and perimeter here are pure geometry, computed in your
+            browser. Slope, water, flood risk and earthwork cost need the
+            elevation engine, which is what that button runs.
+          </p>
         </div>
-
-        {/* The instruction, until the visitor works it out themselves */}
-        {!touched && (
-          <div className="pointer-events-none absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-[11px] text-white/90">
-            <Move size={12} />
-            Drag a green corner
-          </div>
-        )}
-      </div>
-
-      {/* The handoff: the same shape, measured for real by the engine */}
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <button
-          type="button"
-          onClick={runRealSurvey}
-          // shrink-0 and nowrap: in the side-by-side layout this button
-          // was being squeezed by the paragraph next to it until its
-          // label wrapped onto three lines and overlapped the text.
-          className="group inline-flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-accent px-5 text-sm font-semibold text-black transition-colors hover:bg-accent-bright"
-        >
-          Survey this shape
-          <ArrowRight
-            size={15}
-            className="transition-transform group-hover:translate-x-0.5"
-          />
-        </button>
-        <p className="text-[11px] leading-relaxed text-muted">
-          Area and perimeter here are pure geometry, computed in your
-          browser. Slope, water, flood risk and earthwork cost need the
-          elevation engine, which is what that button runs.
-        </p>
       </div>
     </div>
   );

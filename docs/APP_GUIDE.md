@@ -412,6 +412,26 @@ the old project disappeared), three things point at it:
 Check it worked with `GET /health`: `report_storage.durable` must be
 true, and `last_error` must be null after a share.
 
+## 10d. The type system
+
+Three typefaces, each with exactly one job. Mixing them by feel is how a
+page ends up looking generic, so the rule is mechanical.
+
+| Face | Used for | Token |
+| --- | --- | --- |
+| Space Grotesk | Headlines, section labels, buttons, the wordmark, the verdict word | `font-display` |
+| Inter | Body copy, UI text, form fields | `font-sans` (default) |
+| JetBrains Mono | Numbers only: measurements, scores, coordinates | `font-mono` / the `.num` class |
+
+All three are self-hosted through `@fontsource`, so the app carries no
+external font requests and still renders correctly offline as a PWA. The
+whole added weight for the display face is about 22 KB.
+
+Section labels on the landing page carry an index (`01`, `02`, ...) and a
+rule. That is not decoration: at a glance while scrolling, a numbered
+label tells you where you are in a document, which a row of identical
+small-caps headings does not.
+
 ## 11. Rules the codebase holds itself to
 
 1. **Never return a bare number.** Every measurement carries its error.

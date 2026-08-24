@@ -160,7 +160,7 @@ export function ResultsContent({ survey, vertices }: ResultsContentProps) {
         role="status"
       >
         <div className="flex items-center justify-between">
-          <span className="text-2xl font-bold tracking-tight">
+          <span className="font-display text-2xl font-bold tracking-tight">
             {assessment.verdict}
             {/* The backend's one-word grade ("Good", "Fair", ...) only
                 when there is no headline sentence: one qualifier under

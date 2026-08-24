@@ -264,7 +264,7 @@ export function SiteMesh3D({ survey, vertices, compact }: SiteMesh3DProps) {
   return (
     <div className="rounded-xl border border-line bg-surface-2/40 px-4 py-3">
       <div className="mb-2 flex items-center gap-2">
-        <span className="text-[11px] uppercase tracking-widest text-muted">
+        <span className="font-display text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
           3D site model
         </span>
         <span className="num ml-auto text-[10px] text-muted">

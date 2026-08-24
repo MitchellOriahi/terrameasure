@@ -157,7 +157,9 @@ export default function ReportsPage() {
                 <Bookmark className="text-accent-bright" size={20} />
               </div>
               <div>
-                <h1 className="text-lg font-semibold text-foreground">Saved</h1>
+                <h1 className="font-display text-xl font-bold tracking-tight text-foreground">
+                  Saved
+                </h1>
                 <p className="text-xs text-muted">
                   Your surveys and share links
                 </p>
@@ -175,7 +177,7 @@ export default function ReportsPage() {
           <div className="glass p-4">
             <div className="mb-2 flex items-center gap-2 px-2">
               <Bookmark className="text-accent-bright" size={15} />
-              <h2 className="text-sm font-semibold text-foreground">
+              <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
                 Saved surveys
               </h2>
               <span className="num ml-auto text-[11px] text-muted">
@@ -260,7 +262,7 @@ export default function ReportsPage() {
           <div className="glass p-4">
             <div className="mb-2 flex items-center gap-2 px-2">
               <FileText className="text-accent-bright" size={15} />
-              <h2 className="text-sm font-semibold text-foreground">
+              <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
                 Shared reports
               </h2>
               <span className="num ml-auto text-[11px] text-muted">

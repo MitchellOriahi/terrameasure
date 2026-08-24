@@ -69,13 +69,34 @@ function Mark({ className = "" }: { className?: string }) {
   );
 }
 
-/** A small section label: a hairline, then mono capitals. Used instead
-    of the usual centered eyebrow pill, which every SaaS page has. */
-function SectionLabel({ children }: { children: React.ReactNode }) {
+/**
+ * A section label: an index number, a rule, then the name of the
+ * section.
+ *
+ * The old version was 10px of muted mono, so small it read as a
+ * disclaimer rather than a signpost, and every section looked identical
+ * from a distance. This one is bigger (12px), brighter, and carries a
+ * number, which does two things: it gives the eye something to anchor on
+ * while scrolling, and it makes the page feel like a document with parts
+ * rather than a scroll of cards. Drafting sheets number their views for
+ * the same reason.
+ */
+function SectionLabel({
+  index,
+  children,
+}: {
+  index?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-center gap-3">
-      <span className="h-px w-8 bg-accent/60" />
-      <span className="num text-[10px] uppercase tracking-[0.22em] text-accent-bright">
+      {index && (
+        <span className="num text-xs font-semibold tabular-nums text-accent-bright">
+          {index}
+        </span>
+      )}
+      <span className="h-px w-10 bg-accent/50" />
+      <span className="font-display text-xs font-medium uppercase tracking-[0.18em] text-accent-bright">
         {children}
       </span>
     </div>
@@ -97,8 +118,12 @@ function SpecRow({
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-line py-2.5 last:border-b-0">
       <span className="min-w-0">
-        <span className="block text-xs text-foreground/90">{label}</span>
-        {note && <span className="block text-[10px] text-muted">{note}</span>}
+        <span className="block text-[13px] text-foreground/90">{label}</span>
+        {note && (
+          <span className="mt-0.5 block text-[11px] leading-snug text-muted">
+            {note}
+          </span>
+        )}
       </span>
       <span className="num shrink-0 text-sm text-foreground">
         {value}
@@ -119,13 +144,15 @@ function FeatureCard({
   body: string;
 }) {
   return (
-    <div className="lp-reveal flex gap-3 border-t border-line pt-4">
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-deep text-accent-bright">
+    <div className="lp-reveal group flex gap-3 border-t border-line pt-4 transition-colors hover:border-accent/40">
+      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-deep text-accent-bright transition-colors group-hover:bg-accent/20">
         <Icon size={16} />
       </span>
       <div>
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        <p className="mt-1 text-xs leading-relaxed text-muted">{body}</p>
+        <h3 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
+          {title}
+        </h3>
+        <p className="mt-1.5 text-[13.5px] leading-[1.6] text-muted">{body}</p>
       </div>
     </div>
   );
@@ -136,14 +163,16 @@ function FeatureCard({
 function Faq({ q, children }: { q: string; children: React.ReactNode }) {
   return (
     <details className="group border-b border-line py-4">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium text-foreground">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-display text-[15px] font-medium text-foreground">
         {q}
         <ChevronDown
           size={16}
           className="shrink-0 text-muted transition-transform group-open:rotate-180"
         />
       </summary>
-      <div className="mt-2 text-xs leading-relaxed text-muted">{children}</div>
+      <div className="mt-3 max-w-2xl text-[13.5px] leading-[1.65] text-muted">
+        {children}
+      </div>
     </details>
   );
 }
@@ -226,31 +255,31 @@ export default function LandingPage() {
           <nav className="flex items-center gap-1 sm:gap-2">
             <a
               href="#how-it-works"
-              className="hidden rounded-lg px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-foreground sm:block"
+              className="hidden rounded-lg px-3 py-2 text-[13px] font-medium text-muted transition-colors hover:text-foreground sm:block"
             >
               How it works
             </a>
             <a
               href="#faq"
-              className="hidden rounded-lg px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-foreground sm:block"
+              className="hidden rounded-lg px-3 py-2 text-[13px] font-medium text-muted transition-colors hover:text-foreground sm:block"
             >
               FAQ
             </a>
             <Link
               to="/news"
-              className="hidden rounded-lg px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-foreground sm:block"
+              className="hidden rounded-lg px-3 py-2 text-[13px] font-medium text-muted transition-colors hover:text-foreground sm:block"
             >
               News
             </Link>
             <Link
               to="/auth"
-              className="rounded-lg px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-foreground"
+              className="rounded-lg px-3 py-2 text-[13px] font-medium text-muted transition-colors hover:text-foreground"
             >
               Sign in
             </Link>
             <Link
               to="/map"
-              className="inline-flex h-11 items-center gap-1.5 rounded-xl bg-accent px-4 text-xs font-semibold text-black transition-colors hover:bg-accent-bright sm:h-9"
+              className="inline-flex h-11 items-center gap-1.5 rounded-xl bg-accent px-4 font-display text-xs font-semibold text-black transition-colors hover:bg-accent-bright sm:h-9"
             >
               Open the map
               <ArrowRight size={14} />
@@ -264,17 +293,17 @@ export default function LandingPage() {
          ============================================================ */}
       <section className="relative overflow-hidden border-b border-line">
         <div className="lp-topo pointer-events-none absolute inset-0" aria-hidden />
-        <div className="relative mx-auto grid max-w-6xl gap-10 px-6 pb-14 pt-14 lg:grid-cols-[1fr_1.05fr] lg:items-center lg:gap-14 lg:pb-20 lg:pt-20">
+        <div className="relative mx-auto grid max-w-6xl gap-10 px-6 pb-16 pt-12 lg:grid-cols-[1fr_1.05fr] lg:items-center lg:gap-16 lg:pb-24 lg:pt-24">
           {/* ---- Left: the promise ---- */}
           <div>
             <SectionLabel>Site pre-screen, United States</SectionLabel>
             {/* No manual line break. A hard <br> at this size stranded
                 the word "is" on a line of its own at 1440px wide; a max
                 width lets the browser break it sensibly at every size. */}
-            <h1 className="mt-5 max-w-[15ch] text-[2.1rem] font-semibold leading-[1.06] tracking-tight sm:text-5xl">
+            <h1 className="mt-6 max-w-[15ch] font-display text-[2.4rem] font-bold leading-[1.02] tracking-[-0.03em] text-foreground sm:text-[3.5rem]">
               Know whether the land is worth the drive.
             </h1>
-            <p className="mt-5 max-w-lg text-sm leading-relaxed text-muted sm:text-base">
+            <p className="mt-6 max-w-lg text-[15px] leading-[1.7] text-muted sm:text-[17px]">
               Draw any boundary in the country. TerraMeasure reads federal
               elevation, wetland and flood data and answers the question
               that comes first: build here, or keep looking. Every number
@@ -284,7 +313,7 @@ export default function LandingPage() {
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <Link
                 to="/map"
-                className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-7 text-sm font-semibold text-black transition-colors hover:bg-accent-bright"
+                className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-7 font-display text-sm font-semibold text-black transition-colors hover:bg-accent-bright"
               >
                 Open the map
                 <ArrowRight
@@ -294,7 +323,7 @@ export default function LandingPage() {
               </Link>
               <a
                 href="#how-it-works"
-                className="inline-flex h-12 items-center justify-center rounded-xl border border-line bg-surface/70 px-7 text-sm font-medium text-foreground transition-colors hover:bg-surface-2"
+                className="inline-flex h-12 items-center justify-center rounded-xl border border-line bg-surface/70 px-7 font-display text-sm font-medium text-foreground transition-colors hover:bg-surface-2"
               >
                 See what comes back
               </a>
@@ -304,11 +333,11 @@ export default function LandingPage() {
 
           {/* ---- Right: the live tool ---- */}
           <div className="lp-reveal lp-in">
-            <div className="mb-2 flex items-baseline justify-between">
-              <span className="num text-[10px] uppercase tracking-[0.2em] text-muted">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <span className="font-display text-[11px] font-medium uppercase tracking-[0.16em] text-foreground/70">
                 Live, right here
               </span>
-              <span className="text-[10px] text-muted">
+              <span className="text-[11px] text-muted">
                 real satellite imagery
               </span>
             </div>
@@ -326,8 +355,10 @@ export default function LandingPage() {
               ["60s", "typical answer"],
             ].map(([v, k]) => (
               <div key={k} className="bg-background px-2 py-3">
-                <dt className="text-lg font-semibold text-foreground">{v}</dt>
-                <dd className="mt-0.5 text-[10px] uppercase tracking-wider text-muted">
+                <dt className="text-2xl font-semibold tracking-tight text-foreground">
+                  {v}
+                </dt>
+                <dd className="mt-1 font-display text-[10px] uppercase tracking-[0.14em] text-muted">
                   {k}
                 </dd>
               </div>
@@ -345,11 +376,11 @@ export default function LandingPage() {
             <SiteMesh3D survey={SAMPLE_SITE} vertices={SAMPLE_SITE_VERTICES} />
           </div>
           <div className="lp-reveal order-1 lg:order-2">
-            <SectionLabel>What the engine actually sees</SectionLabel>
-            <h2 className="mt-5 text-2xl font-semibold tracking-tight sm:text-3xl">
+            <SectionLabel index="01">What the engine actually sees</SectionLabel>
+            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
               A photo shows you trees. This shows you the ground.
             </h2>
-            <p className="mt-4 text-sm leading-relaxed text-muted">
+            <p className="mt-5 text-[15px] leading-[1.7] text-muted">
               Every measurement in TerraMeasure comes off an elevation
               grid: a block of ground heights from USGS lidar, one number
               per square metre where the coverage is good. Area is
@@ -358,7 +389,7 @@ export default function LandingPage() {
               and it is why the answers are arithmetic instead of
               opinion.
             </p>
-            <p className="mt-3 text-sm leading-relaxed text-muted">
+            <p className="mt-4 text-[15px] leading-[1.7] text-muted">
               Spin the model. That is real ground west of Golden,
               Colorado, trimmed to a real drawn boundary, rendered from
               the same grid that produced its verdict.
@@ -380,18 +411,18 @@ export default function LandingPage() {
       <section className="border-b border-line">
         <div className="mx-auto grid max-w-6xl gap-10 px-6 py-14 lg:grid-cols-2 lg:py-20">
           <div className="lp-reveal">
-            <SectionLabel>What comes back</SectionLabel>
-            <h2 className="mt-5 text-2xl font-semibold tracking-tight sm:text-3xl">
+            <SectionLabel index="02">What comes back</SectionLabel>
+            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
               One verdict, and the receipts behind it.
             </h2>
-            <p className="mt-4 text-sm leading-relaxed text-muted">
+            <p className="mt-5 text-[15px] leading-[1.7] text-muted">
               The answer is a single word, because that is the decision
               you are making. Everything under it exists to let a
               professional check the word: which factor moved the score,
               which federal dataset said so, how current that data is,
               and how wrong each number could be.
             </p>
-            <p className="mt-3 text-sm leading-relaxed text-muted">
+            <p className="mt-4 text-[15px] leading-[1.7] text-muted">
               Share it as a link and the person who opens it sees the
               same page, with no login, on any phone.
             </p>
@@ -400,12 +431,12 @@ export default function LandingPage() {
           {/* The example report card */}
           <div className="lp-reveal">
             <div className="rounded-2xl border border-line bg-surface/60 p-4">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
+              <div className="font-display text-[11px] font-medium uppercase tracking-[0.16em] text-foreground/70">
                 Example report
               </div>
               <div className="mt-2 rounded-xl border border-caution/30 bg-caution/10 px-4 py-3">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-lg font-semibold text-caution">
+                  <span className="font-display text-lg font-bold tracking-tight text-caution">
                     PROCEED WITH CONDITIONS
                   </span>
                   <span className="num text-base font-semibold text-caution">
@@ -461,8 +492,8 @@ export default function LandingPage() {
       <section id="how-it-works" className="border-b border-line">
         <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
           <div className="lp-reveal max-w-xl">
-            <SectionLabel>How it works</SectionLabel>
-            <h2 className="mt-5 text-2xl font-semibold tracking-tight sm:text-3xl">
+            <SectionLabel index="03">How it works</SectionLabel>
+            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
               Three steps, about a minute, no equipment.
             </h2>
           </div>
@@ -483,13 +514,13 @@ export default function LandingPage() {
               ],
             ].map(([title, body], i) => (
               <li key={title} className="lp-reveal border-t border-line pt-4">
-                <span className="num text-[11px] text-accent-bright">
+                <span className="num text-sm font-semibold tabular-nums text-accent-bright">
                   0{i + 1}
                 </span>
-                <h3 className="mt-2 text-base font-semibold text-foreground">
+                <h3 className="mt-2 font-display text-lg font-semibold tracking-tight text-foreground">
                   {title}
                 </h3>
-                <p className="mt-2 text-[13px] leading-relaxed text-muted">
+                <p className="mt-2 text-[14px] leading-[1.65] text-muted">
                   {body}
                 </p>
               </li>
@@ -504,8 +535,8 @@ export default function LandingPage() {
       <section className="border-b border-line">
         <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
           <div className="lp-reveal max-w-xl">
-            <SectionLabel>In the box</SectionLabel>
-            <h2 className="mt-5 text-2xl font-semibold tracking-tight sm:text-3xl">
+            <SectionLabel index="04">In the box</SectionLabel>
+            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
               Built for the decision, not the demo.
             </h2>
           </div>
@@ -550,14 +581,14 @@ export default function LandingPage() {
       <section className="border-b border-line bg-surface/40">
         <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
           <div className="lp-reveal max-w-xl">
-            <SectionLabel>What this is not</SectionLabel>
-            <h2 className="mt-5 text-2xl font-semibold tracking-tight sm:text-3xl">
+            <SectionLabel index="05">What this is not</SectionLabel>
+            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
               We would rather lose the sale than overstate the number.
             </h2>
           </div>
           <div className="mt-8 grid gap-6 sm:grid-cols-3">
-            <p className="lp-reveal border-t border-line pt-4 text-xs leading-relaxed text-muted">
-              <span className="block text-sm font-semibold text-foreground">
+            <p className="lp-reveal border-t border-line pt-4 text-[13.5px] leading-[1.65] text-muted">
+              <span className="mb-1.5 block font-display text-[15px] font-semibold tracking-tight text-foreground">
                 Not a legal survey
               </span>
               Nothing here can be recorded, sealed or relied on for a
@@ -565,8 +596,8 @@ export default function LandingPage() {
               that work, and our job is to tell you whether it is worth
               booking one.
             </p>
-            <p className="lp-reveal border-t border-line pt-4 text-xs leading-relaxed text-muted">
-              <span className="block text-sm font-semibold text-foreground">
+            <p className="lp-reveal border-t border-line pt-4 text-[13.5px] leading-[1.65] text-muted">
+              <span className="mb-1.5 block font-display text-[15px] font-semibold tracking-tight text-foreground">
                 As good as the source data
               </span>
               USGS lidar is roughly 0.2 m vertical where it exists, and
@@ -574,8 +605,8 @@ export default function LandingPage() {
               answered, how old it is, and what that means for each
               number, on every report.
             </p>
-            <p className="lp-reveal border-t border-line pt-4 text-xs leading-relaxed text-muted">
-              <span className="block text-sm font-semibold text-foreground">
+            <p className="lp-reveal border-t border-line pt-4 text-[13.5px] leading-[1.65] text-muted">
+              <span className="mb-1.5 block font-display text-[15px] font-semibold tracking-tight text-foreground">
                 Terrain and water, not title
               </span>
               Zoning, easements, septic feasibility, utilities and title
@@ -592,8 +623,8 @@ export default function LandingPage() {
       <section id="faq" className="border-b border-line">
         <div className="mx-auto max-w-3xl px-6 py-14 lg:py-20">
           <div className="lp-reveal">
-            <SectionLabel>Questions</SectionLabel>
-            <h2 className="mt-5 text-2xl font-semibold tracking-tight sm:text-3xl">
+            <SectionLabel index="06">Questions</SectionLabel>
+            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
               The things people ask first.
             </h2>
           </div>
@@ -642,7 +673,7 @@ export default function LandingPage() {
          ============================================================ */}
       <section className="mx-auto max-w-3xl px-6 py-16 text-center lg:py-24">
         <div className="lp-reveal">
-          <h2 className="text-2xl font-semibold tracking-tight sm:text-4xl">
+          <h2 className="font-display text-[1.9rem] font-bold leading-[1.08] tracking-[-0.02em] sm:text-[2.75rem]">
             Check a site before you spend a Saturday on it.
           </h2>
           <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-muted">
@@ -651,7 +682,7 @@ export default function LandingPage() {
           </p>
           <Link
             to="/map"
-            className="group mt-7 inline-flex h-12 items-center gap-2 rounded-xl bg-accent px-8 text-sm font-semibold text-black transition-colors hover:bg-accent-bright"
+            className="group mt-7 inline-flex h-12 items-center gap-2 rounded-xl bg-accent px-8 font-display text-sm font-semibold text-black transition-colors hover:bg-accent-bright"
             onClick={() => setDemoOpen(false)}
           >
             Open the map

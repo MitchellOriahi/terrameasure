@@ -238,7 +238,7 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <h1 className="truncate text-lg font-semibold text-foreground">
+                    <h1 className="truncate font-display text-xl font-bold tracking-tight text-foreground">
                       {user.name}
                     </h1>
                     {nameSaved ? (
