@@ -941,7 +941,15 @@ if os.path.isdir(_dist_dir):
                       flags=re.IGNORECASE | re.DOTALL)
         return html.replace("</head>", tags + "</head>", 1)
 
-    @app.get("/{full_path:path}", include_in_schema=False)
+    # GET and HEAD. A HEAD request asks "does this exist, how big is
+    # it?" without downloading the body, and it is what link preview
+    # scrapers, uptime monitors and some CDNs try FIRST. Registering GET
+    # alone answered every one of them with 405 Method Not Allowed,
+    # which for a product whose growth depends on shared links is a
+    # silent tax. FastAPI builds the HEAD response from the same
+    # handler; it just drops the body.
+    @app.api_route("/{full_path:path}", methods=["GET", "HEAD"],
+                   include_in_schema=False)
     def spa(full_path: str):
         # Serve real files from dist when they exist (icons, manifest,
         # service worker); everything else falls back to index.html so the
