@@ -105,15 +105,25 @@ export default function NewsPage() {
       {/* Single scrollable column, phone-first width */}
       <main className="panel-scroll flex-1 overflow-y-auto">
         <div className="pb-safe mx-auto w-full max-w-2xl px-4 pb-10 pt-6">
-          <h1 className="text-xl font-semibold text-foreground">TerraIntel</h1>
-          <p className="mt-1 text-sm leading-relaxed text-muted">
-            Land-relevant events: disasters, seismic activity, and ground
-            conditions where you work.
-          </p>
+          <header className="border-b border-line pb-6">
+            <div className="flex items-center gap-3">
+              <span className="h-px w-6 bg-accent/60" />
+              <span className="tm-label text-accent-bright">
+                Land intelligence
+              </span>
+            </div>
+            <h1 className="tm-display mt-4 text-[2rem] text-foreground sm:text-[2.6rem]">
+              TerraIntel
+            </h1>
+            <p className="mt-4 max-w-lg text-[13.5px] leading-relaxed text-muted">
+              Land-relevant events: disasters, seismic activity, and ground
+              conditions where you work.
+            </p>
+          </header>
 
           {/* Location filter card */}
-          <div className="glass mt-5 p-4">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted">
+          <div className="mt-6 border border-line bg-surface-2/40 p-4">
+            <div className="tm-label flex items-center gap-2 text-foreground/60">
               <MapPin size={13} className="text-accent-bright" />
               Location filter
             </div>

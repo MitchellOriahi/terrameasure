@@ -243,8 +243,12 @@ export default function AuthPage() {
         <Wordmark />
       </header>
 
-      <main className="flex flex-1 items-center justify-center overflow-y-auto p-6">
-        <div className="glass w-full max-w-md p-8">
+      <main className="flex flex-1 flex-col items-center justify-center overflow-y-auto p-6">
+        <div className="mb-4 flex w-full max-w-md items-center gap-3">
+          <span className="h-px w-6 bg-accent/60" />
+          <span className="tm-label text-accent-bright">Account</span>
+        </div>
+        <div className="w-full max-w-md border border-line bg-surface-2/40 p-8">
           {/* ---- Outage notice ----
                Sign-in leans on an outside service. When that service is
                down there is nothing the user can do about it, so the
@@ -286,7 +290,7 @@ export default function AuthPage() {
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-deep">
                 <Mail className="text-accent-bright" size={26} />
               </div>
-              <h1 className="text-xl font-semibold text-foreground">
+              <h1 className="tm-display text-2xl text-foreground">
                 Check your email
               </h1>
               <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -315,7 +319,7 @@ export default function AuthPage() {
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-deep">
                   <KeyRound className="text-accent-bright" size={26} />
                 </div>
-                <h1 className="text-xl font-semibold text-foreground">
+                <h1 className="tm-display text-2xl text-foreground">
                   {mode === "signin" ? "Welcome back" : "Create your account"}
                 </h1>
                 <p className="mt-1 text-sm text-muted">

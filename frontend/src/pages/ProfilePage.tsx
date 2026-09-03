@@ -201,8 +201,18 @@ export default function ProfilePage() {
 
       <main className="panel-scroll flex-1 overflow-y-auto p-6">
         <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+          <header className="border-b border-line pb-6 pt-3">
+            <div className="flex items-center gap-3">
+              <span className="h-px w-6 bg-accent/60" />
+              <span className="tm-label text-accent-bright">Account</span>
+            </div>
+            <h1 className="tm-display mt-4 text-[2rem] text-foreground sm:text-[2.4rem]">
+              Your profile
+            </h1>
+          </header>
+
           {/* ---- Identity card ---- */}
-          <div className="glass p-6">
+          <div className="border border-line bg-surface-2/40 p-6">
             <div className="flex items-center gap-4">
               {/* Initial avatar: first letter of the name, brand green */}
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-accent-deep text-xl font-semibold text-accent-bright">
@@ -238,9 +248,9 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <h1 className="truncate font-display text-xl font-bold tracking-tight text-foreground">
+                    <h2 className="tm-display truncate text-2xl text-foreground">
                       {user.name}
-                    </h1>
+                    </h2>
                     {nameSaved ? (
                       <Check className="shrink-0 text-go" size={14} />
                     ) : (
@@ -271,10 +281,10 @@ export default function ProfilePage() {
           </div>
 
           {/* ---- Saved surveys ---- */}
-          <div className="glass p-6">
+          <div className="border border-line bg-surface-2/40 p-6">
             <div className="mb-3 flex items-center gap-2">
               <Bookmark className="text-accent-bright" size={16} />
-              <h2 className="text-sm font-semibold text-foreground">
+              <h2 className="tm-label text-foreground/70">
                 Saved surveys
               </h2>
               <span className="num ml-auto text-[11px] text-muted">

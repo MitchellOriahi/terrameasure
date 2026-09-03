@@ -264,30 +264,28 @@ export default function GroundTruthPage() {
       </header>
 
       <main className="panel-scroll flex-1 overflow-y-auto p-6 pb-safe">
-        <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-          {/* ---- The pitch (everyone sees this) ---- */}
-          <div className="glass p-6">
+        <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
+          {/* ---- Title block ---- */}
+          <header className="border-b border-line pb-6 pt-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-deep">
-                <Crosshair className="text-accent-bright" size={20} />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold text-foreground">
-                  Ground Truth
-                </h1>
-                <p className="text-xs text-muted">The accuracy feedback loop</p>
-              </div>
+              <span className="h-px w-6 bg-accent/60" />
+              <span className="tm-label text-accent-bright">
+                Field log / accuracy loop
+              </span>
             </div>
-            <p className="mt-4 text-sm leading-relaxed text-muted">
+            <h1 className="tm-display mt-4 text-[2rem] text-foreground sm:text-[2.6rem]">
+              Ground truth
+            </h1>
+            <p className="mt-4 max-w-lg text-[13.5px] leading-relaxed text-muted">
               Walked a site we pre-screened? Log what you actually measured on
               the ground. TerraMeasure compares it to its prediction and learns
               where the public data runs hot or cold, region by region.
             </p>
-          </div>
+          </header>
 
           {/* ---- Anonymous: soft sign-in card, no redirect ---- */}
           {status === "anonymous" && (
-            <div className="glass p-6 text-center">
+            <div className="border border-line bg-surface-2/40 p-6 text-center">
               <p className="text-sm leading-relaxed text-muted">
                 Logging field measurements is tied to your account, so your
                 entries stay yours and build your own accuracy history.
@@ -316,7 +314,7 @@ export default function GroundTruthPage() {
 
           {/* ---- Signed in: thank-you state OR the form ---- */}
           {status === "signed-in" && user && submitted && (
-            <div className="glass p-6 text-center">
+            <div className="border border-line bg-surface-2/40 p-6 text-center">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-deep">
                 <Sparkles className="text-accent-bright" size={22} />
               </div>
@@ -339,7 +337,7 @@ export default function GroundTruthPage() {
             <form className="glass flex flex-col gap-4 p-6" onSubmit={handleSubmit}>
               <div className="flex items-center gap-2">
                 <NotebookPen className="text-accent-bright" size={16} />
-                <h2 className="text-sm font-semibold text-foreground">
+                <h2 className="tm-label text-foreground/70">
                   Log a site visit
                 </h2>
               </div>
@@ -518,7 +516,7 @@ export default function GroundTruthPage() {
 
           {/* ---- Past entries (signed in only), newest first ---- */}
           {status === "signed-in" && user && (
-            <div className="glass p-6">
+            <div className="border border-line bg-surface-2/40 p-6">
               <h2 className="mb-3 text-sm font-semibold text-foreground">
                 Your ground truth log
               </h2>

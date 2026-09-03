@@ -146,7 +146,7 @@ function SectionCard({
 }) {
   return (
     <section className="rounded-xl border border-line bg-surface-2/40 px-4 py-3">
-      <h2 className="mb-2 font-display text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
+      <h2 className="tm-label mb-3 text-foreground/60">
         {title}
       </h2>
       {children}
@@ -194,7 +194,7 @@ function IdentityHeader({
     <header className="rounded-xl border border-line bg-surface-2/40 px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display text-xl font-bold leading-tight tracking-tight text-foreground">
+          <h1 className="tm-display text-[1.6rem] leading-none text-foreground sm:text-[1.9rem]">
             {title}
           </h1>
           {/* Where on earth this is. County and state is how land is

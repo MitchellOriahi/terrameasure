@@ -432,6 +432,24 @@ rule. That is not decoration: at a glance while scrolling, a numbered
 label tells you where you are in a document, which a row of identical
 small-caps headings does not.
 
+## 10e. The visual language
+
+One set of pieces, used on every screen, so the front door and the app
+behind it read as the same product.
+
+| Piece | What it is | Where it lives |
+| --- | --- | --- |
+| `.tm-display` | Stencil lettering: heavy, uppercase, tight. Headings, verdicts, anything stamped rather than typed. | `src/index.css` |
+| `.tm-label` | The small mono capital that names a thing without shouting. | `src/index.css` |
+| `.tm-marks` | Registration marks: two corner brackets framing a visual, the way a drawing frames a detail view. | `src/index.css` |
+| `.tm-stripes` | Hazard stripes from site tape and plant livery. Used once per page at most. | `src/index.css` |
+| `PageShell` / `PageHeader` / `Section` / `EmptyNote` | The furniture every non-map screen is built from: a title block, hairline sections, bordered empty states. | `src/components/ui/pageChrome.tsx` |
+
+Two rules worth keeping. The `glass` treatment is for panels FLOATING
+OVER THE MAP; on a plain document page it turns the content into a stack
+of unrelated boxes, so those pages use hairline rules instead. And the
+accent is spent in one place per screen, never sprinkled.
+
 ## 11. Rules the codebase holds itself to
 
 1. **Never return a bare number.** Every measurement carries its error.
