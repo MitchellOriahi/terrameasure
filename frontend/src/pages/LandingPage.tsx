@@ -89,14 +89,14 @@ function SectionLabel({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-baseline gap-3">
       {index && (
-        <span className="num text-xs font-semibold tabular-nums text-accent-bright">
+        <span className="lp-display text-3xl tabular-nums text-accent sm:text-4xl">
           {index}
         </span>
       )}
-      <span className="h-px w-10 bg-accent/50" />
-      <span className="font-display text-xs font-medium uppercase tracking-[0.18em] text-accent-bright">
+      <span className="mb-1 h-px flex-1 max-w-[3rem] bg-accent/40" />
+      <span className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-accent-bright sm:text-xs">
         {children}
       </span>
     </div>
@@ -136,24 +136,23 @@ function SpecRow({
 /** One card in the "what you get" grid. */
 function FeatureCard({
   icon: Icon,
+  index,
   title,
   body,
 }: {
   icon: typeof Gauge;
+  index: string;
   title: string;
   body: string;
 }) {
   return (
-    <div className="lp-reveal group flex gap-3 border-t border-line pt-4 transition-colors hover:border-accent/40">
-      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-deep text-accent-bright transition-colors group-hover:bg-accent/20">
-        <Icon size={16} />
-      </span>
-      <div>
-        <h3 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
-          {title}
-        </h3>
-        <p className="mt-1.5 text-[13.5px] leading-[1.6] text-muted">{body}</p>
+    <div className="lp-reveal group border-t-2 border-dashed border-[#111]/15 pt-4">
+      <div className="flex items-center gap-2.5">
+        <span className="lp-display text-2xl text-[#0d7a44]">{index}</span>
+        <Icon size={15} className="text-[#0d7a44]" />
       </div>
+      <h3 className="lp-display mt-3 text-[15px] text-[#111]">{title}</h3>
+      <p className="mt-2 text-[13.5px] leading-[1.6] text-[#111]/65">{body}</p>
     </div>
   );
 }
@@ -240,6 +239,46 @@ export default function LandingPage() {
       <style>{`
         .lp-reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; }
         .lp-reveal.lp-in { opacity: 1; transform: none; }
+
+        /* Hazard stripes. Borrowed from equipment livery and site
+           tape, which is the world this product lives in: survey
+           markers, grade stakes, plant hire. One motif, used sparingly,
+           does more for identity than another gradient. */
+        .lp-stripes {
+          background-image: repeating-linear-gradient(
+            -55deg,
+            var(--accent) 0px,
+            var(--accent) 14px,
+            transparent 14px,
+            transparent 34px
+          );
+        }
+
+        /* Registration marks: four corner brackets around a visual, the
+           way a drawing frames a detail view. They tell the eye "this is
+           the specimen" without a heavy border. */
+        .lp-marks { position: relative; }
+        .lp-marks::before,
+        .lp-marks::after {
+          content: "";
+          position: absolute;
+          width: 18px; height: 18px;
+          border-color: var(--accent);
+          pointer-events: none;
+        }
+        .lp-marks::before { top: -6px; left: -6px; border-top: 2px solid; border-left: 2px solid; }
+        .lp-marks::after { bottom: -6px; right: -6px; border-bottom: 2px solid; border-right: 2px solid; }
+
+        /* The display setting for headlines: heavy, uppercase, tight.
+           Space Grotesk at this weight and tracking reads like stencil
+           lettering on equipment rather than a website headline. */
+        .lp-display {
+          font-family: var(--font-display);
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: -0.02em;
+          line-height: 0.98;
+        }
         /* Contour backdrop: repeating hairlines bent by a skew, which
            reads as a topographic sheet without loading an image. */
         .lp-topo {
@@ -303,27 +342,47 @@ export default function LandingPage() {
          ============================================================ */}
       <section className="relative overflow-hidden border-b border-line">
         <div className="lp-topo pointer-events-none absolute inset-0" aria-hidden />
-        <div className="relative mx-auto grid max-w-6xl gap-10 px-6 pb-16 pt-12 lg:grid-cols-[1fr_1.05fr] lg:items-center lg:gap-16 lg:pb-24 lg:pt-24">
-          {/* ---- Left: the promise ---- */}
+        {/* Hazard stripes across the top right, cropped by the section.
+            Sparing on purpose: one flash of the motif, not wallpaper. */}
+        <div
+          className="lp-stripes pointer-events-none absolute -right-24 -top-24 h-64 w-[28rem] rotate-6 opacity-[0.07]"
+          aria-hidden
+        />
+        {/* The price, in the corner, the way a product page states one.
+            It is the most persuasive number here: everything else on the
+            page argues that the answer is good, and this says it costs
+            nothing to find out. Hidden on phones, where the hero has no
+            room to spare. */}
+        <div className="pointer-events-none absolute right-6 top-8 hidden text-right lg:block">
+          <div className="lp-display text-5xl text-accent">$0</div>
+          <div className="font-display text-[10px] uppercase tracking-[0.2em] text-muted">
+            per survey
+          </div>
+        </div>
+
+        <div className="relative mx-auto grid max-w-6xl gap-10 px-6 pb-14 pt-10 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-14 lg:pb-20 lg:pt-16">
+          {/* ---- Left: the claim ---- */}
           <div>
-            <SectionLabel>Site pre-screen, United States</SectionLabel>
-            {/* No manual line break. A hard <br> at this size stranded
-                the word "is" on a line of its own at 1440px wide; a max
-                width lets the browser break it sensibly at every size. */}
-            <h1 className="mt-6 max-w-[15ch] font-display text-[2.4rem] font-bold leading-[1.02] tracking-[-0.03em] text-foreground sm:text-[3.5rem]">
-              Know whether the land is worth the drive.
+            <span className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-accent-bright">
+              Site pre-screen / United States
+            </span>
+
+            <h1 className="lp-display mt-5 text-[2.7rem] text-foreground sm:text-[4.1rem]">
+              Know whether the land is{" "}
+              <span className="text-accent">worth the drive.</span>
             </h1>
-            <p className="mt-6 max-w-lg text-[15px] leading-[1.7] text-muted sm:text-[17px]">
+
+            <p className="mt-6 max-w-lg text-[15px] leading-[1.7] text-muted sm:text-base">
               Draw any boundary in the country. TerraMeasure reads federal
               elevation, wetland and flood data and answers the question
               that comes first: build here, or keep looking. Every number
               carries its error bound.
             </p>
 
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 to="/map"
-                className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-7 font-display text-sm font-semibold text-black transition-colors hover:bg-accent-bright"
+                className="group inline-flex items-center justify-center gap-2 bg-accent px-8 py-4 font-display text-sm font-bold uppercase tracking-wider text-black transition-colors hover:bg-accent-bright"
               >
                 Open the map
                 <ArrowRight
@@ -333,66 +392,66 @@ export default function LandingPage() {
               </Link>
               <a
                 href="#how-it-works"
-                className="inline-flex h-12 items-center justify-center rounded-xl border border-line bg-surface/70 px-7 font-display text-sm font-medium text-foreground transition-colors hover:bg-surface-2"
+                className="inline-flex items-center justify-center border border-line bg-transparent px-8 py-4 font-display text-sm font-bold uppercase tracking-wider text-foreground transition-colors hover:border-accent/60 hover:text-accent-bright"
               >
                 See what comes back
               </a>
             </div>
 
+            {/* ---- Spec chips ----
+                 The way a product states its numbers on the pack. Four
+                 facts, each one a thing a buyer actually weighs: how
+                 accurate, from how many sources, how fast, what it costs. */}
+            <dl className="mt-10 grid max-w-lg grid-cols-4 gap-px overflow-hidden border border-line bg-line">
+              {[
+                ["0.2 m", "lidar accuracy"],
+                ["3", "federal sources"],
+                ["60 s", "to an answer"],
+                ["None", "sign-up needed"],
+              ].map(([v, k]) => (
+                <div key={k} className="bg-background px-2 py-3 text-center">
+                  <dt className="num text-lg font-semibold text-foreground sm:text-xl">
+                    {v}
+                  </dt>
+                  <dd className="mt-1 font-display text-[9px] uppercase leading-tight tracking-[0.12em] text-muted">
+                    {k}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
-          {/* ---- Right: the live tool ---- */}
+          {/* ---- Right: the live tool, framed like a detail view ---- */}
           <div className="lp-reveal lp-in">
             <div className="mb-3 flex items-baseline justify-between gap-3">
-              <span className="font-display text-[11px] font-medium uppercase tracking-[0.16em] text-foreground/70">
+              <span className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/70">
                 Live, right here
               </span>
               <span className="text-[11px] text-muted">
                 real satellite imagery
               </span>
             </div>
-            <DemoMeasureMap />
+            <div className="lp-marks">
+              <DemoMeasureMap />
+            </div>
           </div>
 
-          {/* The spec line: what it costs, what it runs on, how long it
-              takes. Full width under the hero so that on a phone the
-              live demo comes straight after the buttons, and on desktop
-              it reads as a footer to the whole section. */}
-          <dl className="num grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-line bg-line text-center lg:col-span-2">
-            {[
-              ["$0", "to run a survey"],
-              ["3", "federal datasets"],
-              ["60s", "typical answer"],
-            ].map(([v, k]) => (
-              <div key={k} className="bg-background px-2 py-3">
-                <dt className="text-2xl font-semibold tracking-tight text-foreground">
-                  {v}
-                </dt>
-                <dd className="mt-1 font-display text-[10px] uppercase tracking-[0.14em] text-muted">
-                  {k}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
-          {/* Where the answers come from. A visitor's first silent
-              question about a free tool is "based on what?", and naming
-              the actual federal datasets answers it faster than any
-              paragraph of copy. These are the real sources, which is why
-              we can print them. */}
-          <div className="lg:col-span-2">
-            <p className="font-display text-[10px] uppercase tracking-[0.18em] text-muted">
+          {/* Where the answers come from. The first silent question about
+              a free tool is "based on what?", and naming the actual
+              federal datasets answers it faster than any paragraph. */}
+          <div className="border-t border-line pt-5 lg:col-span-2">
+            <p className="font-display text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
               Reading, live
             </p>
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-foreground/70">
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 font-display text-[12px] uppercase tracking-wider text-foreground/60">
               <span>USGS 3DEP lidar</span>
-              <span className="text-line">/</span>
-              <span>FEMA National Flood Hazard Layer</span>
-              <span className="text-line">/</span>
-              <span>USFWS National Wetlands Inventory</span>
-              <span className="text-line">/</span>
+              <span className="text-accent/50">/</span>
+              <span>FEMA flood hazard layer</span>
+              <span className="text-accent/50">/</span>
+              <span>USFWS wetlands inventory</span>
+              <span className="text-accent/50">/</span>
               <span>USGS hydrography</span>
-              <span className="text-line">/</span>
+              <span className="text-accent/50">/</span>
               <span>county parcel records</span>
             </div>
           </div>
@@ -412,7 +471,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
           <div className="lp-reveal max-w-2xl">
             <SectionLabel index="01">The actual screen</SectionLabel>
-            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
+            <h2 className="lp-display mt-6 max-w-[18ch] text-[1.9rem] sm:text-[2.6rem]">
               Draw a boundary. Get an answer with its receipts.
             </h2>
             <p className="mt-5 max-w-xl text-[15px] leading-[1.7] text-muted">
@@ -442,7 +501,7 @@ export default function LandingPage() {
 
           <div className="mt-14 grid gap-10 lg:grid-cols-[1fr_auto] lg:items-center">
             <div className="lp-reveal">
-              <h3 className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              <h3 className="lp-display text-xl text-foreground sm:text-2xl">
                 Send it to anyone. Nothing to install, no login on their
                 end.
               </h3>
@@ -487,7 +546,7 @@ export default function LandingPage() {
           </div>
           <div className="lp-reveal order-1 lg:order-2">
             <SectionLabel index="02">What the engine actually sees</SectionLabel>
-            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
+            <h2 className="lp-display mt-6 max-w-[18ch] text-[1.9rem] sm:text-[2.6rem]">
               A photo shows you trees. This shows you the ground.
             </h2>
             <p className="mt-5 text-[15px] leading-[1.7] text-muted">
@@ -522,7 +581,7 @@ export default function LandingPage() {
         <div className="mx-auto grid max-w-6xl gap-10 px-6 py-14 lg:grid-cols-2 lg:py-20">
           <div className="lp-reveal">
             <SectionLabel index="03">What comes back</SectionLabel>
-            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
+            <h2 className="lp-display mt-6 max-w-[18ch] text-[1.9rem] sm:text-[2.6rem]">
               One verdict, and the receipts behind it.
             </h2>
             <p className="mt-5 text-[15px] leading-[1.7] text-muted">
@@ -597,13 +656,72 @@ export default function LandingPage() {
       </section>
 
       {/* ============================================================
+          POSITIONING: the choice a visitor is actually making
+          ------------------------------------------------------------
+          Every other product in this space sells a stack of toggleable
+          layers and leaves the interpreting to you. Naming that
+          difference plainly is more persuasive than another feature
+          list, and it is a claim we can back: the verdict, the dollar
+          figure and the error bounds are all things a layer viewer
+          structurally cannot produce.
+         ============================================================ */}
+      <section className="border-b border-line">
+        <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
+          <div className="lp-reveal max-w-2xl">
+            <SectionLabel index="04">The difference</SectionLabel>
+            <h2 className="lp-display mt-6 max-w-[18ch] text-[1.9rem] sm:text-[2.6rem]">
+              Ten map layers is not an answer.
+            </h2>
+            <p className="mt-5 max-w-xl text-[15px] leading-[1.7] text-muted">
+              Parcel viewers hand you elevation, soil, flood and wetland
+              layers and let you work it out. That is fine if you already
+              know how to read them, and useless at eight in the evening
+              with twenty listings open.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-px overflow-hidden border border-line bg-line sm:grid-cols-3">
+            {[
+              [
+                "One verdict",
+                "Every layer folded into a single word and a single sentence naming the biggest constraint, plus the score behind it. Not a stack of maps to interpret.",
+              ],
+              [
+                "A dollar figure",
+                "What it costs to grade a building pad, in dollars and cubic yards. No layer viewer computes this, because it needs the elevation maths, not just a picture of it.",
+              ],
+              [
+                "Error bounds on everything",
+                "Every number carries how wrong it could be, and names the dataset and vintage it came from. That is what makes it usable by somebody whose licence is on the line.",
+              ],
+            ].map(([title, body]) => (
+              <div key={title} className="bg-background p-6">
+                <h3 className="lp-display text-base text-accent-bright">
+                  {title}
+                </h3>
+                <p className="mt-3 text-[13.5px] leading-[1.6] text-muted">
+                  {body}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <p className="lp-reveal mt-6 max-w-2xl text-[13px] leading-relaxed text-muted">
+            And the part that matters most: the verdict, the numbers, the
+            cost range and the shareable report are the free product, not a
+            trial of it.
+          </p>
+        </div>
+      </section>
+
+      {/* ============================================================
           HOW IT WORKS
          ============================================================ */}
       <section id="how-it-works" className="border-b border-line">
         <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
           <div className="lp-reveal max-w-xl">
-            <SectionLabel index="04">How it works</SectionLabel>
-            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
+            <SectionLabel index="05">How it works</SectionLabel>
+            <h2 className="lp-display mt-6 max-w-[18ch] text-[1.9rem] sm:text-[2.6rem]">
               Three steps, about a minute, no equipment.
             </h2>
           </div>
@@ -642,42 +760,61 @@ export default function LandingPage() {
       {/* ============================================================
           FEATURES
          ============================================================ */}
-      <section className="border-b border-line">
-        <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
+      {/* ---- The one panel of daylight ----
+           A page that is dark from top to bottom goes flat. One inverted
+           section resets the eye and makes the dark read as a choice
+           rather than a default. This is the list of what you actually
+           get, so it is the section worth the emphasis. */}
+      <section className="border-b border-line bg-[#f4f4f0] text-[#111]">
+        <div className="mx-auto max-w-6xl px-6 py-16 lg:py-24">
           <div className="lp-reveal max-w-xl">
-            <SectionLabel index="05">In the box</SectionLabel>
-            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
+            <div className="flex items-baseline gap-3">
+              <span className="lp-display text-3xl text-[#0d7a44] sm:text-4xl">
+                06
+              </span>
+              <span className="mb-1 h-px max-w-[3rem] flex-1 bg-[#0d7a44]/40" />
+              <span className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-[#0d7a44] sm:text-xs">
+                In the box
+              </span>
+            </div>
+            <h2 className="lp-display mt-6 max-w-[18ch] text-[1.9rem] text-[#111] sm:text-[2.6rem]">
               Built for the decision, not the demo.
             </h2>
           </div>
-          <div className="mt-10 grid gap-x-10 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-12 grid gap-x-12 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
             <FeatureCard
               icon={Gauge}
+              index="01"
               title="Verdict and score"
               body="GO, PROCEED WITH CONDITIONS, or NOT RECOMMENDED, with every point of the score explained in plain language. No black box."
             />
             <FeatureCard
               icon={MapIcon}
+              index="02"
               title="Real parcel records"
               body="Official boundaries, acreage and ownership in five pilot counties today (Maricopa AZ, Travis TX, King WA, Mecklenburg NC, Miami-Dade FL). Everywhere else, draw the outline and get the full analysis."
             />
             <FeatureCard
               icon={Waves}
+              index="03"
               title="Water, wetland and flood"
               body="National Wetlands Inventory, USGS hydrography and FEMA flood zones, drawn on the map and folded into the verdict. A lake can no longer score as flat, buildable ground."
             />
             <FeatureCard
               icon={Banknote}
+              index="04"
               title="Earthwork in dollars"
               body="Cut and fill turned into a cost range for grading a building pad, priced the way earthwork is actually bid: cubic yards, balanced volume moved once."
             />
             <FeatureCard
               icon={Share2}
+              index="05"
               title="Reports you can send"
               body="A public link with the site name, county, outline, verdict and every number. Add your own notes, and edit them later. Readers need no account."
             />
             <FeatureCard
               icon={Smartphone}
+              index="06"
               title="Made for the truck"
               body="One-thumb controls, a crosshair drawing mode built for fingers, offline-friendly saves, and installable as an app on iPhone and Android."
             />
@@ -691,8 +828,8 @@ export default function LandingPage() {
       <section className="border-b border-line bg-surface/40">
         <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
           <div className="lp-reveal max-w-xl">
-            <SectionLabel index="06">What this is not</SectionLabel>
-            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
+            <SectionLabel index="07">What this is not</SectionLabel>
+            <h2 className="lp-display mt-6 max-w-[18ch] text-[1.9rem] sm:text-[2.6rem]">
               We would rather lose the sale than overstate the number.
             </h2>
           </div>
@@ -733,8 +870,8 @@ export default function LandingPage() {
       <section id="faq" className="border-b border-line">
         <div className="mx-auto max-w-3xl px-6 py-14 lg:py-20">
           <div className="lp-reveal">
-            <SectionLabel index="07">Questions</SectionLabel>
-            <h2 className="mt-6 font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.02em] sm:text-4xl">
+            <SectionLabel index="08">Questions</SectionLabel>
+            <h2 className="lp-display mt-6 max-w-[18ch] text-[1.9rem] sm:text-[2.6rem]">
               The things people ask first.
             </h2>
           </div>
@@ -783,7 +920,7 @@ export default function LandingPage() {
          ============================================================ */}
       <section className="mx-auto max-w-3xl px-6 py-16 text-center lg:py-24">
         <div className="lp-reveal">
-          <h2 className="font-display text-[1.9rem] font-bold leading-[1.08] tracking-[-0.02em] sm:text-[2.75rem]">
+          <h2 className="lp-display text-[2.1rem] sm:text-[3rem]">
             Check a site before you spend a Saturday on it.
           </h2>
           <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-muted">

@@ -164,7 +164,7 @@ async function desktopPass(browser) {
   // ---------- 1. Landing page ----------
   await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
   await sleep(2500);
-  const heroOk = await bodyHasText(page, /Know whether the land is/);
+  const heroOk = await bodyHasText(page, /Know whether the land is/i);
   await shot(page, "d01-landing-top");
   await shot(page, "d01-landing-full", true);
   check("1a", "landing hero renders", heroOk);
@@ -571,7 +571,7 @@ async function desktopPass(browser) {
   const backMapOk = page.url().endsWith("/map") && (await canvasOk(page)).ok;
   await page.goBack(); // -> /
   await sleep(2000);
-  const backLandOk = await bodyHasText(page, /Know whether the land is/);
+  const backLandOk = await bodyHasText(page, /Know whether the land is/i);
   await page.goForward(); // -> /map
   await sleep(3500);
   const fwdMapOk = page.url().endsWith("/map") && (await canvasOk(page)).ok;
