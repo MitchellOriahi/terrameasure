@@ -424,8 +424,13 @@ def create_report(req: CreateReportRequest, request: Request):
 
     try:
         created_at = _store.save(slug, req.title, snapshot)
-    except Exception as e:
+        # A success clears the last failure. Without this the health
+        # endpoint keeps reporting an outage that ended hours ago, which
+        # is worse than reporting nothing: it sends whoever is checking
+        # off to debug a problem that has already fixed itself.
         global _last_store_error
+        _last_store_error = None
+    except Exception as e:
         _last_store_error = f"{type(e).__name__}: {e}"
         log.error("Reports: save failed: %s", e)
         raise HTTPException(
